@@ -21,15 +21,15 @@ Choose the tool based on the file extension. Do not improvise.
 | `.md` / `.txt` / `.tex` | Read tool directly | Edit mode |
 | `.docx` | detect: `textutil` (macOS) or `soffice` (Linux) | Report only |
 
-**For `.docx` — detect the available converter before proceeding:**
+**For `.docx`, detect the available converter before proceeding:**
 
 1. `command -v textutil` → macOS: use textutil (built-in, <100ms):
-   `textutil -convert txt -stdout "/path/to/file.docx"` — output goes to stdout, no temp file needed.
+   `textutil -convert txt -stdout "/path/to/file.docx"`, output goes to stdout, no temp file needed.
 2. `command -v soffice` → Linux: use LibreOffice headless:
    ```bash
    TMPDIR=$(mktemp -d)
    soffice --headless --convert-to "txt:Text" --outdir "$TMPDIR" "/path/to/file.docx"
-   # Output: $TMPDIR/<filename-stem>.txt — read with Read tool, then rm -rf "$TMPDIR"
+   # Output: $TMPDIR/<filename-stem>.txt, read with Read tool, then rm -rf "$TMPDIR"
    ```
 3. Neither found: stop. Report: "No `.docx` converter available. Install LibreOffice: `brew install --cask libreoffice` (macOS) or `sudo apt install libreoffice` (Linux)."
 
@@ -43,9 +43,9 @@ Do not use `python-docx`, `pandoc`, or any other tool.
 
 ## Scope
 
-`$ARGUMENTS` — file path to the manuscript.
+`$ARGUMENTS`, file path to the manuscript.
 
-**Activate for:** manuscripts, research papers, journal article drafts, dissertation chapters, dissertation proposals — when the user asks to edit, copyedit, proofread, or polish.
+**Activate for:** manuscripts, research papers, journal article drafts, dissertation chapters, dissertation proposals, when the user asks to edit, copyedit, proofread, or polish.
 
 **Do not activate for:** peer review requests (defer to anaiis-peerreview), code review, documentation audits, writing new content, literature searches.
 
@@ -141,7 +141,7 @@ In report mode: collect all findings categorized by type.
 
 A dedicated cross-document sweep. These checks require full-manuscript context and must follow Pass 1.
 
-- **Terminological consistency:** Identify every key construct. Flag instances where the same concept is referred to by more than one term — unless variation is deliberate (e.g., paraphrasing). Query rather than standardize silently.
+- **Terminological consistency:** Identify every key construct. Flag instances where the same concept is referred to by more than one term, unless variation is deliberate (e.g., paraphrasing). Query rather than standardize silently.
 - **Abbreviation consistency:** Every abbreviation must be defined on first use in the running text and used consistently thereafter. Re-check figures and table captions (which may require re-introduction per APA).
 - **Capitalization consistency:** Record decisions on style sheet. Flag inconsistent application.
 - **Number formatting:** APA rules (see Style guide section). Fix violations silently.

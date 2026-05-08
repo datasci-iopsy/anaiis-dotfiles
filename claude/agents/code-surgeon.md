@@ -21,7 +21,7 @@ Context validation (run before any edit):
   caller identified in step 2. A caller is "already addressed" only if it meets one of:
   (1) modified within the same patch or session that introduces the signature change,
   (2) explicitly listed in the PR/prompt as an already-updated caller, or
-  (3) static checks (Read, Grep, Glob only — no Bash, no compilation) confirm the callers
+  (3) static checks (Read, Grep, Glob only, no Bash, no compilation) confirm the callers
       identified in step 2 are already compatible with the new signature. Callers satisfy
       condition (3) when ALL of the following hold: the exported symbol name at every call
       site still matches the new name; argument arity at the call site matches the new

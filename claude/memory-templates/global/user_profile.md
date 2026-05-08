@@ -4,7 +4,7 @@ description: Who the user is and how they prefer to collaborate
 type: user
 ---
 
-(Replace this with concrete, current facts. Examples below — not assertions.)
+(Replace this with concrete, current facts. Examples below, not assertions.)
 
 - Role: data scientist / I-O Psychology research
 - Languages: R, Python, SQL

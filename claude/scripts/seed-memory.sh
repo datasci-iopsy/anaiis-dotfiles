@@ -28,7 +28,7 @@ if [ -d "$GLOBAL_TEMPLATES" ]; then
 			echo "  seeded  global/$filename"
 		done
 	else
-		# Top up missing files only — never overwrite existing global content.
+		# Top up missing files only, never overwrite existing global content.
 		for template in "$GLOBAL_TEMPLATES"/*.md; do
 			[ -f "$template" ] || continue
 			filename="$(basename "$template")"

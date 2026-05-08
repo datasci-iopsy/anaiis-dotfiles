@@ -48,7 +48,7 @@ session_id=$(echo "$input" | "$JQ" -r '.session_id // empty')
 # Detect "fix all" batch: CodeRabbit's batch button produces a prompt
 # with multiple findings, each preceded by a "Verify each finding against"
 # line. A single paste has exactly one such line; a batch has two or more.
-# Count occurrences — two or more means it is a batch.
+# Count occurrences, two or more means it is a batch.
 # ------------------------------------------------------------------
 verify_count=$(echo "$prompt" | grep -c 'Verify each finding against' 2>/dev/null || true)
 if [[ "$verify_count" -ge 2 ]]; then

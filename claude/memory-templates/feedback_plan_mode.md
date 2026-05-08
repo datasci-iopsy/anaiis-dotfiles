@@ -1,6 +1,6 @@
 ---
 name: Plan Mode Usage
-description: When to use plan mode vs execute immediately — user has interrupted both ways
+description: When to use plan mode vs execute immediately, user has interrupted both ways
 type: feedback
 ---
 

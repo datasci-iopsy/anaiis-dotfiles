@@ -6,8 +6,8 @@
 # (always exits 0). Cadence controlled by stamp files to avoid nagging.
 #
 # Checks:
-#   Plans   — weekly:  notify if >10 files or any older than 14 days
-#   Sessions — monthly: notify if ~/.claude/projects exceeds 50 MB
+#   Plans  , weekly:  notify if >10 files or any older than 14 days
+#   Sessions, monthly: notify if ~/.claude/projects exceeds 50 MB
 
 set -euo pipefail
 

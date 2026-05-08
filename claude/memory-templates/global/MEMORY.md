@@ -8,10 +8,10 @@ What belongs here:
 - Pointers to external systems usable from any project (`reference_*.md`)
 
 What does NOT belong here:
-- Anything specific to a single repo or codebase — that goes in `~/.claude/projects/<project-key>/memory/`
+- Anything specific to a single repo or codebase, that goes in `~/.claude/projects/<project-key>/memory/`
 - Secrets, tokens, API keys (memory is not a secret store)
 - Session handoffs (those live in the per-project `handoffs/` subdirectory)
 
 Add an entry below for each topical file. Keep the index under 60 lines.
 
-- [User profile](user_profile.md) — who the user is and how they work
+- [User profile](user_profile.md), who the user is and how they work

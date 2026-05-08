@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # ~/.claude/scripts/statusline-command.sh
 #
-# Claude Code rich status line — pure bash + jq, zero extra deps.
+# Claude Code rich status line, pure bash + jq, zero extra deps.
 # Receives Claude session JSON on stdin; prints up to 3 colored lines.
 # Designed for dark-mode terminals. Compatible with macOS and Linux (Ubuntu/RHEL).
 #
-# Line 1 — identity:   model · effort · [vim] · ⎇ branch +staged ~modified
-# Line 2 — session:    ctx% · tok:in+out · cache · $session
-# Line 3 — billing:    5h:[bar]% reset · 7d% · repo:$X · all:$X
+# Line 1, identity:   model · effort · [vim] · ⎇ branch +staged ~modified
+# Line 2, session:    ctx% · tok:in+out · cache · $session
+# Line 3, billing:    5h:[bar]% reset · 7d% · repo:$X · all:$X
 #
 # Costs beyond the live session are read from ~/.claude/projects/<slug>/*.jsonl
 # and cached for 5 minutes to avoid re-scanning on every refresh.
@@ -34,7 +34,7 @@ else
 	CENT="c"
 fi
 
-# ─── ANSI — bright palette for dark-mode terminals ───────────────────────────
+# ─── ANSI, bright palette for dark-mode terminals ───────────────────────────
 rs=$'\033[0m'
 dim=$'\033[2m'
 bd=$'\033[1m'
@@ -352,7 +352,7 @@ if [ -n "$all_str" ]; then
 	line3+=("$(printf "${b_mag}${dim}all:%s${rs}" "$all_str")")
 fi
 
-# ─── Render — each non-empty line wrapped in dim brackets ────────────────────
+# ─── Render, each non-empty line wrapped in dim brackets ────────────────────
 render_line() {
 	local -n _segs=$1
 	[ "${#_segs[@]}" -eq 0 ] && return

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# cost-guard.sh — PreToolUse cost transparency hook
+# cost-guard.sh, PreToolUse cost transparency hook
 #
 # Shows estimated token cost before expensive operations.
 # Soft-gates general-purpose agent spawns (Claude pauses for user confirmation).
@@ -33,7 +33,7 @@ case "$TOOL" in
 
 		case "$SUBTYPE" in
 			Explore | Plan | claude-code-guide)
-				# Bounded research agents — inform but don't gate
+				# Bounded research agents, inform but don't gate
 				if [ "$CHARS" -gt 3000 ]; then
 					RANGE="10k-30k tokens"
 				elif [ "$CHARS" -gt 1000 ]; then
@@ -41,16 +41,16 @@ case "$TOOL" in
 				else
 					RANGE="2k-8k tokens"
 				fi
-				echo "[cost] $SUBTYPE agent (~$RANGE) — $DESC" >&2
+				echo "[cost] $SUBTYPE agent (~$RANGE), $DESC" >&2
 				exit 0
 				;;
 			*)
-				# CodeRabbit surgeon spawns: bounded, Sonnet, surgical edits only — pass through
+				# CodeRabbit surgeon spawns: bounded, Sonnet, surgical edits only, pass through
 				if echo "$DESC" | grep -qE '^Fix CR-[0-9]+'; then
-					echo "[cost] code-surgeon (~2k-8k tokens, Sonnet) — $DESC" >&2
+					echo "[cost] code-surgeon (~2k-8k tokens, Sonnet), $DESC" >&2
 					exit 0
 				fi
-				# General-purpose agents are unbounded — gate these
+				# General-purpose agents are unbounded, gate these
 				if [ "$CHARS" -gt 3000 ]; then
 					TIER="VERY HIGH"
 					RANGE="50k-150k tokens"
@@ -61,7 +61,7 @@ case "$TOOL" in
 					TIER="MEDIUM"
 					RANGE="5k-25k tokens"
 				fi
-				echo "[COST GATE] General-purpose agent — estimated $TIER ($RANGE)" >&2
+				echo "[COST GATE] General-purpose agent, estimated $TIER ($RANGE)" >&2
 				echo "Task: $DESC" >&2
 				echo "Pause and confirm with the user before proceeding." >&2
 				exit 1
@@ -71,7 +71,7 @@ case "$TOOL" in
 
 	WebFetch)
 		URL=$(jq -r '.tool_input.url // ""' 2>/dev/null <<<"$INPUT")
-		echo "[cost] WebFetch (~1k-8k tokens) — $URL" >&2
+		echo "[cost] WebFetch (~1k-8k tokens), $URL" >&2
 		exit 0
 		;;
 

@@ -1,6 +1,6 @@
 ---
 name: Global Claude Config
-description: Global settings.json and CLAUDE.md scope — set up via dotfiles
+description: Global settings.json and CLAUDE.md scope, set up via dotfiles
 type: reference
 ---
 

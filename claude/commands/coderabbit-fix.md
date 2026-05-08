@@ -2,7 +2,7 @@ Auto-triggers on CodeRabbit inline review pastes ("Verify each finding against",
 
 ## Arguments
 
-$ARGUMENTS — optional flags:
+$ARGUMENTS, optional flags:
 - `--review`: spawn the `code-reviewer` agent on staged changes before committing (quality gate, costs extra tokens)
 
 ## Pipeline
@@ -14,14 +14,14 @@ Run all steps inline. Do not spawn agents unless `--review` is passed.
 Check whether `~/.claude/coderabbit-staged-batch.md` exists and contains non-comment content (lines not starting with `#`).
 
 If a staged batch exists:
-- Read the file — it contains raw CodeRabbit findings in the "fix all" format, one finding per "In @file around lines X" block
+- Read the file, it contains raw CodeRabbit findings in the "fix all" format, one finding per "In @file around lines X" block
 - For each finding, apply the **full triage rubric**:
   1. Read the affected file around the reported lines to understand local context
   2. Grep for the affected symbol across the codebase to find callers and related files
   3. Rate 1-5:
-     - 1-2: false positive or nitpick — dismiss with one-line rationale, no edit
-     - 3: judgment call — append to `~/.claude/coderabbit-deferred.md`, report "Deferred: <summary>"
-     - 4-5: real defect — spawn the `code-surgeon` agent (`subagent_type: "general-purpose"`, description `"Fix CR-<N>: <summary>"`)
+     - 1-2: false positive or nitpick, dismiss with one-line rationale, no edit
+     - 3: judgment call, append to `~/.claude/coderabbit-deferred.md`, report "Deferred: <summary>"
+     - 4-5: real defect, spawn the `code-surgeon` agent (`subagent_type: "general-purpose"`, description `"Fix CR-<N>: <summary>"`)
   4. After each surgeon fix, append to `~/.claude/coderabbit-session-log.md` per the standard format
 - After all findings are processed, delete `~/.claude/coderabbit-staged-batch.md`
 - Then continue to step 1
@@ -49,7 +49,7 @@ For each actionable finding:
 ### 4. Commit by group
 
 For each logical fix group:
-- Stage files by name: `git add <file1> <file2>` — never `git add .` or `git add -A`
+- Stage files by name: `git add <file1> <file2>`, never `git add .` or `git add -A`
 - Commit with an imperative message describing the fix: `git commit -m "fix: <what>"`
 - One commit per logical group; do not batch unrelated fixes into a single commit
 
@@ -60,7 +60,7 @@ If `--review` was passed: before the first commit, spawn the `code-reviewer` age
 Print a concise summary:
 - Fixed: N findings (list commit SHAs and one-line descriptions)
 - Already resolved: N findings (list)
-- Still deferred: N findings (list — these remain in `~/.claude/coderabbit-deferred.md`)
+- Still deferred: N findings (list, these remain in `~/.claude/coderabbit-deferred.md`)
 
 Do NOT push. The user reviews commits and pushes when satisfied.
 

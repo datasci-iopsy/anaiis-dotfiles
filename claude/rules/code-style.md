@@ -5,8 +5,19 @@ description: Writing, JSON, SQL, and shell formatting conventions enforced acros
 
 # Code and Writing Style
 
+## Em dashes are forbidden (hard rule, enforced)
+**Never emit U+2014 (em dash) in any output: code, comments, docs, commit messages, PR descriptions, or assistant prose.** This applies to every channel, every file type, every response.
+
+Substitute with one of:
+- a comma, when the dash marks a brief pause or apposition
+- a semicolon, when joining two independent clauses
+- parentheses, when the dashed text is a true aside
+- a period, splitting into separate sentences
+- the literal word "to", for numeric or alphabetic ranges
+
+Enforcement: the `block-em-dash.sh` PreToolUse hook denies any `Write`, `Edit`, `MultiEdit`, or `NotebookEdit` whose payload contains a U+2014. If this hook fires, the tool call is rejected before it touches disk; rewrite the payload without the em dash and retry. Do not work around it with `sed` or shell heredocs; the rule is the same regardless of channel.
+
 ## Writing style
-- Never use em dashes. Use commas, semicolons, parentheses, or separate sentences.
 - Never use causal framing ("This is because..."). State the fact directly.
 - No emojis in code, comments, commit messages, or prose unless requested.
 - Commit messages: imperative mood, concise, no trailing period.

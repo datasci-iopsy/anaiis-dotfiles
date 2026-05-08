@@ -1,6 +1,6 @@
 ---
 name: anaiis-peerreview
-description: Peer-review manuscripts and dissertation drafts through a journal reviewer lens — auto-triggers on manuscript review requests; APA 7th and JARS standards
+description: Peer-review manuscripts and dissertation drafts through a journal reviewer lens, auto-triggers on manuscript review requests; APA 7th and JARS standards
 ---
 
 # Peer Review
@@ -19,15 +19,15 @@ Choose the tool based on the file extension. Do not improvise.
 | `.md` / `.txt` / `.tex` | Read tool directly | Plain text; zero overhead. Use `offset`/`limit` for files over 200 lines. |
 | `.docx` | detect: `textutil` (macOS) or `soffice` (Linux) | See detection rules below |
 
-**For `.docx` — detect the available converter before proceeding:**
+**For `.docx`, detect the available converter before proceeding:**
 
 1. `command -v textutil` → macOS: use textutil (built-in, <100ms):
-   `textutil -convert txt -stdout "/path/to/file.docx"` — output goes to stdout, no temp file needed.
+   `textutil -convert txt -stdout "/path/to/file.docx"`, output goes to stdout, no temp file needed.
 2. `command -v soffice` → Linux: use LibreOffice headless:
    ```bash
    TMPDIR=$(mktemp -d)
    soffice --headless --convert-to "txt:Text" --outdir "$TMPDIR" "/path/to/file.docx"
-   # Output: $TMPDIR/<filename-stem>.txt — read with Read tool, then rm -rf "$TMPDIR"
+   # Output: $TMPDIR/<filename-stem>.txt, read with Read tool, then rm -rf "$TMPDIR"
    ```
 3. Neither found: stop. Report: "No `.docx` converter available. Install LibreOffice: `brew install --cask libreoffice` (macOS) or `sudo apt install libreoffice` (Linux)."
 
@@ -48,12 +48,12 @@ Activate when the request matches any of these patterns:
 
 Do NOT activate when:
 
-- The user wants to **edit or rewrite** content — use anaiis-copyedit (reviewer flags, does not edit)
-- The user wants a **literature search** — use anaiis-litreview
-- The user wants a **documentation audit** of code or project files — use anaiis-docaudit
-- The user asks to generate a review for submission to a journal on someone else's work — decline per APA ethical guidelines
-- The target is a code file, PR diff, or technical spec — use review or security-review
-- The user says "review my literature section" **without a manuscript file path** — that is a catalog gap identification task; use anaiis-litreview
+- The user wants to **edit or rewrite** content, use anaiis-copyedit (reviewer flags, does not edit)
+- The user wants a **literature search**, use anaiis-litreview
+- The user wants a **documentation audit** of code or project files, use anaiis-docaudit
+- The user asks to generate a review for submission to a journal on someone else's work, decline per APA ethical guidelines
+- The target is a code file, PR diff, or technical spec, use review or security-review
+- The user says "review my literature section" **without a manuscript file path**, that is a catalog gap identification task; use anaiis-litreview
 
 **Disambiguation:** "Review my literature section" with a file path = manuscript section review → activate peerreview. Without a file path = catalog synthesis → use litreview.
 
@@ -75,14 +75,14 @@ This skill applies the dual role described by APA: **evaluator** (assess quality
 | Evaluate theoretical grounding and literature coverage | Suggest specific citations to add |
 | Rate argument strength on 8 APA dimensions | Reorganize sections |
 | Check internal consistency across the full document | Copy-edit (copyediting happens post-acceptance) |
-| Use third person: "the authors," "the manuscript" | Use second person "you" (can seem accusatory — APA) |
+| Use third person: "the authors," "the manuscript" | Use second person "you" (can seem accusatory, APA) |
 | Lead with strengths before concerns (Wiley) | Open with criticism |
 
 ---
 
 ## Workflow
 
-### Read 1: First read-through — big picture
+### Read 1: First read-through, big picture
 
 *Per Wiley Steps 1–3: form an initial impression, identify major flaws, draft opening assessment.*
 
@@ -95,7 +95,7 @@ This skill applies the dual role described by APA: **evaluator** (assess quality
    - Claimed contribution(s)
 4. Assess: Is the main question interesting, relevant, and original? Are conclusions supported by evidence? (Wiley)
 5. Flag any major flaws visible from this initial pass: methodological concerns, conclusions contradicting evidence, overlooked influential factors. (Wiley Step 2)
-6. **Output a brief structural summary before proceeding** — include what the manuscript does well. Wiley: "read the entire paper to identify positive aspects, even if serious flaws exist."
+6. **Output a brief structural summary before proceeding**, include what the manuscript does well. Wiley: "read the entire paper to identify positive aspects, even if serious flaws exist."
 
 Pause here and confirm the structural summary is accurate before continuing to Read 2.
 
@@ -126,7 +126,7 @@ Apply Wiley's three-criterion framework:
 Additional criteria (APA JARS + I-O specifics):
 - Are participants/sample described adequately: demographics, recruitment, inclusion/exclusion criteria, power analysis? (APA)
 - Are measures validated? Is reliability evidence provided?
-- Are constructs operationalized appropriately — formative vs. reflective where relevant?
+- Are constructs operationalized appropriately, formative vs. reflective where relevant?
 - Does the analysis plan match the research questions and data structure?
 - *For multilevel designs:* Is the nesting structure theoretically justified? Are ICCs reported?
 - *For survey studies:* Is common method bias addressed?
@@ -139,7 +139,7 @@ Additional criteria (APA JARS + I-O specifics):
 - Are effect sizes and confidence intervals reported per APA 7th?
 - Are statistical assumptions checked and reported?
 - Are results over-interpreted or under-interpreted?
-- Are non-significant findings handled appropriately — neither ignored nor over-explained?
+- Are non-significant findings handled appropriately, neither ignored nor over-explained?
 - Do tables and figures effectively support the findings, or are any superfluous? (Wiley)
 - Are labels, titles, and statistical notation clear? (Wiley)
 
@@ -174,7 +174,7 @@ Additional criteria (APA JARS + I-O specifics):
 
 - **Thread coherence:** Do research questions flow through method → results → discussion as a connected argument? Identify any breaks.
 - **Internal consistency:** Are claims in the discussion supported by the results? Are key terms used consistently throughout?
-- **Writing quality:** Flag paragraph-level coherence issues, jargon overuse, and passive voice density. Do not copy-edit — copyediting is separate from review (APA/Wiley).
+- **Writing quality:** Flag paragraph-level coherence issues, jargon overuse, and passive voice density. Do not copy-edit, copyediting is separate from review (APA/Wiley).
 - **APA format compliance:** Spot-check headings, citation style, table/figure formatting. Exhaustive reference format checking is the editor's role (Wiley).
 - **EDI considerations (APA):** Does the manuscript use bias-free language? Are participant samples described with inclusion efforts explained? Could any framing harm or stigmatize vulnerable populations? (Reference: APA Bias-Free Language Guidelines)
 
@@ -188,13 +188,13 @@ Additional criteria (APA JARS + I-O specifics):
 
 **Summary**
 
-[2–3 sentences stating what the manuscript does and what it finds. Then: key strengths — what it does well. Wiley: give positive feedback first so authors engage with the review.]
+[2–3 sentences stating what the manuscript does and what it finds. Then: key strengths, what it does well. Wiley: give positive feedback first so authors engage with the review.]
 
 ---
 
 **Dimension Ratings**
 
-Rate each dimension: **Strong** / **Adequate** / **Needs Strengthening** — with a one-line justification. (APA review form dimensions)
+Rate each dimension: **Strong** / **Adequate** / **Needs Strengthening**, with a one-line justification. (APA review form dimensions)
 
 | Dimension | Rating | Justification |
 |---|---|---|
@@ -227,7 +227,7 @@ Rate each dimension: **Strong** / **Adequate** / **Needs Strengthening** — wit
 
 **Questions for the Author**
 
-[Numbered list. Genuine questions probing unclear reasoning, gaps in argument, or missing justification. These push back as a reviewer would — not rhetorical, but substantive.]
+[Numbered list. Genuine questions probing unclear reasoning, gaps in argument, or missing justification. These push back as a reviewer would, not rhetorical, but substantive.]
 
 1. …
 
@@ -241,7 +241,7 @@ Rate each dimension: **Strong** / **Adequate** / **Needs Strengthening** — wit
 
 **Overall Impression**
 
-[2–3 sentences on the manuscript's contribution, its readiness, and where effort should be focused. No accept/reject recommendation — the reviewer evaluates; the editor decides (APA). Frame constructively: "Addressing X and Y would substantially strengthen this manuscript for submission."]
+[2–3 sentences on the manuscript's contribution, its readiness, and where effort should be focused. No accept/reject recommendation, the reviewer evaluates; the editor decides (APA). Frame constructively: "Addressing X and Y would substantially strengthen this manuscript for submission."]
 
 ---
 
@@ -258,7 +258,7 @@ Rate each dimension: **Strong** / **Adequate** / **Needs Strengthening** — wit
 - Do not provide an accept/reject recommendation. (APA: "do not include your recommended decision within the narrative to the author")
 - Treat multiple files as parts of the same manuscript, not independent papers.
 - Critique within the author's theoretical framework, not from an external framework preference.
-- Use third person throughout — "the authors," "the manuscript" — never "you." (APA)
+- Use third person throughout, "the authors," "the manuscript", never "you." (APA)
 - Give positive feedback before criticism. (Wiley)
 - Even if serious issues exist, identify what the manuscript does well. (Wiley)
 

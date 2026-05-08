@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# migrate-memory.sh — one-shot, idempotent migration to Phase-9 memory layout.
+# migrate-memory.sh, one-shot, idempotent migration to Phase-9 memory layout.
 #
 # Two transformations, applied per machine:
 #
@@ -150,7 +150,7 @@ if [ -d "$PROJECTS_DIR" ]; then
 		fi
 
 		# 4b. Strip lines pointing at user-level files no longer in this dir
-		# Extract markdown link targets, e.g. `[Title](filename.md) — ...`
+		# Extract markdown link targets, e.g. `[Title](filename.md), ...`
 		while IFS= read -r line; do
 			target=$(printf '%s' "$line" | grep -oE '\([a-zA-Z0-9_./-]+\.md\)' | head -1 | tr -d '()')
 			[ -z "$target" ] && continue
@@ -183,7 +183,7 @@ fi
 echo
 echo "──────────────────────────────────────────────"
 echo "Memory migration summary"
-$DRY_RUN && echo "(DRY RUN — no changes written)"
+$DRY_RUN && echo "(DRY RUN, no changes written)"
 echo "  user-level files promoted to global tier:  $PROMOTED"
 echo "  user-level files skipped (older copy):     $SKIPPED"
 echo "  flat handoffs moved into handoffs/ subdir: $HANDOFFS_MOVED"

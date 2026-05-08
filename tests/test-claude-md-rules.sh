@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/test-claude-md-rules.sh — verification harness for the
+# tests/test-claude-md-rules.sh, verification harness for the
 # behavioral-rules pipeline (CLAUDE.md ↔ rules/behavioral.md ↔ hook ↔
 # settings.json ↔ rules-doctor.sh).
 #

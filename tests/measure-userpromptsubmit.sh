@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/measure-userpromptsubmit.sh — measure each UserPromptSubmit hook
+# tests/measure-userpromptsubmit.sh, measure each UserPromptSubmit hook
 # in isolation, repeated N times, report median + sum.
 #
 # Usage: bash tests/measure-userpromptsubmit.sh [N]   # default N=5
@@ -19,7 +19,7 @@ HOOKS=(
     "$REPO_DIR/claude/hooks/ensure-repo-hooks.sh"
 )
 
-# Synthetic UserPromptSubmit input — what Claude Code sends to hooks.
+# Synthetic UserPromptSubmit input, what Claude Code sends to hooks.
 PAYLOAD=$(cat <<JSON
 {
     "session_id": "measure-$RANDOM",
@@ -87,9 +87,9 @@ echo "  Aggregate median: $TOTAL_MEDIAN ms"
 
 THRESHOLD=100
 if [ "$TOTAL_MEDIAN" -le "$THRESHOLD" ]; then
-    echo "  Verdict: KEEP CHAIN — aggregate ≤ ${THRESHOLD} ms"
+    echo "  Verdict: KEEP CHAIN, aggregate ≤ ${THRESHOLD} ms"
     exit 0
 else
-    echo "  Verdict: CONSOLIDATE — aggregate > ${THRESHOLD} ms"
+    echo "  Verdict: CONSOLIDATE, aggregate > ${THRESHOLD} ms"
     exit 1
 fi

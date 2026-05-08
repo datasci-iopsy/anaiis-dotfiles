@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# memory-doctor.sh — verify the memory pipeline end to end.
+# memory-doctor.sh, verify the memory pipeline end to end.
 #
 # Reports per-project memory health and synthetically exercises the
 # load-global-memory and pre/post-compact hooks so problems surface
@@ -125,7 +125,7 @@ fi
 if [ "$FLAT_CT" -eq 0 ]; then
 	ok "D.1 no flat handoff_*.md outside handoffs/ subdirs"
 else
-	fail "D.1 flat handoff detection" "$FLAT_CT flat handoff(s) found — run migrate-memory.sh:"
+	fail "D.1 flat handoff detection" "$FLAT_CT flat handoff(s) found, run migrate-memory.sh:"
 	printf '          %s\n' "${FLAT_FILES[@]}"
 fi
 
@@ -152,7 +152,7 @@ if [ -d "$GLOBAL_DIR" ] && [ -f "$GLOBAL_DIR/MEMORY.md" ]; then
 		fail "E.2 second invocation" "expected empty output, got: $(printf '%s' "$OUT2" | head -c 80)"
 	fi
 else
-	ok "E.* skipped (no global memory directory yet — run seed-memory.sh)"
+	ok "E.* skipped (no global memory directory yet, run seed-memory.sh)"
 fi
 
 # ── F. pre-compact writes into handoffs/ subdir ───────────────────────────

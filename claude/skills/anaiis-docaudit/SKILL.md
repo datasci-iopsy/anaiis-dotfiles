@@ -1,7 +1,7 @@
 ---
 name: anaiis-docaudit
 description: Audit documentation files for accuracy against the current project state
-built_in_alternative: "/review checks the diff. anaiis-docaudit checks the entire docs tree (READMEs, CLAUDE.md, in-repo guides) against current repo state — different scope (full tree vs changed lines) and different output (audit report vs PR review comments)."
+built_in_alternative: "/review checks the diff. anaiis-docaudit checks the entire docs tree (READMEs, CLAUDE.md, in-repo guides) against current repo state, different scope (full tree vs changed lines) and different output (audit report vs PR review comments)."
 ---
 
 # Documentation Audit
@@ -9,7 +9,7 @@ built_in_alternative: "/review checks the diff. anaiis-docaudit checks the entir
 Audit documentation files for accuracy against the current project state.
 
 ## Scope
-$ARGUMENTS — optional path or glob pattern. Defaults to all of the following files anywhere in the repo:
+$ARGUMENTS, optional path or glob pattern. Defaults to all of the following files anywhere in the repo:
 
 - `README.md`, `README`, `README.txt`
 - `CLAUDE.md`
@@ -23,7 +23,7 @@ $ARGUMENTS — optional path or glob pattern. Defaults to all of the following f
 
 Use `Glob` with each pattern to discover files; collect all matches before beginning audits. Skip binary LICENSE files (check with `file` if uncertain).
 
-## Tool usage (required — do not deviate)
+## Tool usage (required, do not deviate)
 
 Follow CLAUDE.md tool preferences exactly:
 
@@ -31,7 +31,7 @@ Follow CLAUDE.md tool preferences exactly:
 - **Content search**: use `Grep`, never `Bash(grep)` or `Bash(rg)`
 - **Reading files**: use `Read` with `offset`/`limit` for large files, never `Bash(cat)`, `Bash(head)`, or `Bash(tail)`
 - **File existence checks**: use `Glob` (a hit means it exists; no results means it does not)
-- **Bash**: only for things that cannot be done with the above tools — simple, single-purpose commands with no compound brace groups `{ }`, no chained logic inside quotes, and no `echo` with special characters. Examples of acceptable Bash: `make -n <target>`, `cat file | jq '.key'`
+- **Bash**: only for things that cannot be done with the above tools, simple, single-purpose commands with no compound brace groups `{ }`, no chained logic inside quotes, and no `echo` with special characters. Examples of acceptable Bash: `make -n <target>`, `cat file | jq '.key'`
 - **Parallel calls**: run independent Glob/Grep/Read calls in the same message when they do not depend on each other
 
 ## Process
@@ -59,7 +59,7 @@ For each documentation file in scope:
 - Flag anything described in docs that has no match in the current codebase
 
 ### 5. Stale content
-- Flag sections describing removed features, completed migrations, or deprecated workflows — identified by cross-referencing doc claims against what Glob/Grep finds in the actual codebase
+- Flag sections describing removed features, completed migrations, or deprecated workflows, identified by cross-referencing doc claims against what Glob/Grep finds in the actual codebase
 
 ### 6. Makefile-specific audit (Makefile, makefile, GNUmakefile only)
 - **Target inventory**: use `Grep` with pattern `^[a-zA-Z0-9_-]+:` to extract all defined targets

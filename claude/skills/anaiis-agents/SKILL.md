@@ -27,7 +27,7 @@ Do NOT activate when:
 - Subtasks have serial dependencies (output of A feeds B)
 - Entire task fits in under 4 tool calls
 - User is asking a question, not requesting work
-- Task is file listing, directory inspection, or targeted content search — use Glob, Grep, or Read directly
+- Task is file listing, directory inspection, or targeted content search, use Glob, Grep, or Read directly
 - Two tasks share the same skill and can be combined into one invocation (e.g., two DuckDB queries → one heredoc; two litreview topics → one query with OR conditions)
 
 ## Decision framework
@@ -78,7 +78,7 @@ Each agent prompt must include:
 2. **All file paths and context needed** -- agents have no shared memory or state
 3. **Expected output format** -- what to return and how to structure it
 4. **Scope boundary** -- what not to do (e.g., "read only, do not modify files")
-5. **Capture structural findings** -- if an Explore agent surfaces project-level facts needed in future sessions (pipeline architecture, module boundaries, data contracts), save them to project memory after synthesis. Not code patterns — those change. Facts about why the architecture exists.
+5. **Capture structural findings** -- if an Explore agent surfaces project-level facts needed in future sessions (pipeline architecture, module boundaries, data contracts), save them to project memory after synthesis. Not code patterns, those change. Facts about why the architecture exists.
 
 Keep spawn prompts under 200 words. The main token cost driver is context accumulated during execution, not the prompt size itself.
 

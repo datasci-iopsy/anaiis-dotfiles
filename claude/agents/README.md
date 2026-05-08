@@ -1,6 +1,6 @@
 # Agents
 
-Named subagent type definitions for Claude Code. These are capability-bounded task agents — constrained tool sets, fixed models, specific scope.
+Named subagent type definitions for Claude Code. These are capability-bounded task agents, constrained tool sets, fixed models, specific scope.
 
 This layer is distinct from the `anaiis-agents` skill:
 - **This directory**: defines *what* named agents can do (tools, model, instructions)

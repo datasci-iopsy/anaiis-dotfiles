@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# load-global-memory.sh — emit the cross-project memory tier as context
+# load-global-memory.sh, emit the cross-project memory tier as context
 # on the FIRST UserPromptSubmit of each Claude session.
 #
 # Tracks first-prompt-ness via a marker file at /tmp/claude-session-<id>.global-loaded
@@ -10,7 +10,7 @@
 #   First prompt: JSON systemMessage with the contents of ~/.claude/memory/MEMORY.md
 #                 plus all topical files referenced from it.
 #   Subsequent:   nothing (exit 0).
-# Exit 0 always — never block.
+# Exit 0 always, never block.
 
 set -eu
 

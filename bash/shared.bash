@@ -1,6 +1,6 @@
 # ~/.dotfiles/bash/shared.bash
 #
-# Tracked personal shell preferences — sourced by ~/.bashrc.local.
+# Tracked personal shell preferences, sourced by ~/.bashrc.local.
 # Edit here to keep both machines in sync via git pull.
 # Machine-local overrides (GCP project, API keys) stay in ~/.bashrc.local.
 
@@ -51,7 +51,7 @@ if command -v direnv >/dev/null 2>&1; then
     eval "$(direnv hook bash)"
 fi
 
-# ── Prompt — hostname, directory, git branch ──────────────────────────────────
+# ── Prompt, hostname, directory, git branch ──────────────────────────────────
 git_branch() {
     local dir_name branch_name
     dir_name=$(basename "$(pwd)")

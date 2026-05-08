@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# rules-doctor.sh — verify the behavioral rules pipeline end to end.
+# rules-doctor.sh, verify the behavioral rules pipeline end to end.
 #
 # Reports drift between the 4 lines in CLAUDE.md, rules/behavioral.md,
 # the surface-behavioral-rules.sh hook, and its settings.json

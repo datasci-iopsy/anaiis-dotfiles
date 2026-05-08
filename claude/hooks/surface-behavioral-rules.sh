@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# surface-behavioral-rules.sh — emit the 4 behavioral imperatives from
+# surface-behavioral-rules.sh, emit the 4 behavioral imperatives from
 # CLAUDE.md as a systemMessage on the FIRST UserPromptSubmit of each
 # Claude session, so behavioral rules load before any other context.
 #
@@ -14,7 +14,7 @@
 # Output:
 #   First prompt: JSON systemMessage with the 4 lines.
 #   Subsequent:   nothing (exit 0).
-# Exit 0 always — never block.
+# Exit 0 always, never block.
 
 set -eu
 

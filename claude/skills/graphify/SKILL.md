@@ -1,6 +1,6 @@
 ---
 name: graphify
-description: "Explicit /graphify — build a knowledge graph from a codebase or document corpus"
+description: "Explicit /graphify, build a knowledge graph from a codebase or document corpus"
 trigger: /graphify
 ---
 
@@ -105,7 +105,7 @@ Corpus: X files · ~Y words
 Then act on it:
 - If `total_files` is 0 OR code files are 0 and docs/papers/images are also 0: stop immediately with "No supported files found in [path]. Note: SQL, YAML, JSON, and shell files are not parsed by graphify. If this is a dbt or SQL-heavy project, use the dbt manifest.json for dependency mapping instead."
 - If `skipped_sensitive` is non-empty: mention file count skipped, not the file names.
-- If `total_words` < 150,000 AND `total_files` < 150: stop immediately. Tell the user: "This corpus (~[total_words] words, [total_files] files) fits in a single context window — building a graph costs more tokens than it saves. Use the Explore agent or Read tool directly instead. Graphify pays off for corpora that don't fit in context (150+ files or 150k+ words)." Do not proceed.
+- If `total_words` < 150,000 AND `total_files` < 150: stop immediately. Tell the user: "This corpus (~[total_words] words, [total_files] files) fits in a single context window, building a graph costs more tokens than it saves. Use the Explore agent or Read tool directly instead. Graphify pays off for corpora that don't fit in context (150+ files or 150k+ words)." Do not proceed.
 - If `total_words` > 2,000,000 OR `total_files` > 200: show the warning and the top 5 subdirectories by file count, then ask which subfolder to run on. Wait for the user's answer before proceeding.
 - Otherwise: proceed directly to Step 3 - no need to ask anything.
 
@@ -216,7 +216,7 @@ Rules:
 
 Code files: focus on semantic edges AST cannot find (call relationships, shared data, arch patterns).
   Do not re-extract imports - AST already has those.
-Doc/paper files: extract named concepts, entities, citations. Also extract rationale — sections that explain WHY a decision was made, trade-offs chosen, or design intent. These become nodes with `rationale_for` edges pointing to the concept they explain.
+Doc/paper files: extract named concepts, entities, citations. Also extract rationale, sections that explain WHY a decision was made, trade-offs chosen, or design intent. These become nodes with `rationale_for` edges pointing to the concept they explain.
 Image files: use vision to understand what the image IS - do not just OCR.
   UI screenshot: layout patterns, design decisions, key elements, purpose.
   Chart: metric, trend/insight, data source.
@@ -238,7 +238,7 @@ Hyperedges: if 3 or more nodes clearly participate together in a shared concept,
 - All classes that implement a common protocol or interface
 - All functions in an authentication flow (even if they don't all call each other)
 - All concepts from a paper section that form one coherent idea
-Use sparingly — only when the group relationship adds information beyond the pairwise edges. Maximum 3 hyperedges per chunk.
+Use sparingly, only when the group relationship adds information beyond the pairwise edges. Maximum 3 hyperedges per chunk.
 
 If a file has YAML frontmatter (--- ... ---), copy source_url, captured_at, author,
   contributor onto every node from that file.
@@ -434,7 +434,7 @@ Replace INPUT_PATH with the actual path.
 
 ### Step 6 - Generate Obsidian vault (opt-in) + HTML
 
-**Generate HTML always** (unless `--no-viz`). **Obsidian vault only if `--obsidian` was explicitly given** — skip it otherwise, it generates one file per node.
+**Generate HTML always** (unless `--no-viz`). **Obsidian vault only if `--obsidian` was explicitly given**, skip it otherwise, it generates one file per node.
 
 If `--obsidian` was given:
 

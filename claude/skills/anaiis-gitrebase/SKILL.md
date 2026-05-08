@@ -1,6 +1,6 @@
 ---
 name: anaiis-gitrebase
-description: "Explicit /anaiis-gitrebase — rebase commits into logical groups before PR review"
+description: "Explicit /anaiis-gitrebase, rebase commits into logical groups before PR review"
 trigger: /anaiis-gitrebase
 ---
 
@@ -35,14 +35,14 @@ Examples:
 
 Run as two separate Bash calls. The first resolves the fork SHA; the second uses it as a literal to avoid subshell substitutions that crash the permission parser.
 
-**Call 1 — resolve fork point:**
+**Call 1, resolve fork point:**
 ```bash
 git status --porcelain && \
 git branch --show-current && \
 git merge-base <base> HEAD
 ```
 
-**Call 2 — inspect range (substitute the literal SHA returned above for `<fork>`):**
+**Call 2, inspect range (substitute the literal SHA returned above for `<fork>`):**
 ```bash
 git log --oneline <fork>..HEAD && \
 git log --oneline --merges <fork>..HEAD

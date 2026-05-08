@@ -5,7 +5,7 @@ description: Python project conventions, uv for versions and deps, direnv-manage
 
 # Python Conventions
 
-- `uv` manages Python versions and all project dependencies. Do not use `pyenv` for project Python — `pyenv` is installed via Homebrew but is not used for version pinning in projects.
+- `uv` manages Python versions and all project dependencies. Do not use `pyenv` for project Python, `pyenv` is installed via Homebrew but is not used for version pinning in projects.
 - Every Python project uses `uv` with a `.python-version` file and `pyproject.toml`. The venv lives at `.venv/` in the project root.
 - `direnv` activates the venv automatically on `cd`. Confirm `.envrc` sources `.venv` before assuming the environment is active. Never manually activate a venv when `direnv` is wired up.
 - Before modifying any venv or dependencies, confirm which project root you are in and that `direnv` has loaded. Never run `uv` commands from the wrong directory.

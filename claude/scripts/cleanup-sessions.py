@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-cleanup-sessions.py — Interactive Claude Code session cleanup.
+cleanup-sessions.py, Interactive Claude Code session cleanup.
 
 Usage:
     claude-cleanup                     # interactive, sorted by size (largest first)
@@ -10,11 +10,11 @@ Usage:
     claude-cleanup --dry-run           # preview deletions without removing files
 
 Columns:
-    Size     — on-disk file size (full conversation history log)
-    Ctx      — effective input tokens at last assistant turn (cache_read + cache_creation
+    Size    , on-disk file size (full conversation history log)
+    Ctx     , effective input tokens at last assistant turn (cache_read + cache_creation
                + uncached); approximates how large the context window was most recently.
-               Low Ctx on a large file means the session was compacted — healthy signal.
-    Msgs     — number of user turns
+               Low Ctx on a large file means the session was compacted, healthy signal.
+    Msgs    , number of user turns
 """
 
 import argparse
@@ -279,7 +279,7 @@ def main():
     total_bytes = 0
     for idx in sorted(chosen):
         s = sessions[idx - 1]
-        print(f"  [{idx}]  {s['project']}  —  {s['title'][:55]}  ({format_size(s['size'])})")
+        print(f"  [{idx}]  {s['project']} ,  {s['title'][:55]}  ({format_size(s['size'])})")
         total_bytes += s["size"]
     print()
     print(f"Space freed: {format_size(total_bytes)}")

@@ -1,5 +1,5 @@
 #!/bin/bash
-# test-compact-hooks.sh — verify pre-compact.sh and post-compact.sh behavior
+# test-compact-hooks.sh, verify pre-compact.sh and post-compact.sh behavior
 #
 # Usage: bash ~/.claude/hooks/test-compact-hooks.sh
 #
@@ -19,32 +19,32 @@ fail() { echo "  FAIL  $1"; FAIL=$((FAIL+1)); }
 
 assert_file_exists() {
     local label="$1" path="$2"
-    [ -f "$path" ] && pass "$label" || fail "$label — missing: $path"
+    [ -f "$path" ] && pass "$label" || fail "$label, missing: $path"
 }
 
 assert_file_missing() {
     local label="$1" path="$2"
-    [ ! -f "$path" ] && pass "$label" || fail "$label — should not exist: $path"
+    [ ! -f "$path" ] && pass "$label" || fail "$label, should not exist: $path"
 }
 
 assert_contains() {
     local label="$1" file="$2" pattern="$3"
-    grep -q "$pattern" "$file" 2>/dev/null && pass "$label" || fail "$label — pattern not found: '$pattern'"
+    grep -q "$pattern" "$file" 2>/dev/null && pass "$label" || fail "$label, pattern not found: '$pattern'"
 }
 
 assert_not_contains() {
     local label="$1" file="$2" pattern="$3"
-    ! grep -q "$pattern" "$file" 2>/dev/null && pass "$label" || fail "$label — unexpected pattern found: '$pattern'"
+    ! grep -q "$pattern" "$file" 2>/dev/null && pass "$label" || fail "$label, unexpected pattern found: '$pattern'"
 }
 
 assert_json_field() {
     local label="$1" json="$2" field="$3"
-    echo "$json" | jq -e ".$field" &>/dev/null && pass "$label" || fail "$label — missing field: $field"
+    echo "$json" | jq -e ".$field" &>/dev/null && pass "$label" || fail "$label, missing field: $field"
 }
 
 assert_exit_zero() {
     local label="$1" cmd="$2"
-    eval "$cmd" &>/dev/null && pass "$label" || fail "$label — expected exit 0"
+    eval "$cmd" &>/dev/null && pass "$label" || fail "$label, expected exit 0"
 }
 
 # ── Test environment setup ────────────────────────────────────────────────────
@@ -92,7 +92,7 @@ run_pre_compact() {
         --arg session_id "$session" \
         --arg cwd "$cwd" \
         '{"trigger": $trigger, "session_id": $session_id, "cwd": $cwd, "hook_event_name": "PreCompact"}')
-    # HOME must be set for bash, not for echo — pipe passes stdin, not env
+    # HOME must be set for bash, not for echo, pipe passes stdin, not env
     echo "$input" | HOME="$TEST_HOME" bash "$HOOK_DIR/pre-compact.sh" 2>/dev/null
 }
 
@@ -214,7 +214,7 @@ test_pre_compact_memory_capped_at_five() {
     local mem_dir="$TEST_HOME/.claude/projects/$(echo "$TEST_CWD" | tr '/.' '-')/memory"
     mkdir -p "$mem_dir"
     for i in 1 2 3 4 5; do
-        echo "- [Session handoff 2026-04-2${i}](handoff_2026-04-2${i}_aabbccdd.md) — manual compact, branch main" >> "$mem_dir/MEMORY.md"
+        echo "- [Session handoff 2026-04-2${i}](handoff_2026-04-2${i}_aabbccdd.md), manual compact, branch main" >> "$mem_dir/MEMORY.md"
     done
     run_pre_compact "manual"
     local count
@@ -244,7 +244,7 @@ test_post_compact_no_handoff_exits_cleanly() {
     echo
     echo "── test_post_compact_no_handoff_exits_cleanly"
     setup_test_env
-    # memory dir is empty — no handoff files
+    # memory dir is empty, no handoff files
     local output
     output=$(run_post_compact)
     [ -z "$output" ] && pass "empty output when no handoff exists" || fail "expected empty output, got: $output"
@@ -335,7 +335,7 @@ SCENARIO 3: File re-read prevention (session.md rule)
 
 SCENARIO 4: Large file offset/limit (session.md rule)
   Step:   Ask Claude to check a specific rule in a file you know is > 200 lines.
-  Expect: Claude uses Read with offset/limit — not Read of the full file.
+  Expect: Claude uses Read with offset/limit, not Read of the full file.
   Fail:   Claude reads the entire file.
 
 SCENARIO 5: Auto-compact hook fires

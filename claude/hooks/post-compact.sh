@@ -1,5 +1,5 @@
 #!/bin/bash
-# post-compact.sh — re-inject session context after compaction completes
+# post-compact.sh, re-inject session context after compaction completes
 #
 # Reads the most recent handoff file written by pre-compact.sh and outputs
 # it as a systemMessage so Claude has immediate context in the compacted
@@ -40,7 +40,7 @@ fi
 
 HANDOFF_CONTENT=$(cat "$LATEST_HANDOFF")
 
-# Output systemMessage — injected into the compacted context so Claude
+# Output systemMessage, injected into the compacted context so Claude
 # immediately knows what was in scope before compaction.
 jq -n --arg content "$HANDOFF_CONTENT" \
 	'{"systemMessage": ("## Restored from pre-compact handoff\n\nThe following context was captured immediately before compaction. Use it to avoid re-reading files and to restore task continuity.\n\n" + $content)}'

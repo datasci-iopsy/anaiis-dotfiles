@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-# Stub real claude — echoes argv, exits 0.
+# Stub real claude, echoes argv, exits 0.
 echo "STUB_CLAUDE argv=[$*]"

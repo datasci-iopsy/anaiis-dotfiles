@@ -1,6 +1,6 @@
 ---
 name: anaiis-duckdb
-description: Ad hoc SQL analytics on local parquet, CSV, Excel, JSON, Avro, or SQLite files — auto-triggers on data analysis requests
+description: Ad hoc SQL analytics on local parquet, CSV, Excel, JSON, Avro, or SQLite files, auto-triggers on data analysis requests
 ---
 
 # DuckDB Analytics

@@ -1,15 +1,15 @@
 # dotfiles
 
-**What this is.** A personal Claude Code policy stack — rules, skills, hooks, agents, slash commands — plus one shell-agnostic Claude wrapper. Tracked in git, shared across two machines (personal + work), installed via symlinks in `install.sh`. macOS today; portable to Linux.
+**What this is.** A personal Claude Code policy stack, rules, skills, hooks, agents, slash commands, plus one shell-agnostic Claude wrapper. Tracked in git, shared across two machines (personal + work), installed via symlinks in `install.sh`. macOS today; portable to Linux.
 
 **It does not manage your shell config.** The previous bash layer was deleted in the 2026-04-29 audit. The only shell-adjacent piece left is `bin/claude`, a standalone POSIX script you opt into by adding one directory to `$PATH`. Your `~/.bashrc` / `~/.zshrc` / `~/.config/fish/config.fish` is yours.
 
 **The "anaiis-" prefix** is the namespace for this repo's custom skills, distinct from upstream Anthropic skills (which keep their unprefixed names). When you see `/anaiis-litreview` or `/anaiis-duckdb`, that's a custom skill defined in `claude/skills/`.
 
-**Two-machine model.** The same repo is checked out on personal and work machines. Machine-local config — secrets, project IDs, GCP project — lives in two files that `install.sh` *copies* (not symlinks) on first install:
+**Two-machine model.** The same repo is checked out on personal and work machines. Machine-local config, secrets, project IDs, GCP project, lives in two files that `install.sh` *copies* (not symlinks) on first install:
 
-- `~/.claude/settings.local.json` — model override, machine-local Claude settings
-- `~/.claude/CLAUDE.local.md` — machine-local environment notes
+- `~/.claude/settings.local.json`, model override, machine-local Claude settings
+- `~/.claude/CLAUDE.local.md`, machine-local environment notes
 
 Both are gitignored from this repo by virtue of being outside it. Your shell config and any other machine-local secrets are your concern, not this repo's.
 
@@ -37,7 +37,7 @@ That installs the Claude policy stack and prints a one-line snippet to add to yo
 ├── council-report-2026-04-29.html  LLM Council visual report (audit basis)
 ├── council-transcript-2026-04-29.md  Full 5-advisor + 5-peer-review transcript
 ├── .lintr                          → ~/.lintr   Global R style config
-├── .env.example                    Structural template — this repo consumes nothing from .env
+├── .env.example                    Structural template, this repo consumes nothing from .env
 ├── bin/
 │   └── claude                      Shell-agnostic CodeRabbit batch wrapper
 ├── claude/
@@ -75,14 +75,14 @@ git clone git@github.com:datasci-iopsy/.dotfiles.git ~/.dotfiles
 bash ~/.dotfiles/install.sh
 ```
 
-Each line prints `ok` (already linked), `link` (newly created), or `SKIP` (real file present — back up and remove first). Two files are *copied* (not symlinked) as machine-local config and never overwritten on subsequent runs:
+Each line prints `ok` (already linked), `link` (newly created), or `SKIP` (real file present, back up and remove first). Two files are *copied* (not symlinked) as machine-local config and never overwritten on subsequent runs:
 
-- `~/.claude/settings.local.json` — set `GITHUB_TOKEN`, override model, etc.
-- `~/.claude/CLAUDE.local.md` — machine-specific environment notes
+- `~/.claude/settings.local.json`, set `GITHUB_TOKEN`, override model, etc.
+- `~/.claude/CLAUDE.local.md`, machine-specific environment notes
 
 ### 3. Add the wrapper to PATH (optional but recommended)
 
-The installer prints this line; copy it into your shell config (one of `~/.bashrc`, `~/.zshrc`, `~/.config/fish/config.fish` — whichever your shell reads):
+The installer prints this line; copy it into your shell config (one of `~/.bashrc`, `~/.zshrc`, `~/.config/fish/config.fish`, whichever your shell reads):
 
 ```bash
 export PATH="$HOME/.dotfiles/bin:$PATH"
@@ -119,7 +119,7 @@ bash ~/.claude/scripts/install-repo-hooks.sh
 
 A standalone POSIX bash script. When you put `~/.dotfiles/bin` ahead of the system `claude` in `$PATH`, this wrapper runs first and handles one job: detecting CodeRabbit "fix all" batches before they reach `claude` and stage to a deterministic file.
 
-**Why a shell-level wrapper:** CodeRabbit's "Fix all" emits `claude "$(cat …tmpfile)" && rm …tmpfile`. In a fresh terminal, `direnv` startup latency causes CodeRabbit to retry, by which point the trailing `rm` has already deleted the tmpfile, leaving Claude with empty input. A Claude `PreToolUse` hook can't help — by then `claude` has already started.
+**Why a shell-level wrapper:** CodeRabbit's "Fix all" emits `claude "$(cat …tmpfile)" && rm …tmpfile`. In a fresh terminal, `direnv` startup latency causes CodeRabbit to retry, by which point the trailing `rm` has already deleted the tmpfile, leaving Claude with empty input. A Claude `PreToolUse` hook can't help, by then `claude` has already started.
 
 **Behavior.** If the first arg contains ≥2 `Verify each finding against the current code` lines:
 
@@ -146,9 +146,9 @@ Otherwise, pass-through: the wrapper exec's the real `claude` with all args, unc
 
 | Rating | Action |
 |---|---|
-| 1–2 | False positive or nitpick — dismiss with one-line rationale, no edit |
-| 3 | Judgment call — append to `~/.claude/coderabbit-deferred.md`, report "Deferred: …" |
-| 4–5 | Real defect — spawn `code-surgeon` agent (`Fix CR-<N>: …`), log to `~/.claude/coderabbit-session-log.md` |
+| 1–2 | False positive or nitpick, dismiss with one-line rationale, no edit |
+| 3 | Judgment call, append to `~/.claude/coderabbit-deferred.md`, report "Deferred: …" |
+| 4–5 | Real defect, spawn `code-surgeon` agent (`Fix CR-<N>: …`), log to `~/.claude/coderabbit-session-log.md` |
 
 ### Files
 
@@ -195,9 +195,9 @@ See `claude/skills/README.md` for trigger conditions.
 
 ### Agents (Sonnet, restricted tools)
 
-- `code-reviewer.md` — diff review (Read/Grep/Glob)
-- `security-auditor.md` — credential and injection checks (Read/Grep/Glob)
-- `code-surgeon.md` — surgical fixes from CodeRabbit triage (Read/Grep/Glob/Edit)
+- `code-reviewer.md`, diff review (Read/Grep/Glob)
+- `security-auditor.md`, credential and injection checks (Read/Grep/Glob)
+- `code-surgeon.md`, surgical fixes from CodeRabbit triage (Read/Grep/Glob/Edit)
 
 ---
 
@@ -207,16 +207,16 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 
 | Event | Matcher | Script | Behavior |
 |---|---|---|---|
-| `UserPromptSubmit` | — | `maintenance-check.sh` | Weekly plan-file check; monthly session-storage check; weekly repo-hooks audit |
-| `UserPromptSubmit` | — | `coderabbit-triage.sh` | CodeRabbit triage rubric injection for individual pastes |
-| `UserPromptSubmit` | — | `ensure-repo-hooks.sh` | Silently installs pre-commit dispatcher in current repo if missing |
-| `UserPromptSubmit` | — | `load-global-memory.sh` | Loads global memory tier (`~/.claude/memory/`) once per session |
+| `UserPromptSubmit` |, | `maintenance-check.sh` | Weekly plan-file check; monthly session-storage check; weekly repo-hooks audit |
+| `UserPromptSubmit` |, | `coderabbit-triage.sh` | CodeRabbit triage rubric injection for individual pastes |
+| `UserPromptSubmit` |, | `ensure-repo-hooks.sh` | Silently installs pre-commit dispatcher in current repo if missing |
+| `UserPromptSubmit` |, | `load-global-memory.sh` | Loads global memory tier (`~/.claude/memory/`) once per session |
 | `PostToolUse` | `Edit\|Write` | `post-edit-lint.sh` | `.py` ruff; `.sh` shfmt (auto-fix) + shellcheck; `.sql` sqlfmt; `.R` lintr; `.json` jq --indent 4 |
 | `PreToolUse` | `Write\|Edit` | inline | Allow `*.env.example`/`*.env.template`; block `*.lock`, `*.env`, `*credentials*`, `*secret*`, `*.pem`, `*.key` |
 | `PreToolUse` | `Bash` | inline | Block destructive `bq rm`, `gcloud delete*`, `uv cache clean`/`pip uninstall` |
 | `PreToolUse` | `Bash` | `prefer-jq.sh` | Warns when Python is used for JSON instead of jq |
 | `PreToolUse` | `Agent\|WebFetch` | `cost-guard.sh` | Cost tiering MEDIUM/HIGH/VERY HIGH; gates general-purpose agents |
-| `Stop` | — | `stop-hook-git-check.sh` | Reports uncommitted changes; never blocks (status-only) |
+| `Stop` |, | `stop-hook-git-check.sh` | Reports uncommitted changes; never blocks (status-only) |
 | `PreCompact` | `*` | `pre-compact.sh` | Writes a structured handoff to project memory |
 | `PostCompact` | `*` | `post-compact.sh` | Re-injects the handoff so Claude has continuity post-compaction |
 
@@ -234,7 +234,7 @@ Hook latency on this machine (measured 2026-04-29): aggregate UserPromptSubmit c
 | **Python** | `post-edit-lint.sh` runs `ruff check` (reported) + `ruff format` (auto-applied) | `ruff-lint-staged.sh` blocks | `SKIP_RUFF=1 git commit …` |
 | **JSON** | `post-edit-lint.sh` enforces `jq --indent 4` | `json-lint-staged.sh` checks indent | n/a |
 
-`~/.lintr` is symlinked from this repo (`.lintr`). Per-project `.lintr` overrides are honored — lintr walks up from the project root.
+`~/.lintr` is symlinked from this repo (`.lintr`). Per-project `.lintr` overrides are honored, lintr walks up from the project root.
 
 ---
 
@@ -259,7 +259,7 @@ Claude-driven commit authorship is set via env vars in `claude/settings.json`:
 }
 ```
 
-These override `git config`. The `attribution.commit` field (currently `""`) controls Co-Authored-By trailers only — it does not affect author name.
+These override `git config`. The `attribution.commit` field (currently `""`) controls Co-Authored-By trailers only, it does not affect author name.
 
 ---
 

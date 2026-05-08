@@ -1,6 +1,6 @@
 ---
 name: anaiis-gitpr
-description: "Explicit /anaiis-gitpr — open a pull request after CodeRabbit triage and commit cleanup"
+description: "Explicit /anaiis-gitpr, open a pull request after CodeRabbit triage and commit cleanup"
 trigger: /anaiis-gitpr
 ---
 
@@ -85,7 +85,7 @@ Body structure:
 - <feature 2>
 
 ### Fixes
-- <fix 1 — derived from commit messages>
+- <fix 1, derived from commit messages>
 
 ### Removed
 - <removed item if applicable>

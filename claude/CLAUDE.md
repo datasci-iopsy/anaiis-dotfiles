@@ -39,10 +39,10 @@ Rules (`~/.claude/rules/`) constrain Claude's behavior across all tasks. Skills 
 | `rules/citations.md` | Citation integrity: corpus-only sources, no fabrication, web search only on explicit request |
 
 ## Machine-local overrides
-`~/.claude/CLAUDE.local.md` (gitignored) — machine-specific environment notes.
+`~/.claude/CLAUDE.local.md` (gitignored), machine-specific environment notes.
 
 ## Memory tiers
 Two tiers, both per-machine, both auto-loaded:
-- **Global tier** at `~/.claude/memory/` — cross-project user-level facts (identity, preferences). Loaded once per session via the `load-global-memory.sh` UserPromptSubmit hook.
-- **Project tier** at `~/.claude/projects/<project-key>/memory/` — project-specific facts. The project's `MEMORY.md` index loads natively. Session handoffs live in the `handoffs/` subdirectory (rolling cap of 5, ISO-timestamped).
+- **Global tier** at `~/.claude/memory/`, cross-project user-level facts (identity, preferences). Loaded once per session via the `load-global-memory.sh` UserPromptSubmit hook.
+- **Project tier** at `~/.claude/projects/<project-key>/memory/`, project-specific facts. The project's `MEMORY.md` index loads natively. Session handoffs live in the `handoffs/` subdirectory (rolling cap of 5, ISO-timestamped).
 Run `bash ~/.claude/scripts/memory-doctor.sh` to verify the pipeline end-to-end.

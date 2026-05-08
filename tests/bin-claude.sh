@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/bin-claude.sh — verification harness for bin/claude wrapper.
+# tests/bin-claude.sh, verification harness for bin/claude wrapper.
 #
 # Runs deterministic scenarios from the audit plan Phase 3 (sections 3.1
 # through 3.9). Exits 0 on full pass; non-zero on first failure.
@@ -55,7 +55,7 @@ assert_contains() {
 mkdir -p "$FIXTURE_DIR"
 cat > "$FIXTURE" <<'STUB'
 #!/usr/bin/env bash
-# Stub real claude — echoes argv, exits 0.
+# Stub real claude, echoes argv, exits 0.
 echo "STUB_CLAUDE argv=[$*]"
 STUB
 chmod +x "$FIXTURE"
@@ -76,7 +76,7 @@ if command -v zsh >/dev/null 2>&1; then
     RESOLVED_Z=$(PATH="$REPO_DIR/bin:$FIXTURE_DIR:$PATH" zsh -c 'command -v claude')
     assert "3.3 zsh resolves to wrapper" "$WRAPPER" "$RESOLVED_Z"
 else
-    echo "# 3.3 zsh not installed — skipped"
+    echo "# 3.3 zsh not installed, skipped"
 fi
 
 # ── 3.4: pass-through (no batch) ──────────────────────────────────────────
@@ -114,7 +114,7 @@ OUT=$(cat /tmp/bin-claude.out)
 rm -rf "$COLL_DIR"
 assert_contains "3.6 wrapper falls through to next executable claude" "STUB_CLAUDE argv=[check]" "$OUT"
 
-# ── 3.8: bash/ layer — shared.bash is the only tracked file ──────────────
+# ── 3.8: bash/ layer, shared.bash is the only tracked file ──────────────
 echo "# 3.8 bash/ tracks only shared.bash"
 TRACKED_BASH=$(cd "$REPO_DIR" && git ls-files bash/ 2>/dev/null)
 assert "3.8 git ls-files bash/ returns only shared.bash" "bash/shared.bash" "$TRACKED_BASH"

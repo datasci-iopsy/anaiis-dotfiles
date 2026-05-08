@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # ~/.dotfiles/install.sh
 # Run once on a new machine to symlink the Claude policy stack into place.
-# Safe to re-run — skips anything already correctly linked.
+# Safe to re-run, skips anything already correctly linked.
 #
 # This dotfiles repo no longer manages your shell config. The only shell-
-# adjacent piece is bin/claude — a shell-agnostic wrapper that intercepts
+# adjacent piece is bin/claude, a shell-agnostic wrapper that intercepts
 # CodeRabbit "fix all" batches before claude starts. To use it, add this
 # directory to your PATH (instructions printed below).
 
@@ -18,7 +18,7 @@ symlink() {
 	if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$src" ]; then
 		echo "  ok   $dst"
 	elif [ -e "$dst" ] && [ ! -L "$dst" ]; then
-		echo "  SKIP $dst (real file exists — back it up and remove it first)"
+		echo "  SKIP $dst (real file exists, back it up and remove it first)"
 	else
 		ln -sf "$src" "$dst"
 		echo "  link $dst -> $src"
@@ -71,7 +71,7 @@ echo ""
 echo "=== Claude wrapper (opt-in, shell-agnostic) ==="
 echo ""
 echo "Add this single line to your shell config (~/.bashrc, ~/.zshrc, or"
-echo "~/.config/fish/config.fish — choose whichever your shell reads):"
+echo "~/.config/fish/config.fish, choose whichever your shell reads):"
 echo ""
 echo "    export PATH=\"\$HOME/.dotfiles/bin:\$PATH\""
 echo ""
@@ -91,14 +91,14 @@ echo "  rm -f \"\$HOME/.mcp.json\"   # the github MCP entry was removed; this cl
 echo "  rm -f \"\$HOME/.bashrc\" \"\$HOME/.bash_profile\" \"\$HOME/.bashrc.local\"   # only if these were dotfiles symlinks; back up first"
 echo ""
 echo "Next steps:"
-echo "  1. Edit ~/.claude/settings.local.json  — set GITHUB_TOKEN and model"
-echo "  2. Edit ~/.claude/CLAUDE.local.md      — note machine-specific environment"
+echo "  1. Edit ~/.claude/settings.local.json , set GITHUB_TOKEN and model"
+echo "  2. Edit ~/.claude/CLAUDE.local.md     , note machine-specific environment"
 echo "  3. Run ~/.claude/scripts/seed-memory.sh from any project root to init memory"
 echo "  4. Run ~/.claude/scripts/install-repo-hooks.sh in repos that need lint hooks"
 echo ""
 echo "=== Suggested tools (not installed by this script) ==="
 echo ""
-echo "LibreOffice — required for .docx ingestion on Linux; optional on macOS (textutil"
+echo "LibreOffice, required for .docx ingestion on Linux; optional on macOS (textutil"
 echo "is used there instead, but LibreOffice is available as a fallback)."
 echo ""
 echo "  macOS:  brew install --cask libreoffice"

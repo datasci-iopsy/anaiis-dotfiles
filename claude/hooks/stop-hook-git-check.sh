@@ -17,7 +17,7 @@ if ! git rev-parse --git-dir >/dev/null 2>&1; then
 fi
 
 # Bail if there's no remote to push to. Every error path below asks the user
-# to "push to the remote branch" — meaningless without a remote, and
+# to "push to the remote branch", meaningless without a remote, and
 # unsatisfiable if signing also requires a source. This case arises when CCR
 # was launched against a local repo with no github remote (sources=[]) and
 # the container's cwd has a leftover .git from a cached resume.

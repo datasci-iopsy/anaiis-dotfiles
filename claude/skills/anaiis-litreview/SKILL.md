@@ -1,6 +1,6 @@
 ---
 name: anaiis-litreview
-description: Literature review or research synthesis on a topic — auto-triggers when the user asks to find, review, or synthesize literature from the local references catalog
+description: Literature review or research synthesis on a topic, auto-triggers when the user asks to find, review, or synthesize literature from the local references catalog
 ---
 
 # Literature Review
@@ -23,11 +23,11 @@ Activate when the request matches any of these patterns:
 
 Do NOT activate when:
 
-- The user asks to **edit or copyedit** a manuscript — use anaiis-copyedit
-- The user asks to **peer-review** a manuscript draft — use anaiis-peerreview
-- The request is a one-off catalog count or schema check — run DuckDB inline, no skill needed
-- The user wants a **single specific paper** by author/year — run a targeted DuckDB lookup, no synthesis needed
-- The user says "review my literature section" **and provides a manuscript file path** — that is a manuscript section review; use anaiis-peerreview
+- The user asks to **edit or copyedit** a manuscript, use anaiis-copyedit
+- The user asks to **peer-review** a manuscript draft, use anaiis-peerreview
+- The request is a one-off catalog count or schema check, run DuckDB inline, no skill needed
+- The user wants a **single specific paper** by author/year, run a targeted DuckDB lookup, no synthesis needed
+- The user says "review my literature section" **and provides a manuscript file path**, that is a manuscript section review; use anaiis-peerreview
 
 **Disambiguation:** "Review my literature section" without a file path = catalog gap identification → activate litreview. With a file path to a manuscript = manuscript section review → use peerreview.
 
@@ -48,7 +48,7 @@ Before querying, verify the catalog exists using Glob:
 
 Always query the catalog before reading any PDF. This is the primary narrowing step.
 
-Purpose: **Discovery** — browsing records to find relevant items; user is steering. Per `rules/duckdb.md`: select only columns needed for reasoning, LIMIT 20. Run COUNT first if result set size is uncertain.
+Purpose: **Discovery**, browsing records to find relevant items; user is steering. Per `rules/duckdb.md`: select only columns needed for reasoning, LIMIT 20. Run COUNT first if result set size is uncertain.
 
 ```bash
 duckdb -json -c "
@@ -75,7 +75,7 @@ Inspect the results:
 
 ### Step 2: Narrow by abstract review (in context, no reads)
 
-From the catalog results, rank candidates based on title, authors, year, and abstract text already returned. Do this reasoning in context — do not read PDFs yet.
+From the catalog results, rank candidates based on title, authors, year, and abstract text already returned. Do this reasoning in context, do not read PDFs yet.
 
 Select the 3-5 papers most relevant to the user's specific question. Prefer:
 - Papers where the abstract directly addresses the query
@@ -92,7 +92,7 @@ Grep(pattern=<keyword>, path=<subdirectory path>, glob="*.txt", output_mode="fil
 
 This verifies a specific method, finding, or term appears in the paper body, not just the abstract.
 
-Check with Glob before grepping — skip this step if `.txt` files do not exist alongside the PDFs.
+Check with Glob before grepping, skip this step if `.txt` files do not exist alongside the PDFs.
 
 Never use `Bash(rg)` or `Bash(grep)` for this step.
 
@@ -109,9 +109,9 @@ Respect the read-only analyst role established in the project CLAUDE.md.
 
 ### Step 5: Synthesize
 
-After reading, produce a synthesis — not a list of summaries. Structure around themes, agreements, contradictions, and gaps relevant to the user's query.
+After reading, produce a synthesis, not a list of summaries. Structure around themes, agreements, contradictions, and gaps relevant to the user's query.
 
-Cite as: Author(s) (Year) — use the catalog `authors` and `year` fields for accuracy.
+Cite as: Author(s) (Year), use the catalog `authors` and `year` fields for accuracy.
 
 ### Step 6: Web expansion (conditional)
 
@@ -121,9 +121,9 @@ Activate this step when:
 - User's query is on a topic they are new to and the catalog is thin
 
 Use WebSearch to find additional papers. For each result:
-1. Confirm the DOI (journal articles) or ISBN (books) — search CrossRef, Semantic Scholar, publisher page, or Google Scholar
+1. Confirm the DOI (journal articles) or ISBN (books), search CrossRef, Semantic Scholar, publisher page, or Google Scholar
 2. Include only results where a DOI or ISBN can be confirmed or reasonably inferred
-3. Flag any result where DOI/ISBN cannot be confirmed: "Note: could not confirm DOI — verify before adding to your library"
+3. Flag any result where DOI/ISBN cannot be confirmed: "Note: could not confirm DOI, verify before adding to your library"
 4. Never fabricate a DOI or ISBN
 
 Per `rules/citations.md`: web results are supplementary. Present them separately from catalog results.
@@ -158,13 +158,13 @@ Per `rules/citations.md`: web results are supplementary. Present them separately
 - Never read more than 5 PDFs in a single pass
 - Never attempt to read all PDFs in a subdirectory
 - Always query the catalog first; never skip to reading
-- Do not summarize papers individually — synthesize across them
+- Do not summarize papers individually, synthesize across them
 - Citation integrity: follow `rules/citations.md`. Only cite papers confirmed via catalog query or direct Read. If a source is not in the local catalog, say so and offer a web search only if the user explicitly asks.
 
 ## Guardrails
 
 - Query discipline (purpose classification, column selection, re-query prevention): follow `rules/duckdb.md`
-- Never use `Bash(rg)` or `Bash(grep)` — use the Grep tool for content search; use Glob for file existence checks
+- Never use `Bash(rg)` or `Bash(grep)`, use the Grep tool for content search; use Glob for file existence checks
 - The catalog query is a Discovery query: limit to columns needed for narrowing (title, authors, year, subdirectory, file_path, abstract); do not add columns that will not drive the selection decision
 
 ## Integration

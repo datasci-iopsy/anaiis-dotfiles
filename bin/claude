@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# bin/claude — shell-agnostic CodeRabbit batch interceptor.
+# bin/claude, shell-agnostic CodeRabbit batch interceptor.
 #
 # Why this exists: CodeRabbit's "fix all" batches are passed as a single
 # argument followed by a trailing `&& rm <tmpfile>` that removes the source
 # before Claude can read it. Intercepting at the shell level (before claude
 # starts) is the only place we can capture the batch contents safely. A
-# Claude PreToolUse hook can't help here — by the time hooks fire, claude
+# Claude PreToolUse hook can't help here, by the time hooks fire, claude
 # is already past startup.
 #
 # Install: add this directory to PATH ahead of the real claude:

@@ -1,9 +1,9 @@
 #!/bin/bash
-# pre-compact.sh — capture session state before context compaction
+# pre-compact.sh, capture session state before context compaction
 #
 # Fires on both triggers:
-#   trigger=manual  — user ran /compact
-#   trigger=auto    — context threshold hit automatically
+#   trigger=manual , user ran /compact
+#   trigger=auto   , context threshold hit automatically
 #
 # Writes a structured handoff file to the project memory directory's
 # handoffs/ subdirectory. Filename uses ISO 8601 minute-precision UTC
@@ -11,11 +11,11 @@
 # in the same day cannot collide on filename. Applies a rolling cap of
 # 5 inside the handoffs/ subdir (oldest deleted on overflow).
 #
-# MEMORY.md is NOT mutated — handoffs are an opaque mechanism enforced
+# MEMORY.md is NOT mutated, handoffs are an opaque mechanism enforced
 # by the subdirectory itself; the index stays focused on topical memory.
 #
 # Output file: ~/.claude/projects/<project>/memory/handoffs/handoff_<isots>_<id>.md
-# Exit 0 always — never block compaction.
+# Exit 0 always, never block compaction.
 
 set -euo pipefail
 
@@ -23,7 +23,7 @@ set -euo pipefail
 INPUT=$(cat)
 
 if ! command -v jq &>/dev/null; then
-	echo "[pre-compact] jq not found — skipping handoff" >&2
+	echo "[pre-compact] jq not found, skipping handoff" >&2
 	exit 0
 fi
 
@@ -33,7 +33,7 @@ CWD=$(echo "$INPUT" | jq -r '.cwd // ""')
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // ""')
 
 if [ -z "$CWD" ]; then
-	echo "[pre-compact] cwd missing from hook input — skipping" >&2
+	echo "[pre-compact] cwd missing from hook input, skipping" >&2
 	exit 0
 fi
 
@@ -102,7 +102,7 @@ fi
 cat >"$HANDOFF_FILE" <<HANDOFF
 ---
 name: Session handoff ${FILE_TS}
-description: Pre-compact snapshot — ${TRIGGER} trigger, branch ${BRANCH}
+description: Pre-compact snapshot, ${TRIGGER} trigger, branch ${BRANCH}
 type: project
 ---
 
@@ -114,7 +114,7 @@ type: project
 
 ## Files active this session
 
-Do not re-read these files — their content was in context before compaction:
+Do not re-read these files, their content was in context before compaction:
 
 \`\`\`
 ${FILE_READS}
