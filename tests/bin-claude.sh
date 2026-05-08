@@ -114,10 +114,10 @@ OUT=$(cat /tmp/bin-claude.out)
 rm -rf "$COLL_DIR"
 assert_contains "3.6 wrapper falls through to next executable claude" "STUB_CLAUDE argv=[check]" "$OUT"
 
-# ── 3.8: bash/ directory removed ──────────────────────────────────────────
-echo "# 3.8 bash/ directory absent in tracked tree"
-TRACKED_BASH=$(cd "$REPO_DIR" && git ls-files bash/ 2>/dev/null | head -1)
-assert "3.8 git ls-files bash/ returns nothing" "" "$TRACKED_BASH"
+# ── 3.8: bash/ layer — shared.bash is the only tracked file ──────────────
+echo "# 3.8 bash/ tracks only shared.bash"
+TRACKED_BASH=$(cd "$REPO_DIR" && git ls-files bash/ 2>/dev/null)
+assert "3.8 git ls-files bash/ returns only shared.bash" "bash/shared.bash" "$TRACKED_BASH"
 
 # ── 3.9: install.sh prints PATH-extension snippet, no bash symlinks ───────
 echo "# 3.9 install.sh output shape"
