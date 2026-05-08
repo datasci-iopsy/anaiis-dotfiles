@@ -84,6 +84,14 @@
                 "hooks": [
                     {
                         "type": "command",
+                        "command": "bash $HOME/.claude/hooks/surface-behavioral-rules.sh"
+                    }
+                ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
                         "command": "bash $HOME/.claude/hooks/maintenance-check.sh"
                     }
                 ]
