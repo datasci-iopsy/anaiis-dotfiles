@@ -1,5 +1,14 @@
 # Global Claude Instructions
 
+## Behavioral rules
+
+1. Don't assume. Don't hide confusion. Surface tradeoffs.
+2. Minimum code that solves the problem. Nothing speculative.
+3. Touch only what you must. Clean up only your own mess.
+4. Define success criteria. Loop until verified.
+
+For rationale and cross-links, see `rules/behavioral.md`.
+
 This file provides project context and author identity. Detailed rules live in `~/.claude/rules/`.
 
 ## Project context
@@ -17,6 +26,7 @@ Rules (`~/.claude/rules/`) constrain Claude's behavior across all tasks. Skills 
 ## Rules index
 | File | Covers |
 |---|---|
+| `rules/behavioral.md` | The 4 lines: surface tradeoffs, minimum code, touch only what you must, verify before claiming done |
 | `rules/environment.md` | macOS, Bash, direnv, pyenv, worktree safety |
 | `rules/tools.md` | gh, jq, gcloud, make, structured CLI output |
 | `rules/code-style.md` | Writing style, shell formatting, no emojis |
