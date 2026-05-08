@@ -1,3 +1,8 @@
+---
+name: core
+description: Core principles (simplicity, root causes, minimal impact) and the per-task workflow that applies before, during, and after every task
+---
+
 # Core Principles and Workflow
 
 ## Core principles

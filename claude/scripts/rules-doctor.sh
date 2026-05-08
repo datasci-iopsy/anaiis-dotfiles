@@ -80,10 +80,19 @@ fi
 echo "## C. rules/behavioral.md"
 if [ -f "$BEHAV_MD" ]; then
 	ok "C.1 rules/behavioral.md exists"
-	if head -1 "$BEHAV_MD" | grep -qE '^# '; then
+	# Skip optional YAML frontmatter and blank lines, then check first
+	# non-empty content line is an H1.
+	FIRST_CONTENT=$(awk '
+		NR==1 && /^---$/  { fm=1; next }
+		fm && /^---$/     { fm=0; next }
+		fm                { next }
+		/^[[:space:]]*$/  { next }
+		                  { print; exit }
+	' "$BEHAV_MD")
+	if printf '%s' "$FIRST_CONTENT" | grep -qE '^# '; then
 		ok "C.2 has H1 title"
 	else
-		fail "C.2 H1 title" "first line is not '# Title'"
+		fail "C.2 H1 title" "first non-frontmatter line is not '# Title'"
 	fi
 	H2_CT=$(grep -cE '^## [1-4]\.' "$BEHAV_MD" || true)
 	if [ "${H2_CT:-0}" -eq 4 ]; then

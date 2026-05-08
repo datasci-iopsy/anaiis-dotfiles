@@ -1,3 +1,8 @@
+---
+name: behavioral
+description: The four imperatives that govern every task, surface ambiguity, minimum code, touch only what you must, verify before claiming done
+---
+
 # Behavioral Rules
 
 The four imperatives at the top of `~/.claude/CLAUDE.md` distill behaviors that hold across stacks and tasks. Prescriptive rules go stale when codebases shift; behaviors do not. This file expands each line with rationale and cross-links to existing rules.

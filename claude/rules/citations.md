@@ -1,3 +1,8 @@
+---
+name: citations
+description: Citation integrity for specific paper claims (author, year, title, finding); does not restrict general conceptual or coding answers
+---
+
 # Citation Integrity
 
 ## What this rule covers

@@ -1,3 +1,8 @@
+---
+name: duckdb
+description: Query discipline for DuckDB, classify purpose (analytical, audit, discovery, inspection, log) before writing SQL
+---
+
 # DuckDB Query Discipline
 
 ## Identify query purpose before writing SQL

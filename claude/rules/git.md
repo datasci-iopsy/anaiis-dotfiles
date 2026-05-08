@@ -1,3 +1,8 @@
+---
+name: git
+description: Git workflow guardrails, branch verification, user-initiated commits and pushes, staging by name, no force-push, no --no-verify
+---
+
 # Git Workflow
 
 ## Before any push or commit suggestion

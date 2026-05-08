@@ -1,3 +1,8 @@
+---
+name: code-style
+description: Writing, JSON, SQL, and shell formatting conventions enforced across all edits
+---
+
 # Code and Writing Style
 
 ## Writing style

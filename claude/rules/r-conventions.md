@@ -1,3 +1,8 @@
+---
+name: r-conventions
+description: R conventions, vectorization over for-loops, vapply over sapply, pre-allocate when looping is unavoidable, Rcpp for sequential-dependent work
+---
+
 # R Programming Conventions
 
 **Default to vectorization over for-loops.** R's built-in vectorized operations run in compiled C/Fortran and are substantially faster than R-level loops at any meaningful data size.

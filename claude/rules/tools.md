@@ -1,3 +1,8 @@
+---
+name: tools
+description: Preferred CLIs (gh, jq, duckdb, gcloud, make, tmux) and the always-use-structured-output flag
+---
+
 # Tool Preferences
 
 - Use `gh` for all GitHub operations (PRs, issues, checks, repo links, etc.) — never raw curl to the API.

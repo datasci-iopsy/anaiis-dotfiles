@@ -1,3 +1,8 @@
+---
+name: session
+description: Token efficiency and output discipline, read-once policy, scoped reads with offset/limit, dedicated tools over Bash equivalents
+---
+
 # Session Discipline and Output Preferences
 
 ## Token efficiency

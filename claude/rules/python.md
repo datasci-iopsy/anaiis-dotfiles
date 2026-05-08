@@ -1,3 +1,8 @@
+---
+name: python
+description: Python project conventions, uv for versions and deps, direnv-managed venvs, ruff formatting; never invoke python directly
+---
+
 # Python Conventions
 
 - `uv` manages Python versions and all project dependencies. Do not use `pyenv` for project Python — `pyenv` is installed via Homebrew but is not used for version pinning in projects.
