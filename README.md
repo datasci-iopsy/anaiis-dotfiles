@@ -13,7 +13,7 @@
 
 Both are gitignored from this repo by virtue of being outside it. Your shell config and any other machine-local secrets are your concern, not this repo's.
 
-**Audit artifacts.** The current state of this repo is the result of a 5-advisor LLM Council audit on 2026-04-29. The full transcript, visual report, and remediation plan are tracked in the repo root: `council-report-2026-04-29.html`, `council-transcript-2026-04-29.md`. They explain *why* the structure looks the way it does.
+**Audit artifacts.** The current state of this repo is the result of a 5-advisor LLM Council audit on 2026-04-29. The full transcript, visual report, and remediation plan are archived in `_archive/`: `council-report-2026-04-29.html`, `council-transcript-2026-04-29.md`. They explain *why* the structure looks the way it does.
 
 **Install in 60 seconds.**
 
@@ -34,12 +34,14 @@ That installs the Claude policy stack and prints a one-line snippet to add to yo
 .dotfiles/
 ├── install.sh                      Symlinks claude/* into ~/.claude/; prints PATH snippet
 ├── README.md                       This file
-├── council-report-2026-04-29.html  LLM Council visual report (audit basis)
-├── council-transcript-2026-04-29.md  Full 5-advisor + 5-peer-review transcript
 ├── .lintr                          → ~/.lintr   Global R style config
 ├── .env.example                    Structural template, this repo consumes nothing from .env
+├── _archive/                       Non-tracked artifacts (council report, transcript, etc.)
+├── bash/
+│   └── shared.bash                 Shared bash helpers sourced by hook and test scripts
 ├── bin/
-│   └── claude                      Shell-agnostic CodeRabbit batch wrapper
+│   ├── claude                      Shell-agnostic CodeRabbit batch wrapper
+│   └── web-verify                  CLI wrapper: serve + Playwright verify + teardown
 ├── claude/
 │   ├── CLAUDE.md                   → ~/.claude/CLAUDE.md   Short index; rules live in rules/
 │   ├── CLAUDE.local.md.template    Copy-once template for machine-local Claude notes
@@ -53,10 +55,18 @@ That installs the Claude policy stack and prints a one-line snippet to add to yo
 │   ├── hooks/                      → ~/.claude/hooks/   Hook scripts (referenced by settings.json)
 │   ├── scripts/                    → ~/.claude/scripts/   Utility scripts
 │   └── memory-templates/           Templates copied per-project by seed-memory.sh
+├── templates/
+│   ├── dashboard/                  anaiis-dashboard: manifest validator, bootstrap.js, inline helper, Playwright spec
+│   ├── playwright-plotly/          Plotly render template (render.py + index.html.tmpl)
+│   ├── playwright-ggplot2/         ggplot2/htmlwidgets render template (render.R)
+│   └── playwright-static/          Static HTML smoke test scaffold (package.json, playwright.config.ts)
 └── tests/
     ├── bin-claude.sh               Phase-3 wrapper test harness (cross-shell, Linux-ready)
+    ├── fixtures/                   Test fixture files
     ├── measure-userpromptsubmit.sh  Hook-latency measurement (run when chain grows)
-    └── test-compact-hooks.sh       PreCompact / PostCompact end-to-end test
+    ├── test-claude-md-rules.sh     Validates CLAUDE.md rules index against rules/ on disk
+    ├── test-compact-hooks.sh       PreCompact / PostCompact end-to-end test
+    └── test-em-dash-guard.sh       Verifies block-em-dash.sh hook fires on U+2014 payloads
 ```
 
 ---
@@ -164,7 +174,7 @@ Otherwise, pass-through: the wrapper exec's the real `claude` with all args, unc
 
 ### Skills (custom, lazy-loaded)
 
-`anaiis-agents`, `anaiis-changelog`, `anaiis-copyedit`, `anaiis-docaudit`, `anaiis-duckdb`, `anaiis-gitpr`, `anaiis-gitrebase`, `anaiis-litreview`, `anaiis-peerreview`, `anaiis-preflight`, `anaiis-skillreview`, `graphify` (12 total).
+`anaiis-agents`, `anaiis-changelog`, `anaiis-copyedit`, `anaiis-dashboard`, `anaiis-docaudit`, `anaiis-duckdb`, `anaiis-gitpr`, `anaiis-gitrebase`, `anaiis-litreview`, `anaiis-peerreview`, `anaiis-preflight`, `anaiis-skillreview`, `anaiis-webverify`, `graphify` (14 total).
 
 Skills with overlap against an Anthropic built-in declare a `built_in_alternative` field in their `SKILL.md` frontmatter explaining the differentiation (currently: `anaiis-changelog`, `anaiis-docaudit`).
 
@@ -182,6 +192,7 @@ See `claude/skills/README.md` for trigger conditions.
 
 | File | Covers |
 |---|---|
+| `rules/behavioral.md` | The 4 imperatives: surface tradeoffs, minimum code, touch only what you must, verify |
 | `rules/environment.md` | macOS, Bash, direnv, pyenv, worktree safety |
 | `rules/tools.md` | gh, jq, gcloud, make, structured CLI output flags |
 | `rules/code-style.md` | Writing style, shell formatting, no emojis |
@@ -192,6 +203,7 @@ See `claude/skills/README.md` for trigger conditions.
 | `rules/duckdb.md` | DuckDB query discipline (purpose-based patterns) |
 | `rules/citations.md` | Citation integrity (corpus-only sources, no fabrication) |
 | `rules/core.md` | Simplicity, root causes, subagent discipline |
+| `rules/dashboards.md` | Dashboard data provenance, manifest discipline, narrative-data alignment, audience language |
 
 ### Agents (Sonnet, restricted tools)
 
@@ -207,11 +219,13 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 
 | Event | Matcher | Script | Behavior |
 |---|---|---|---|
+| `UserPromptSubmit` |, | `surface-behavioral-rules.sh` | Injects behavioral rules into the first prompt of each session |
 | `UserPromptSubmit` |, | `maintenance-check.sh` | Weekly plan-file check; monthly session-storage check; weekly repo-hooks audit |
 | `UserPromptSubmit` |, | `coderabbit-triage.sh` | CodeRabbit triage rubric injection for individual pastes |
 | `UserPromptSubmit` |, | `ensure-repo-hooks.sh` | Silently installs pre-commit dispatcher in current repo if missing |
 | `UserPromptSubmit` |, | `load-global-memory.sh` | Loads global memory tier (`~/.claude/memory/`) once per session |
 | `PostToolUse` | `Edit\|Write` | `post-edit-lint.sh` | `.py` ruff; `.sh` shfmt (auto-fix) + shellcheck; `.sql` sqlfmt; `.R` lintr; `.json` jq --indent 4 |
+| `PreToolUse` | `Write\|Edit\|MultiEdit\|NotebookEdit` | `block-em-dash.sh` | Rejects any payload containing U+2014 (em dash); enforces no-em-dash code style rule |
 | `PreToolUse` | `Write\|Edit` | inline | Allow `*.env.example`/`*.env.template`; block `*.lock`, `*.env`, `*credentials*`, `*secret*`, `*.pem`, `*.key` |
 | `PreToolUse` | `Bash` | inline | Block destructive `bq rm`, `gcloud delete*`, `uv cache clean`/`pip uninstall` |
 | `PreToolUse` | `Bash` | `prefer-jq.sh` | Warns when Python is used for JSON instead of jq |
@@ -219,8 +233,9 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 | `Stop` |, | `stop-hook-git-check.sh` | Reports uncommitted changes; never blocks (status-only) |
 | `PreCompact` | `*` | `pre-compact.sh` | Writes a structured handoff to project memory |
 | `PostCompact` | `*` | `post-compact.sh` | Re-injects the handoff so Claude has continuity post-compaction |
+| `StatusLine` | n/a | `statusline-command.sh` (in `scripts/`) | Custom status line display in the Claude Code UI |
 
-Hook latency on this machine (measured 2026-04-29): aggregate UserPromptSubmit chain median = **98 ms** (under 100 ms target). Re-measure with `bash tests/measure-userpromptsubmit.sh` if the chain grows.
+Hook latency on this machine (measured 2026-04-29, before `surface-behavioral-rules.sh` was added): aggregate UserPromptSubmit chain median = **98 ms** (under 100 ms target). Re-measure with `bash tests/measure-userpromptsubmit.sh` if the chain grows.
 
 ---
 
@@ -270,8 +285,9 @@ These override `git config`. The `attribution.commit` field (currently `""`) con
 ```bash
 brew install gh jq shellcheck shfmt ruff uv
 uv tool install shandy-sqlfmt
-uv tool install graphify
 ```
+
+The `graphify` skill is a Claude Code skill (not a uv tool). It auto-installs its Python dependency (`pip install graphifyy`) on first use via Step 1 of the skill. No manual install required.
 
 R packages (global, not renv-managed):
 

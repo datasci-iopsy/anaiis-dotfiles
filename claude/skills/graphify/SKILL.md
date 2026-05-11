@@ -71,6 +71,8 @@ if [ -n "$GRAPHIFY_BIN" ]; then
 else
     PYTHON="python3"
 fi
+# NOTE: "graphifyy" (double 'y') is the correct PyPI package name for this tool.
+# See https://github.com/safishamsi/graphify. This is intentional, not a typo.
 $PYTHON -c "import graphify" 2>/dev/null || pip install graphifyy -q --break-system-packages 2>&1 | tail -3
 # Write interpreter path for all subsequent steps
 $PYTHON -c "import sys; open('.graphify_python', 'w').write(sys.executable)"
