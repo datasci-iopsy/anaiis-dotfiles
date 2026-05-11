@@ -6,7 +6,7 @@ This layer is distinct from the `anaiis-agents` skill:
 - **This directory**: defines *what* named agents can do (tools, model, instructions)
 - **`anaiis-agents` skill**: defines *when and how* to spawn agents dynamically during a session
 
-Named agents here are invoked by the `coderabbit-fix` workflow. They are not general-purpose.
+Named agents here are invoked by the CodeRabbit triage workflow (implemented in the `anaiis-coderabbit` skill). They are not general-purpose.
 
 | Agent | Purpose | Tools |
 |-------|---------|-------|

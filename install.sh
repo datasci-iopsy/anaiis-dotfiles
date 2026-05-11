@@ -4,9 +4,9 @@
 # Safe to re-run, skips anything already correctly linked.
 #
 # This dotfiles repo no longer manages your shell config. The only shell-
-# adjacent piece is bin/claude, a shell-agnostic wrapper that intercepts
-# CodeRabbit "fix all" batches before claude starts. To use it, add this
-# directory to your PATH (instructions printed below).
+# adjacent piece is bin/web-verify, a CLI wrapper for serving + Playwright
+# verify + teardown. To use it, add this directory to your PATH (instructions
+# printed below).
 
 set -euo pipefail
 
@@ -68,23 +68,15 @@ symlink "$DOTFILES/.lintr" "$HOME/.lintr"
 echo ""
 echo "Done."
 echo ""
-echo "=== Claude wrapper (opt-in, shell-agnostic) ==="
+echo "=== web-verify CLI (optional) ==="
 echo ""
-echo "Add this single line to your shell config (~/.bashrc, ~/.zshrc, or"
+echo "If you use the anaiis-webverify skill or web-verify command directly,"
+echo "add this single line to your shell config (~/.bashrc, ~/.zshrc, or"
 echo "~/.config/fish/config.fish, choose whichever your shell reads):"
 echo ""
 echo "    export PATH=\"\$HOME/.dotfiles/bin:\$PATH\""
 echo ""
-echo "That puts $DOTFILES/bin/claude ahead of the system claude in PATH so"
-echo "CodeRabbit batches get intercepted before claude starts. Works in"
-echo "bash, zsh, fish, or any POSIX shell. No 'source' required."
-echo ""
-echo "=== Shell config template ==="
-echo ""
-echo "A bashrc.local.template in the repo root documents machine-local aliases"
-echo "(e.g. claude-fast). Copy it to ~/.bashrc.local and add this to ~/.bashrc:"
-echo ""
-echo "    [ -f ~/.bashrc.local ] && source ~/.bashrc.local"
+echo "Works in bash, zsh, fish, or any POSIX shell. No 'source' required."
 echo ""
 echo "Cleanup (if upgrading from a prior install):"
 echo "  rm -f \"\$HOME/.mcp.json\"   # the github MCP entry was removed; this clears any dangling symlink"
