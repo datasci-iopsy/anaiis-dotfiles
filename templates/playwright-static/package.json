@@ -1,0 +1,14 @@
+{
+    "name": "playwright-verify",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "test": "npx playwright test",
+        "test:headed": "npx playwright test --headed",
+        "codegen": "npx playwright codegen",
+        "serve": "python3 -m http.server 8080"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.44.0"
+    }
+}
