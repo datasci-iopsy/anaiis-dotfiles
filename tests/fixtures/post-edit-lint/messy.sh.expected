@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+if [ "$1" = "hello" ]; then
+	echo "hello"
+fi
