@@ -11,8 +11,8 @@
     "permissions": {
         "allow": [
             "Read",
-            "Read(/var/folders/*/*/T/coderabbit-instructions-*.txt)",
             "WebFetch(domain:docs.coderabbit.ai)",
+            "Bash(coderabbit:*)",
             "WebSearch",
             "Bash(git:*)",
             "Bash(git -C *)",
@@ -100,14 +100,6 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "bash $HOME/.claude/hooks/coderabbit-triage.sh"
-                    }
-                ]
-            },
-            {
-                "hooks": [
-                    {
-                        "type": "command",
                         "command": "bash $HOME/.claude/hooks/ensure-repo-hooks.sh"
                     }
                 ]
@@ -139,6 +131,10 @@
                     {
                         "type": "command",
                         "command": "bash $HOME/.claude/hooks/block-em-dash.sh"
+                    },
+                    {
+                        "type": "command",
+                        "command": "bash $HOME/.claude/hooks/block-edit-on-main.sh"
                     }
                 ]
             },
