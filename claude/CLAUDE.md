@@ -37,6 +37,7 @@ Rules (`~/.claude/rules/`) constrain Claude's behavior across all tasks. Skills 
 | `rules/core.md` | Simplicity, root causes, workflow, sub-agents |
 | `rules/duckdb.md` | DuckDB query discipline: purpose-based patterns, no re-querying context |
 | `rules/citations.md` | Citation integrity: corpus-only sources, no fabrication, web search only on explicit request |
+| `rules/dashboards.md` | Dashboard data provenance, manifest discipline, narrative-data alignment, audience language |
 
 ## Machine-local overrides
 `~/.claude/CLAUDE.local.md` (gitignored), machine-specific environment notes.
