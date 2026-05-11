@@ -30,6 +30,7 @@ Enforcement: the `block-em-dash.sh` PreToolUse hook denies any `Write`, `Edit`, 
 - Do not use jinja formatting. sqlfmt is jinja-aware and preserves jinja expressions as-is; this applies to both dbt and non-dbt SQL.
 - In dbt projects, sqlfmt config lives in `[tool.sqlfmt]` in `pyproject.toml`. Write SQL that passes sqlfmt without modification.
 - The post-edit hook auto-applies sqlfmt when found in the project venv (`.venv/bin/sqlfmt`) or on PATH.
+- `sqlfmt --check` runs at pre-commit via `sqlfmt-lint-staged.sh` and blocks commits with format drift (`SKIP_SQLFMT=1 git commit` to bypass).
 
 ## Shell formatting
 - All shell scripts (`.sh`) are formatted with `shfmt`. Style: tabs for indentation (`-i 0`), binary ops at line start (`-bn`), indented switch cases (`-ci`).

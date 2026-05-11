@@ -92,4 +92,4 @@ fi
 
 echo ""
 echo "Done. Pre-commit hook active for this repo."
-echo "Bypass: SKIP_R_LINT=1 git commit   |   SKIP_RUFF=1 git commit   |   SKIP_SHFMT=1 git commit"
+echo "Bypass: SKIP_R_LINT=1 git commit   |   SKIP_RUFF=1 git commit   |   SKIP_SHFMT=1 git commit   |   SKIP_SQLFMT=1 git commit"

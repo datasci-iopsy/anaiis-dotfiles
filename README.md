@@ -239,7 +239,7 @@ Hook latency on this machine (measured 2026-04-29, before `surface-behavioral-ru
 |---|---|---|---|
 | **Shell** | `post-edit-lint.sh` auto-applies `shfmt -w -i 0 -bn -ci` | `shfmt-lint-staged.sh` blocks | `SKIP_SHFMT=1 git commit …` |
 | **R** | `post-edit-lint.sh` runs `lintr` and reports | `r-lint-staged.sh` blocks if violations | `SKIP_R_LINT=1 git commit …` |
-| **SQL** | `post-edit-lint.sh` auto-applies `sqlfmt` (line_length=120, jinja-aware) | not enforced | n/a (auto-fix only) |
+| **SQL** | `post-edit-lint.sh` auto-applies `sqlfmt` (line_length=120, jinja-aware) | `sqlfmt-lint-staged.sh` blocks | `SKIP_SQLFMT=1 git commit …` |
 | **Python** | `post-edit-lint.sh` runs `ruff check` (reported) + `ruff format` (auto-applied) | `ruff-lint-staged.sh` blocks | `SKIP_RUFF=1 git commit …` |
 | **JSON** | `post-edit-lint.sh` enforces `jq --indent 4` | `json-lint-staged.sh` checks indent | n/a |
 
