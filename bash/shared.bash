@@ -28,6 +28,11 @@ for _brew_prefix in \
 done
 unset _brew_prefix
 
+# ── bash-completion ───────────────────────────────────────────────────────────
+if [ -r "$(brew --prefix 2>/dev/null)/etc/profile.d/bash_completion.sh" ]; then
+	. "$(brew --prefix)/etc/profile.d/bash_completion.sh"
+fi
+
 # ── pyenv ─────────────────────────────────────────────────────────────────────
 if [ -d "$HOME/.pyenv" ]; then
 	export PYENV_ROOT="$HOME/.pyenv"
