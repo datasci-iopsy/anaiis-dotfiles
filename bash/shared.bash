@@ -9,30 +9,29 @@ _os="$(uname -s)"
 
 # ── macOS-only ────────────────────────────────────────────────────────────────
 if [ "$_os" = "Darwin" ]; then
-    export BASH_SILENCE_DEPRECATION_WARNING=1
-    export LSCOLORS=GxFxCxDxBxegedabagaced
+	export BASH_SILENCE_DEPRECATION_WARNING=1
+	export LSCOLORS=GxFxCxDxBxegedabagaced
 fi
 
 # ── Homebrew ──────────────────────────────────────────────────────────────────
 # macOS: Apple Silicon (/opt/homebrew) and Intel (/usr/local)
 # Linux: Linuxbrew user install (~/.linuxbrew) and system install (/home/linuxbrew/.linuxbrew)
 for _brew_prefix in \
-    /opt/homebrew \
-    /usr/local \
-    "$HOME/.linuxbrew" \
-    /home/linuxbrew/.linuxbrew
-do
-    if [ -x "${_brew_prefix}/bin/brew" ]; then
-        eval "$("${_brew_prefix}/bin/brew" shellenv)"
-        break
-    fi
+	/opt/homebrew \
+	/usr/local \
+	"$HOME/.linuxbrew" \
+	/home/linuxbrew/.linuxbrew; do
+	if [ -x "${_brew_prefix}/bin/brew" ]; then
+		eval "$("${_brew_prefix}/bin/brew" shellenv)"
+		break
+	fi
 done
 unset _brew_prefix
 
 # ── pyenv ─────────────────────────────────────────────────────────────────────
 if [ -d "$HOME/.pyenv" ]; then
-    export PYENV_ROOT="$HOME/.pyenv"
-    export PATH="$PYENV_ROOT/bin:$PATH"
+	export PYENV_ROOT="$HOME/.pyenv"
+	export PATH="$PYENV_ROOT/bin:$PATH"
 fi
 
 # ── pipx / uv tools ───────────────────────────────────────────────────────────
@@ -40,41 +39,41 @@ fi
 
 # ── Google Cloud SDK ──────────────────────────────────────────────────────────
 if [ -f "$HOME/google-cloud-sdk/path.bash.inc" ]; then
-    . "$HOME/google-cloud-sdk/path.bash.inc"
+	. "$HOME/google-cloud-sdk/path.bash.inc"
 fi
 if [ -f "$HOME/google-cloud-sdk/completion.bash.inc" ]; then
-    . "$HOME/google-cloud-sdk/completion.bash.inc"
+	. "$HOME/google-cloud-sdk/completion.bash.inc"
 fi
 
 # ── direnv ────────────────────────────────────────────────────────────────────
 if command -v direnv >/dev/null 2>&1; then
-    eval "$(direnv hook bash)"
+	eval "$(direnv hook bash)"
 fi
 
 # ── Prompt, hostname, directory, git branch ──────────────────────────────────
 git_branch() {
-    local dir_name branch_name
-    dir_name=$(basename "$(pwd)")
-    if git rev-parse --is-inside-work-tree &>/dev/null 2>&1; then
-        branch_name=$(git symbolic-ref --short -q HEAD)
-        PS1="\[\e[1;32m\]\h\e[0m\]:\[\e[1;34m\][${dir_name}]\[\e[0m\]:\[\e[1;33m\]{${branch_name}}\[\e[0m\] "
-    else
-        PS1="\[\e[1;32m\]\h\e[0m\]:\[\e[1;34m\][${dir_name}]\[\e[0m\] "
-    fi
+	local dir_name branch_name
+	dir_name=$(basename "$(pwd)")
+	if git rev-parse --is-inside-work-tree &>/dev/null 2>&1; then
+		branch_name=$(git symbolic-ref --short -q HEAD)
+		PS1="\[\e[1;32m\]\h\e[0m\]:\[\e[1;34m\][${dir_name}]\[\e[0m\]:\[\e[1;33m\]{${branch_name}}\[\e[0m\] "
+	else
+		PS1="\[\e[1;32m\]\h\e[0m\]:\[\e[1;34m\][${dir_name}]\[\e[0m\] "
+	fi
 }
 PROMPT_COMMAND=git_branch
 
 # ── ls aliases ────────────────────────────────────────────────────────────────
 if [ "$_os" = "Darwin" ]; then
-    alias ls='ls -GFhp'
-    alias ll='ls -lAGFhp'
-    alias lt='ls -lAGFhtr'
-    alias l.='ls -dAGFhp .* 2>/dev/null'
+	alias ls='ls -GFhp'
+	alias ll='ls -lAGFhp'
+	alias lt='ls -lAGFhtr'
+	alias l.='ls -dAGFhp .* 2>/dev/null'
 else
-    alias ls='ls --color=auto -Fhp'
-    alias ll='ls --color=auto -lAFhp'
-    alias lt='ls --color=auto -lAFhtr'
-    alias l.='ls --color=auto -dAFhp .* 2>/dev/null'
+	alias ls='ls --color=auto -Fhp'
+	alias ll='ls --color=auto -lAFhp'
+	alias lt='ls --color=auto -lAFhtr'
+	alias l.='ls --color=auto -dAFhp .* 2>/dev/null'
 fi
 unset _os
 
@@ -120,6 +119,7 @@ alias gc_authList='gcloud auth list'
 
 # ── Claude ────────────────────────────────────────────────────────────────────
 alias claude-fast='claude --permission-mode bypassPermissions'
+alias cr='coderabbit'
 
 # ── Shell functions ───────────────────────────────────────────────────────────
 mcd() { mkdir -p "$1" && cd "$1"; }
