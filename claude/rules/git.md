@@ -25,8 +25,7 @@ description: Git workflow guardrails, branch verification, user-initiated commit
   - `<type>/<short-title>` (e.g., `feat/engagement-survey`, `hotfix/auth-fix`)
 - Claude always checks and branches from the user's feature branch (i.e., `<user-branch>/`). If no feature branch is detected, stop and notify the user. Claude branches always should follow the convention: 
   - `claude/<topic>` (e.g., `claude/ana-758-engagement-survey`)
-- CodeRabbit triage via Claude and skill load should **always** detect and use separate branch: `coderabbit/<topic>` 
-  - If CodeRabbit branch is detected, it should be updated and used for the triage; never duplicate CodeRabbit branches
+- CodeRabbit triage is driven by `/anaiis-coderabbit` (the skill at `claude/skills/anaiis-coderabbit/SKILL.md`). Always run it from a `coderabbit/<topic>` or `claude/<topic>` branch; never from `main`. The skill enforces this as a hard stop in Phase 1.
 - Never work directly on the user's feature branch. Always detect and create a Claude sub-branch first.
 - Never push directly to main without explicit instruction.
 - Never include session links (`https://claude.ai/code/session_*`) in PR titles, bodies, or descriptions. Sessions are deleted frequently and the links rot.
