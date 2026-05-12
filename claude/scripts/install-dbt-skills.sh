@@ -113,13 +113,20 @@ patch_skill_md() {
 		new_front+="  ${GATE_SUFFIX}"$'\n'
 	fi
 
-	# Write patched SKILL.md
+	# Write patched SKILL.md only if content changed (drives ok vs patch output label).
+	local tmp
+	tmp="$(mktemp)"
 	{
 		printf -- '---\n'
 		printf '%s' "$new_front"
 		printf -- '---\n'
 		printf '%s' "$body"
-	} >"$dst"
+	} >"$tmp"
+	if [ -f "$dst" ] && diff -q "$tmp" "$dst" >/dev/null 2>&1; then
+		rm -f "$tmp"
+		return 1
+	fi
+	mv "$tmp" "$dst"
 }
 
 echo "=== dbt skills: installing ${#SKILLS[@]} skills ==="
@@ -140,9 +147,12 @@ for skill in "${SKILLS[@]}"; do
 
 	mkdir -p "$dst_dir"
 
-	# Patch SKILL.md (copy + mutate frontmatter)
-	patch_skill_md "$src_dir/SKILL.md" "$dst_dir/SKILL.md" "$skill"
-	echo "  patch  $dst_dir/SKILL.md"
+	# Patch SKILL.md (copy + mutate frontmatter); returns 1 if content unchanged
+	if patch_skill_md "$src_dir/SKILL.md" "$dst_dir/SKILL.md" "$skill"; then
+		echo "  patch  $dst_dir/SKILL.md"
+	else
+		echo "  ok     $dst_dir/SKILL.md"
+	fi
 
 	# Symlink sibling assets (anything that is not SKILL.md)
 	for item in "$src_dir"/*; do
