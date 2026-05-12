@@ -58,7 +58,8 @@ else
 	# Fallback: derive from session ID, then most recent JSONL
 	TRANSCRIPT="$HOME/.claude/projects/$PROJECT_KEY/${SESSION_ID}.jsonl"
 	if [ ! -f "$TRANSCRIPT" ]; then
-		TRANSCRIPT=$(ls -t "$HOME/.claude/projects/$PROJECT_KEY/"*.jsonl 2>/dev/null | head -1 || echo "")
+		TRANSCRIPT=$(find "$HOME/.claude/projects/$PROJECT_KEY/" -maxdepth 1 -name '*.jsonl' 2>/dev/null \
+			| python3 -c "import sys,os; f=[l.rstrip() for l in sys.stdin if l.strip()]; f.sort(key=os.path.getmtime,reverse=True); print(f[0] if f else '')" 2>/dev/null || echo "")
 	fi
 fi
 
@@ -147,7 +148,7 @@ COUNT=$(find "$HANDOFFS_DIR" -maxdepth 1 -name 'handoff_*.md' -type f 2>/dev/nul
 if [ "${COUNT:-0}" -gt "$CAP" ]; then
 	OVERFLOW=$((COUNT - CAP))
 	# ls -1t lists newest first; tail -$OVERFLOW gives us the oldest to delete.
-	ls -1t "$HANDOFFS_DIR"/handoff_*.md 2>/dev/null | tail -n "$OVERFLOW" | while IFS= read -r old; do
+	find "$HANDOFFS_DIR" -maxdepth 1 -name 'handoff_*.md' 2>/dev/null | sort | head -n "$OVERFLOW" | while IFS= read -r old; do
 		rm -f "$old"
 	done
 fi

@@ -42,8 +42,7 @@ case "$FILE" in
 
 	*.json)
 		if command -v jq &>/dev/null; then
-			formatted=$(jq --indent 4 . "$FILE" 2>&1)
-			if [[ $? -eq 0 ]]; then
+			if formatted=$(jq --indent 4 . "$FILE" 2>&1); then
 				echo "$formatted" >"$FILE"
 				echo "[lint] json: formatted $FILE with 4-space indent" >&2
 			else

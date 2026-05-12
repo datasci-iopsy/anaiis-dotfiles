@@ -29,9 +29,9 @@ HANDOFFS_DIR="$MEMORY_DIR/handoffs"
 # Find the most recent handoff: prefer the handoffs/ subdirectory introduced
 # in Phase 9, fall back to the flat layout for projects that have not yet
 # been touched by an updated pre-compact.
-LATEST_HANDOFF=$(ls -t "$HANDOFFS_DIR"/handoff_*.md 2>/dev/null | head -1 || echo "")
+LATEST_HANDOFF=$(find "$HANDOFFS_DIR" -maxdepth 1 -name 'handoff_*.md' 2>/dev/null | sort -r | head -1 || echo "")
 if [ -z "$LATEST_HANDOFF" ]; then
-	LATEST_HANDOFF=$(ls -t "$MEMORY_DIR"/handoff_*.md 2>/dev/null | head -1 || echo "")
+	LATEST_HANDOFF=$(find "$MEMORY_DIR" -maxdepth 1 -name 'handoff_*.md' 2>/dev/null | sort -r | head -1 || echo "")
 fi
 
 if [ -z "$LATEST_HANDOFF" ] || [ ! -f "$LATEST_HANDOFF" ]; then

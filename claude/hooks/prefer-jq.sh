@@ -42,5 +42,3 @@ fi
 
 echo "Prefer jq over Python for JSON parsing -- import json is the only import, this is a pure parsing task. jq is pre-approved, streaming, and faster." >&2
 exit 2
-
-exit 0
