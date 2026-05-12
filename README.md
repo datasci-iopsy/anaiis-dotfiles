@@ -1,6 +1,6 @@
 # dotfiles
 
-**What this is.** A personal Claude Code policy stack, rules, skills, hooks, agents, slash commands, plus one shell-agnostic Claude wrapper. Tracked in git, shared across two machines (personal + work), installed via symlinks in `install.sh`. macOS today; portable to Linux.
+**What this is.** A personal Claude Code policy stack, rules, skills, hooks, agents, slash commands, plus the `web-verify` CLI. Tracked in git, shared across two machines (personal + work), installed via symlinks in `install.sh`. macOS today; portable to Linux.
 
 **It does not manage your shell config.** The previous bash layer was deleted in the 2026-04-29 audit. The only shell-adjacent piece left in `bin/` is `web-verify`. Your `~/.bashrc` / `~/.zshrc` / `~/.config/fish/config.fish` is yours.
 
@@ -13,12 +13,12 @@
 
 Both are gitignored from this repo by virtue of being outside it. Your shell config and any other machine-local secrets are your concern, not this repo's.
 
-**Audit artifacts.** The current state of this repo is the result of a 5-advisor LLM Council audit on 2026-04-29. The full transcript, visual report, and remediation plan are archived in `_archive/`: `council-report-2026-04-29.html`, `council-transcript-2026-04-29.md`. They explain *why* the structure looks the way it does.
+**Audit artifacts.** The current state of this repo is the result of a 5-advisor LLM Council audit on 2026-04-29. The full transcript, visual report, and remediation plan are archived in `_archive/`: `council-report-2026-04-29.html`, `council-transcript-2026-04-29.md` (gitignored; exists only on machines where the audit was originally run). They explain *why* the structure looks the way it does.
 
 **Install in 60 seconds.**
 
 ```bash
-git clone git@github.com:datasci-iopsy/.dotfiles.git ~/.dotfiles
+git clone --recurse-submodules git@github.com:datasci-iopsy/.dotfiles.git ~/.dotfiles
 bash ~/.dotfiles/install.sh
 # Then add to your shell config (~/.bashrc, ~/.zshrc, etc.):
 #   export PATH="$HOME/.dotfiles/bin:$PATH"
@@ -36,6 +36,7 @@ That installs the Claude policy stack and prints a one-line snippet to add to yo
 ├── README.md                       This file
 ├── .lintr                          → ~/.lintr   Global R style config
 ├── .env.example                    Structural template, this repo consumes nothing from .env
+├── bashrc.local.template           Copy-once template for machine-local bash additions
 ├── _archive/                       Non-tracked artifacts (council report, transcript, etc.)
 ├── bash/
 │   └── shared.bash                 Shared bash helpers sourced by hook and test scripts
@@ -59,13 +60,18 @@ That installs the Claude policy stack and prints a one-line snippet to add to yo
 │   ├── playwright-plotly/          Plotly render template (render.py + index.html.tmpl)
 │   ├── playwright-ggplot2/         ggplot2/htmlwidgets render template (render.R)
 │   └── playwright-static/          Static HTML smoke test scaffold (package.json, playwright.config.ts)
-└── tests/
-    ├── bin-claude.sh               Stale: tested the deleted bin/claude wrapper; kept for reference
-    ├── fixtures/                   Test fixture files
-    ├── measure-userpromptsubmit.sh  Hook-latency measurement (run when chain grows)
-    ├── test-claude-md-rules.sh     Validates CLAUDE.md rules index against rules/ on disk
-    ├── test-compact-hooks.sh       PreCompact / PostCompact end-to-end test
-    └── test-em-dash-guard.sh       Verifies block-em-dash.sh hook fires on U+2014 payloads
+├── tests/
+│   ├── bin-claude.sh               Stale: tested the deleted bin/claude wrapper; kept for reference
+│   ├── fixtures/                   Test fixture files
+│   ├── measure-userpromptsubmit.sh  Hook-latency measurement (run when chain grows)
+│   ├── run-all.sh                  Runs the full test suite
+│   ├── test-claude-md-rules.sh     Validates CLAUDE.md rules index against rules/ on disk
+│   ├── test-compact-hooks.sh       PreCompact / PostCompact end-to-end test
+│   ├── test-em-dash-guard.sh       Verifies block-em-dash.sh hook fires on U+2014 payloads
+│   ├── test-post-edit-lint-dispatch.sh  PostToolUse lint hook dispatch tests
+│   └── test-staged-lint-dispatch.sh     Pre-commit staged-lint hook dispatch tests
+└── vendor/
+    └── dbt-agent-skills/           git submodule (pinned); source for dbt-* skill build
 ```
 
 ---
@@ -75,7 +81,13 @@ That installs the Claude policy stack and prints a one-line snippet to add to yo
 ### 1. Clone
 
 ```bash
-git clone git@github.com:datasci-iopsy/.dotfiles.git ~/.dotfiles
+git clone --recurse-submodules git@github.com:datasci-iopsy/.dotfiles.git ~/.dotfiles
+```
+
+If you already cloned without `--recurse-submodules`, run this before Step 2:
+
+```bash
+cd ~/.dotfiles && git submodule update --init --recursive
 ```
 
 ### 2. Run the installer
@@ -169,7 +181,9 @@ Each session writes a JSONL ledger to `~/.claude/anaiis-coderabbit/runs/<branch>
 
 ### Skills (custom, lazy-loaded)
 
-`anaiis-agents`, `anaiis-changelog`, `anaiis-coderabbit`, `anaiis-copyedit`, `anaiis-dashboard`, `anaiis-docaudit`, `anaiis-duckdb`, `anaiis-gitpr`, `anaiis-gitrebase`, `anaiis-litreview`, `anaiis-peerreview`, `anaiis-preflight`, `anaiis-skillreview`, `anaiis-webverify`, `graphify` (15 total).
+`anaiis-agents`, `anaiis-changelog`, `anaiis-coderabbit`, `anaiis-copyedit`, `anaiis-dashboard`, `anaiis-docaudit`, `anaiis-duckdb`, `anaiis-gitpr`, `anaiis-gitrebase`, `anaiis-litreview`, `anaiis-peerreview`, `anaiis-preflight`, `anaiis-skillreview`, `anaiis-webverify`, `graphify` (15 committed).
+
+Six additional `dbt-*` skills are built at install time from the `vendor/dbt-agent-skills` submodule (see `CLAUDE.md` for the full list and upgrade procedure). They are gitignored and do not appear in `git status`.
 
 Skills with overlap against an Anthropic built-in declare a `built_in_alternative` field in their `SKILL.md` frontmatter explaining the differentiation (currently: `anaiis-changelog`, `anaiis-docaudit`).
 
@@ -228,6 +242,7 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 | `PreCompact` | `*` | `pre-compact.sh` | Writes a structured handoff to project memory |
 | `PostCompact` | `*` | `post-compact.sh` | Re-injects the handoff so Claude has continuity post-compaction |
 | `StatusLine` | n/a | `statusline-command.sh` (in `scripts/`) | Custom status line display in the Claude Code UI |
+| (in project repos) | n/a | `repo-pre-commit.sh` | Pre-commit dispatcher (R, Python, Shell, JSON) installed into repos by `install-repo-hooks.sh`; not a Claude Code hook |
 
 Hook latency on this machine (measured 2026-04-29, before `surface-behavioral-rules.sh` was added): aggregate UserPromptSubmit chain median = **98 ms** (under 100 ms target). Re-measure with `bash tests/measure-userpromptsubmit.sh` if the chain grows.
 
