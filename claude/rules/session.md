@@ -23,6 +23,7 @@ Check whether that file path already appears in a prior Read result in this sess
 
 ## Session discipline
 - One deliverable per session. If scope shifts (e.g., planning to implementation), ask whether to continue or start fresh.
+- When the user corrects your approach, save a feedback memory before continuing.
 - Auto-compact is enabled and fires at ~80–85% context. The user prefers to compact manually before auto-compact triggers. When context approaches 80%, stop any long-running process and flag it, do not push past the threshold.
 - The PreCompact hook writes a timestamped handoff file and PostCompact restores it; compacting mid-session is safe and preserves continuity.
 - When context is high, prefer writing output to a file over long in-context responses.

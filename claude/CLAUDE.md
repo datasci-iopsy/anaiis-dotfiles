@@ -34,7 +34,7 @@ Rules (`~/.claude/rules/`) constrain Claude's behavior across all tasks. Skills 
 | `rules/r-conventions.md` | Vectorization, lapply/vapply, lintr style |
 | `rules/python.md` | uv, direnv, ruff |
 | `rules/session.md` | Token efficiency, context thresholds, output prefs, compaction |
-| `rules/core.md` | Simplicity, root causes, workflow, sub-agents |
+| `rules/core.md` | Root causes, plan mode threshold, workflow, sub-agents, hook output handling |
 | `rules/duckdb.md` | DuckDB query discipline: purpose-based patterns, no re-querying context |
 | `rules/citations.md` | Citation integrity: corpus-only sources, no fabrication, web search only on explicit request |
 | `rules/dashboards.md` | Dashboard data provenance, manifest discipline, narrative-data alignment, audience language |
