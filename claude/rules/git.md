@@ -29,6 +29,7 @@ description: Git workflow guardrails, branch verification, user-initiated commit
 - Never work directly on the user's feature branch. Always detect and create a Claude sub-branch first.
 - Never push directly to main without explicit instruction.
 - Never include session links (`https://claude.ai/code/session_*`) in PR titles, bodies, or descriptions. Sessions are deleted frequently and the links rot.
+- When a plan is accepted (ExitPlanMode), branch before the first non-plan edit. Plan files at `~/.claude/plans/` may be written from `main` (the `block-edit-on-main` hook exempts that path), but implementation must run on a `claude/<topic>` branch. If currently on `main`, the first action after plan acceptance is `git checkout -b claude/<topic>`.
 
 ## Identity
 - Git author identity is enforced via `GIT_AUTHOR_NAME`/`GIT_COMMITTER_NAME` in the harness `env` block (`~/.claude/settings.json`). The `attribution.commit` setting controls only `Co-Authored-By` trailers, not the author name.
