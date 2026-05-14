@@ -18,5 +18,8 @@ claude/CLAUDE.local.md
 # vscode
 .vscode/
 
+# Vendored Python environments (machine-local, reproducible from submodule)
+vendor/graphify-venv/
+
 # Misc
 _archive
