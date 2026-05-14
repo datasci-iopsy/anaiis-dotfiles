@@ -71,7 +71,8 @@ That installs the Claude policy stack and prints a one-line snippet to add to yo
 │   ├── test-post-edit-lint-dispatch.sh  PostToolUse lint hook dispatch tests
 │   └── test-staged-lint-dispatch.sh     Pre-commit staged-lint hook dispatch tests
 └── vendor/
-    └── dbt-agent-skills/           git submodule (pinned); source for dbt-* skill build
+    ├── dbt-agent-skills/           git submodule (pinned); source for dbt-* skill build
+    └── graphify/                   git submodule (pinned to v7); source for /graphify skill
 ```
 
 ---
