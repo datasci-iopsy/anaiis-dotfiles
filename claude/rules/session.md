@@ -21,6 +21,14 @@ Check whether that file path already appears in a prior Read result in this sess
 - Chain independent read-only shell commands with `&&` in a single Bash call.
 - Prefer Read over Bash(cat) unless piping to another command (e.g., `cat file | jq`).
 
+### CLI output discipline
+`rtk` is installed and wired via a PreToolUse Bash hook. It auto-intercepts routine commands (git, gh, ls, grep, find, ruff, uv, gcloud, etc.) and reduces output by 60-80%. No action needed for supported commands; the hook runs transparently.
+
+- **Routine commands** (status, list, build success): rtk handles automatically. Do not pipe through head/tail/grep to trim output.
+- **Diagnostic output** (compile errors, test failures, stack traces): call raw. The hook passes these through; do not add extra filtering that could drop error lines.
+- **Structured output** (--json flags): jq projection already efficient; rtk is redundant.
+- **Arbitrary noisy commands** not in the built-in list: pipe through `<cmd> 2>&1 | rtk pipe -f <filter>`. Available pipe filters: `grep`, `rg`, `find`, `fd`, `git-log`, `git-diff`, `git-status`, `ruff-check`, `ruff-format`, `pytest`, `mypy`, `tsc`, `prettier`. For tools with no matching filter (e.g., dbt), run raw and rely on compaction hygiene.
+
 ## Session discipline
 - One deliverable per session. If scope shifts (e.g., planning to implementation), ask whether to continue or start fresh.
 - When the user corrects your approach, save a feedback memory before continuing.
