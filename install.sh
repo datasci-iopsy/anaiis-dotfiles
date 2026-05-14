@@ -62,6 +62,10 @@ echo "=== Claude Code: dbt skills (vendored) ==="
 bash "$DOTFILES/claude/scripts/install-dbt-skills.sh"
 
 echo ""
+echo "=== Claude Code: graphify (vendored) ==="
+bash "$DOTFILES/claude/scripts/install-graphify.sh"
+
+echo ""
 echo "=== Claude Code: CLI tools ==="
 symlink "$DOTFILES/claude/scripts/cleanup-sessions.py" "$HOME/.local/bin/claude-cleanup"
 
