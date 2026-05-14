@@ -96,6 +96,7 @@ alias rsync='rsync -hvrP'
 alias pwd='pwd -P'
 alias du='du -sh'
 alias c='clear'
+alias bashconfig='vim ~/.bashrc'
 alias bashsrc='source ~/.bashrc'
 
 # ── Git ───────────────────────────────────────────────────────────────────────
@@ -118,13 +119,51 @@ alias glog="git log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset
 alias wipe_pip='pip freeze | cut -d "@" -f1 | xargs pip uninstall -y'
 
 # ── Google Cloud ──────────────────────────────────────────────────────────────
-alias gc_update='gcloud components update'
-alias gc_auth='gcloud auth login; gcloud auth application-default login'
-alias gc_authList='gcloud auth list'
+alias gc-update='gcloud components update'
+alias gc-auth='gcloud auth login; gcloud auth application-default login'
+alias gc-authList='gcloud auth list'
 
 # ── Claude ────────────────────────────────────────────────────────────────────
 alias claude-fast='claude --permission-mode bypassPermissions'
+
+# ── CodeRabbit ────────────────────────────────────────────────────────────────
 alias cr='coderabbit'
+alias cr-status='coderabbit auth status'
+cr-login() {
+	if [ -z "$CODERABBIT_API_KEY" ]; then
+		echo "cr-login: CODERABBIT_API_KEY is not set in ~/.bashrc.local" >&2
+		return 1
+	fi
+	if [ -z "$CODERABBIT_ORG_ID" ]; then
+		echo "cr-login: CODERABBIT_ORG_ID is not set in ~/.bashrc.local" >&2
+		return 1
+	fi
+	if ! command -v jq >/dev/null 2>&1; then
+		echo "cr-login: jq is required but not installed" >&2
+		return 1
+	fi
+	if ! coderabbit auth login --api-key "$CODERABBIT_API_KEY"; then
+		echo "cr-login: API key authentication failed" >&2
+		return 1
+	fi
+	local cfg
+	if [ -d "$HOME/Library/Application Support/coderabbit" ]; then
+		cfg="$HOME/Library/Application Support/coderabbit/user-data.json"
+	else
+		cfg="${XDG_CONFIG_HOME:-$HOME/.config}/coderabbit/user-data.json"
+	fi
+	if [ ! -f "$cfg" ]; then
+		echo "cr-login: config file not found at $cfg" >&2
+		return 1
+	fi
+	if ! jq --arg id "$CODERABBIT_ORG_ID" '.orgId = $id' "$cfg" >"$cfg.tmp"; then
+		echo "cr-login: failed to update orgId in $cfg" >&2
+		rm -f "$cfg.tmp"
+		return 1
+	fi
+	mv "$cfg.tmp" "$cfg"
+	echo "cr-login: authenticated and org set"
+}
 
 # ── Shell functions ───────────────────────────────────────────────────────────
 mcd() { mkdir -p "$1" && cd "$1"; }
