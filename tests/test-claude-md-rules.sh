@@ -52,7 +52,7 @@ trap 'cp "$BACKUP_CLAUDE_MD" "$CLAUDE_MD"; cp "$BACKUP_SETTINGS" "$SETTINGS"; rm
 
 # ── 1. Doctor passes on green tree ────────────────────────────────────────
 echo "# 1. Doctor on green tree"
-bash "$DOCTOR" > /tmp/test-rules.green.out 2>&1
+bash "$DOCTOR" >/tmp/test-rules.green.out 2>&1
 assert "1.1 doctor exits 0 on green tree" "0" "$?"
 assert_contains "1.2 green output reports 0 failures" "0 failed" "$(cat /tmp/test-rules.green.out)"
 
@@ -60,7 +60,7 @@ assert_contains "1.2 green output reports 0 failures" "0 failed" "$(cat /tmp/tes
 echo "# 2. Doctor catches CLAUDE.md drift"
 sed -i.bak "s/Don't assume. Don't hide confusion. Surface tradeoffs./MUTATED/" "$CLAUDE_MD"
 rm -f "${CLAUDE_MD}.bak"
-bash "$DOCTOR" > /tmp/test-rules.mangled.out 2>&1
+bash "$DOCTOR" >/tmp/test-rules.mangled.out 2>&1
 EXIT_MANGLED=$?
 assert "2.1 doctor exits non-zero when line mutated" "1" "$EXIT_MANGLED"
 assert_contains "2.2 doctor reports A.2 missing line" "A.2 CLAUDE.md missing line" "$(cat /tmp/test-rules.mangled.out)"
@@ -68,15 +68,15 @@ cp "$BACKUP_CLAUDE_MD" "$CLAUDE_MD"
 
 # ── 3. Doctor passes again after CLAUDE.md restore ────────────────────────
 echo "# 3. Restore CLAUDE.md"
-bash "$DOCTOR" > /dev/null 2>&1
+bash "$DOCTOR" >/dev/null 2>&1
 assert "3.1 doctor exits 0 after restore" "0" "$?"
 
 # ── 4. Doctor fails when hook un-registered from settings.json ────────────
 echo "# 4. Doctor catches settings.json drift"
 if command -v jq >/dev/null 2>&1; then
-	jq 'del(.hooks.UserPromptSubmit[0])' "$SETTINGS" > /tmp/test-rules.settings.json
+	jq 'del(.hooks.UserPromptSubmit[0])' "$SETTINGS" >/tmp/test-rules.settings.json
 	mv /tmp/test-rules.settings.json "$SETTINGS"
-	bash "$DOCTOR" > /tmp/test-rules.unreg.out 2>&1
+	bash "$DOCTOR" >/tmp/test-rules.unreg.out 2>&1
 	EXIT_UNREG=$?
 	assert "4.1 doctor exits non-zero when hook un-registered" "1" "$EXIT_UNREG"
 	assert_contains "4.2 doctor reports E.1 registration failure" "E.1 registration" "$(cat /tmp/test-rules.unreg.out)"
@@ -87,7 +87,7 @@ fi
 
 # ── 5. Doctor passes again after settings.json restore ────────────────────
 echo "# 5. Restore settings.json"
-bash "$DOCTOR" > /dev/null 2>&1
+bash "$DOCTOR" >/dev/null 2>&1
 assert "5.1 doctor exits 0 after restore" "0" "$?"
 
 # ── Cleanup tmp files ─────────────────────────────────────────────────────
