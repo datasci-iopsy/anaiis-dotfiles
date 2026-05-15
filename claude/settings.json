@@ -198,5 +198,13 @@
     "effortLevel": "medium",
     "awaySummaryEnabled": true,
     "skipDangerousModePermissionPrompt": true,
-    "autoCompactEnabled": true
+    "autoCompactEnabled": true,
+    "extraKnownMarketplaces": {
+        "anaiis-plugins": {
+            "source": {
+                "source": "github",
+                "repo": "datasci-iopsy/anaiis-plugins"
+            }
+        }
+    }
 }
