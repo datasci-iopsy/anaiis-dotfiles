@@ -128,7 +128,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "FILE=$(jq -r '.tool_input.file_path // empty'); case \"$FILE\" in *.env.example|*.env.template) exit 0 ;; *.lock|*.env|*.env.*|*credentials*|*secret*|*.pem|*.key) echo 'BLOCK: Refusing write to sensitive file: '\"$FILE\"; exit 2;; esac; exit 0"
+                        "command": "bash $HOME/.claude/hooks/block-sensitive-writes.sh"
                     }
                 ]
             },
@@ -137,7 +137,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "CMD=$(jq -r '.tool_input.command // empty'); if echo \"$CMD\" | grep -qE '^bq\\s+rm\\b'; then echo 'BLOCK: bq rm is destructive. Run this manually in terminal.' >&2; exit 2; fi; if echo \"$CMD\" | grep -qE '^gcloud\\s.*(delete|destroy|remove-iam-policy|set-iam-policy|disable|reset-windows-password)'; then echo 'BLOCK: Destructive gcloud command detected. Run this manually in terminal.' >&2; exit 2; fi; if echo \"$CMD\" | grep -qE '^uv\\s+(cache\\s+(clean|prune)|publish|tool\\s+uninstall|pip\\s+uninstall)'; then echo 'BLOCK: Destructive uv command detected. Run this manually in terminal.' >&2; exit 2; fi; exit 0"
+                        "command": "bash $HOME/.claude/hooks/block-destructive-commands.sh"
                     },
                     {
                         "type": "command",
