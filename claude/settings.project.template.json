@@ -1,0 +1,25 @@
+{
+    "permissions": {
+        "allow": [
+            "Bash(make:*)",
+            "Bash(cat:*)",
+            "Bash(ALLOW_LOCK_COMMIT=1 git commit*)",
+            "Bash(duckdb:*)",
+            "Bash(textutil:*)",
+            "Bash(bq show *)",
+            "Bash(bq ls *)",
+            "Bash(bq ls)",
+            "Bash(bq query *)",
+            "Bash(bq head *)",
+            "Bash(bq version)",
+            "Bash(gcloud auth list)",
+            "Bash(gcloud config *)",
+            "Bash(gcloud projects list *)",
+            "Bash(gcloud projects describe *)",
+            "Bash(gcloud * list *)",
+            "Bash(gcloud * describe *)",
+            "Bash(dbt parse *)",
+            "Bash(dbt compile *)"
+        ]
+    }
+}
