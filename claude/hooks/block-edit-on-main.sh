@@ -14,7 +14,11 @@ if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
 	if [ -n "$FILE" ]; then
 		RESOLVED=$(python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))" "$FILE" 2>/dev/null)
 		PLANS_DIR=$(python3 -c "import os; print(os.path.realpath(os.path.expanduser('~/.claude/plans')))" 2>/dev/null)
+		MEMORY_DIR=$(python3 -c "import os; print(os.path.realpath(os.path.expanduser('~/.claude/projects')))" 2>/dev/null)
 		if [ -n "$RESOLVED" ] && [ -n "$PLANS_DIR" ] && [[ "$RESOLVED" == "$PLANS_DIR"/* ]]; then
+			exit 0
+		fi
+		if [ -n "$RESOLVED" ] && [ -n "$MEMORY_DIR" ] && [[ "$RESOLVED" == "$MEMORY_DIR"/* ]]; then
 			exit 0
 		fi
 	fi
