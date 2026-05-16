@@ -222,6 +222,6 @@
     "skillListingBudgetFraction": 0.02,
     "skillOverrides": {
         "dbt:configuring-dbt-mcp-server": "user-invocable-only",
-        "dbt:working-with-dbt-mesh": "off"
+        "dbt:working-with-dbt-mesh": false
     }
 }
