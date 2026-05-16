@@ -31,6 +31,7 @@ Rules (`~/.claude/rules/`) constrain Claude's behavior across all tasks. Skills 
 | `rules/tools.md` | gh, jq, gcloud, make, structured CLI output |
 | `rules/code-style.md` | Writing style, shell formatting, no emojis |
 | `rules/git.md` | Branch naming, commit discipline, staging |
+| `rules/branching.md` | Trivial-edit criteria, branch reuse, worktree-from-main, cleanup advisory |
 | `rules/r-conventions.md` | Vectorization, lapply/vapply, lintr style |
 | `rules/python.md` | uv, direnv, ruff |
 | `rules/session.md` | Token efficiency, context thresholds, output prefs, compaction |

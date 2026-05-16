@@ -96,6 +96,14 @@
                         "command": "bash $HOME/.claude/hooks/load-global-memory.sh"
                     }
                 ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash $HOME/.claude/hooks/list-merged-claude-branches.sh"
+                    }
+                ]
             }
         ],
         "PostToolUse": [

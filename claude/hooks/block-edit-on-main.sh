@@ -20,7 +20,8 @@ if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
 	fi
 
 	echo "[block-edit-on-main] BLOCKED: refusing to edit '${FILE}' on branch '${BRANCH}'." >&2
-	echo "Create a branch first: git checkout -b claude/<topic>" >&2
+	echo "Preferred: create a worktree: git worktree add ../<repo>.worktrees/<topic> -b claude/<topic>" >&2
+	echo "Fallback (branch in place):   git checkout -b claude/<topic>" >&2
 	exit 2
 fi
 

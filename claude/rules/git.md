@@ -26,7 +26,7 @@ description: Git workflow guardrails, branch verification, user-initiated commit
 - Claude always checks and branches from the user's feature branch (i.e., `<user-branch>/`). If no feature branch is detected, stop and notify the user. Claude branches always should follow the convention: 
   - `claude/<topic>` (e.g., `claude/ana-758-engagement-survey`)
 - CodeRabbit triage is driven by `/anaiis-coderabbit` (the skill at `claude/skills/anaiis-coderabbit/SKILL.md`). Always run it from a `coderabbit/<topic>` or `claude/<topic>` branch; never from `main`. The skill enforces this as a hard stop in Phase 1.
-- Never work directly on the user's feature branch. Always detect and create a Claude sub-branch first.
+- For trivial edits (single file, ≤ 5 lines, no new symbols, no config/hook/test changes) while already on the user's feature branch, commit there directly. For all other edits, create a `claude/<topic>` sub-branch. See `rules/branching.md` for the full decision tree, branch-reuse algorithm, and worktree guidance.
 - Never push directly to main without explicit instruction.
 - Never include session links (`https://claude.ai/code/session_*`) in PR titles, bodies, or descriptions. Sessions are deleted frequently and the links rot.
 - When a plan is accepted (ExitPlanMode), branch before the first non-plan edit. Plan files at `~/.claude/plans/` may be written from `main` (the `block-edit-on-main` hook exempts that path), but implementation must run on a `claude/<topic>` branch. If currently on `main`, the first action after plan acceptance is `git checkout -b claude/<topic>`.
