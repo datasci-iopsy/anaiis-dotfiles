@@ -193,12 +193,13 @@
         "command": "bash $HOME/.claude/scripts/statusline-command.sh"
     },
     "enabledPlugins": {
-        "frontend-design@claude-plugins-official": true
+        "frontend-design@claude-plugins-official": true,
+        "anaiis-review@anaiis-plugins": true,
+        "anaiis-git@anaiis-plugins": true,
+        "anaiis-data@anaiis-plugins": true,
+        "anaiis-writing@anaiis-plugins": true,
+        "anaiis-meta@anaiis-plugins": true
     },
-    "effortLevel": "medium",
-    "awaySummaryEnabled": true,
-    "skipDangerousModePermissionPrompt": true,
-    "autoCompactEnabled": true,
     "extraKnownMarketplaces": {
         "anaiis-plugins": {
             "source": {
@@ -212,5 +213,9 @@
                 "repo": "dbt-labs/dbt-agent-skills"
             }
         }
-    }
+    },
+    "effortLevel": "medium",
+    "awaySummaryEnabled": true,
+    "skipDangerousModePermissionPrompt": true,
+    "autoCompactEnabled": true
 }
