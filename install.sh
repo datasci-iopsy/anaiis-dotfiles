@@ -58,10 +58,6 @@ copy_template "$DOTFILES/claude/CLAUDE.local.md.template" \
 	"$HOME/.claude/CLAUDE.local.md"
 
 echo ""
-echo "=== Claude Code: dbt skills (vendored) ==="
-bash "$DOTFILES/claude/scripts/install-dbt-skills.sh"
-
-echo ""
 echo "=== Claude Code: graphify (vendored) ==="
 bash "$DOTFILES/claude/scripts/install-graphify.sh"
 
@@ -78,7 +74,7 @@ echo "Done."
 echo ""
 echo "=== web-verify CLI (optional) ==="
 echo ""
-echo "If you use the anaiis-webverify skill or web-verify command directly,"
+echo "If you use the web-verify command directly,"
 echo "add this single line to your shell config (~/.bashrc, ~/.zshrc, or"
 echo "~/.config/fish/config.fish, choose whichever your shell reads):"
 echo ""
