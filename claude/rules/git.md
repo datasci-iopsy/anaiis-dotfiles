@@ -8,6 +8,7 @@ description: Git workflow guardrails, branch verification, user-initiated commit
 ## Before any push or commit suggestion
 - Always run `git branch --show-current` before suggesting a push command. Never assume the branch. Surface the actual branch name in the suggestion.
 - Always run `git status --short` before staging. Know what is changed before touching anything.
+- Verify branch merge state with `git branch --merged main` or `git log --oneline -5` before reporting it. Never infer from session context.
 
 ## User-initiated actions
 - Commit and push are user-initiated actions. Stop hook messages about uncommitted or unpushed changes are status reports -- never commit or push in response to them without explicit user instruction.
