@@ -205,6 +205,12 @@
                 "source": "github",
                 "repo": "datasci-iopsy/anaiis-plugins"
             }
+        },
+        "dbt-agent-marketplace": {
+            "source": {
+                "source": "github",
+                "repo": "dbt-labs/dbt-agent-skills"
+            }
         }
     }
 }
