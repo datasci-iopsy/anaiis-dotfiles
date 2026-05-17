@@ -1,10 +1,10 @@
 ---
 name: Shell Config File
-description: Bash config is modular under ~/anaiis-dotfiles/bash/bashrc.d/, never touch .zshrc, and do not treat .bash_profile as the edit target
+description: Bash config uses a single shared file at ~/anaiis-dotfiles/bash/shared.bash; ~/.bashrc and ~/.bashrc.local are real per-machine files, not symlinks; never touch .zshrc
 type: feedback
 ---
 
-Bash configuration is modular and managed by the dotfiles repo. Do not read or modify `.zshrc`.
-**Structure:** `~/.bash_profile` is a thin loader (symlink) that sources `~/.bashrc` (also a symlink). All real config lives in `~/anaiis-dotfiles/bash/bashrc.d/` numbered module files, with OS-specific overrides in `os-darwin.bash` / `os-linux.bash`. Machine-local values (GCP project, API keys) go in `~/.bashrc.local` (not tracked in git).
-**Why:** User uses bash exclusively. Config was modularized for dotfiles management and cross-platform support.
-**How to apply:** To add or change shell config, identify the correct module file (e.g., `09-aliases-git.bash` for git aliases, `04-path.bash` for PATH). Never write directly to `~/.bash_profile` or `~/.bashrc`, they are symlinks and edits would be lost. For machine-specific changes, edit `~/.bashrc.local`.
+Bash configuration is managed by the dotfiles repo. Do not read or modify `.zshrc`.
+**Structure:** `~/anaiis-dotfiles/bash/shared.bash` is the single tracked shared preferences file, sourced by `~/.bashrc.local`. Both `~/.bashrc` and `~/.bashrc.local` are real per-machine files (not symlinks, not tracked in git). Machine-local values (GCP project, API keys) go in `~/.bashrc.local`.
+**Why:** User uses bash exclusively. Shared config is tracked in the dotfiles repo and synced across machines via git pull; machine-local config stays untracked.
+**How to apply:** For changes that should apply on all machines, edit `~/anaiis-dotfiles/bash/shared.bash`. For machine-specific changes, edit `~/.bashrc.local` directly.
