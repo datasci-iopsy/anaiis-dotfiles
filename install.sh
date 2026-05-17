@@ -52,6 +52,7 @@ echo "=== Claude Code: Config files ==="
 symlink "$CANONICAL/claude/settings.json" "$HOME/.claude/settings.json"
 symlink "$CANONICAL/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 symlink "$CANONICAL/claude/keybindings.json" "$HOME/.claude/keybindings.json"
+symlink "$CANONICAL/claude/RTK.md" "$HOME/.claude/RTK.md"
 
 echo ""
 echo "=== Claude Code: Directories ==="
