@@ -4,12 +4,12 @@
 # implementation must run on a claude/<topic> branch (see rules/git.md).
 # Registered in claude/settings.json under PreToolUse matcher "Write|Edit|MultiEdit|NotebookEdit".
 
-BRANCH=$(git branch --show-current 2>/dev/null)
-[ -z "$BRANCH" ] && BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+FILE=$(jq -r '.tool_input.file_path // empty' 2>/dev/null)
+FILE_DIR=$(dirname "$FILE" 2>/dev/null)
+BRANCH=$(git -C "$FILE_DIR" branch --show-current 2>/dev/null)
+[ -z "$BRANCH" ] && BRANCH=$(git -C "$FILE_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
 
 if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
-	FILE=$(jq -r '.tool_input.file_path // empty' 2>/dev/null)
-
 	# Resolve via python3 to handle symlinks and non-existent target files.
 	if [ -n "$FILE" ]; then
 		RESOLVED=$(python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))" "$FILE" 2>/dev/null)
