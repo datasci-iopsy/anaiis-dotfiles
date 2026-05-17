@@ -71,7 +71,6 @@ anaiis-dotfiles/
 │   ├── test-post-edit-lint-dispatch.sh  PostToolUse lint hook dispatch tests
 │   └── test-staged-lint-dispatch.sh     Pre-commit staged-lint hook dispatch tests
 └── vendor/
-    ├── dbt-agent-skills/           git submodule (pinned); source for dbt-* skill build
     └── graphify/                   git submodule (pinned to v7); source for /graphify skill
 ```
 
@@ -184,7 +183,7 @@ Each session writes a JSONL ledger to `~/.claude/anaiis-coderabbit/runs/<branch>
 
 `anaiis-agents`, `anaiis-changelog`, `anaiis-coderabbit`, `anaiis-copyedit`, `anaiis-dashboard`, `anaiis-docaudit`, `anaiis-duckdb`, `anaiis-gitpr`, `anaiis-gitrebase`, `anaiis-litreview`, `anaiis-peerreview`, `anaiis-preflight`, `anaiis-skillreview`, `anaiis-webverify`, `graphify` (15 committed).
 
-Six additional `dbt-*` skills are built at install time from the `vendor/dbt-agent-skills` submodule (see `CLAUDE.md` for the full list and upgrade procedure). They are gitignored and do not appear in `git status`.
+`dbt-*` skills are served via the `dbt-labs/dbt-agent-skills` marketplace (registered in `claude/settings.json` under `extraKnownMarketplaces`). They require no local files and do not appear in this repo.
 
 Skills with overlap against an Anthropic built-in declare a `built_in_alternative` field in their `SKILL.md` frontmatter explaining the differentiation (currently: `anaiis-changelog`, `anaiis-docaudit`).
 
