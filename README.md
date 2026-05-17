@@ -18,7 +18,7 @@ Both are gitignored from this repo by virtue of being outside it. Your shell con
 **Install in 60 seconds.**
 
 ```bash
-git clone --recurse-submodules git@github.com:datasci-iopsy/.dotfiles.git ~/.dotfiles
+git clone --recurse-submodules git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/.dotfiles
 bash ~/.dotfiles/install.sh
 # Then add to your shell config (~/.bashrc, ~/.zshrc, etc.):
 #   export PATH="$HOME/.dotfiles/bin:$PATH"
@@ -82,7 +82,7 @@ That installs the Claude policy stack and prints a one-line snippet to add to yo
 ### 1. Clone
 
 ```bash
-git clone --recurse-submodules git@github.com:datasci-iopsy/.dotfiles.git ~/.dotfiles
+git clone --recurse-submodules git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/.dotfiles
 ```
 
 If you already cloned without `--recurse-submodules`, run this before Step 2:
