@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 # ~/anaiis-dotfiles/install.sh
-# Run once on a new machine to symlink the Claude policy stack into place.
-# Safe to re-run, skips anything already correctly linked.
-#
-# This dotfiles repo no longer manages your shell config. The only shell-
-# adjacent piece is bin/web-verify, a CLI wrapper for serving + Playwright
-# verify + teardown. To use it, add this directory to your PATH (instructions
-# printed below).
+# Run once on a new machine (or after moving the repo) to:
+#   1. Create ~/anaiis-dotfiles as a canonical symlink to wherever this repo lives
+#   2. Symlink the Claude policy stack into ~/.claude/
+#   3. Wire PATH and source shared.bash into ~/.bashrc
+# Safe to re-run — idempotent.
 
 set -euo pipefail
 
 DOTFILES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CANONICAL="$HOME/anaiis-dotfiles"
 
 symlink() {
 	local src="$1" dst="$2"
@@ -36,19 +35,55 @@ copy_template() {
 	fi
 }
 
+echo "=== Canonical path ==="
+if [ "$DOTFILES" != "$CANONICAL" ]; then
+	if [ -e "$CANONICAL" ] && [ ! -L "$CANONICAL" ]; then
+		echo "  SKIP $CANONICAL (real directory exists — move or remove it first)"
+	else
+		ln -sfn "$DOTFILES" "$CANONICAL"
+		echo "  link $CANONICAL -> $DOTFILES"
+	fi
+else
+	echo "  ok   $CANONICAL (repo is already at canonical location)"
+fi
+
+echo ""
 echo "=== Claude Code: Config files ==="
-symlink "$DOTFILES/claude/settings.json" "$HOME/.claude/settings.json"
-symlink "$DOTFILES/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
-symlink "$DOTFILES/claude/keybindings.json" "$HOME/.claude/keybindings.json"
+symlink "$CANONICAL/claude/settings.json" "$HOME/.claude/settings.json"
+symlink "$CANONICAL/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
+symlink "$CANONICAL/claude/keybindings.json" "$HOME/.claude/keybindings.json"
 
 echo ""
 echo "=== Claude Code: Directories ==="
-symlink "$DOTFILES/claude/rules" "$HOME/.claude/rules"
-symlink "$DOTFILES/claude/commands" "$HOME/.claude/commands"
-symlink "$DOTFILES/claude/skills" "$HOME/.claude/skills"
-symlink "$DOTFILES/claude/agents" "$HOME/.claude/agents"
-symlink "$DOTFILES/claude/hooks" "$HOME/.claude/hooks"
-symlink "$DOTFILES/claude/scripts" "$HOME/.claude/scripts"
+symlink "$CANONICAL/claude/rules" "$HOME/.claude/rules"
+symlink "$CANONICAL/claude/commands" "$HOME/.claude/commands"
+symlink "$CANONICAL/claude/skills" "$HOME/.claude/skills"
+symlink "$CANONICAL/claude/agents" "$HOME/.claude/agents"
+symlink "$CANONICAL/claude/hooks" "$HOME/.claude/hooks"
+symlink "$CANONICAL/claude/scripts" "$HOME/.claude/scripts"
+
+echo ""
+echo "=== Shell config (~/.bashrc) ==="
+BASHRC="$HOME/.bashrc"
+if grep -qF 'anaiis-dotfiles/bin' "$BASHRC" 2>/dev/null; then
+	sed -i '' 's|.*anaiis-dotfiles/bin.*|export PATH="$HOME/anaiis-dotfiles/bin:$PATH"|' "$BASHRC"
+	echo "  ok   PATH line (canonical)"
+else
+	printf '\nexport PATH="$HOME/anaiis-dotfiles/bin:$PATH"\n' >>"$BASHRC"
+	echo "  add  PATH -> $BASHRC"
+fi
+if grep -qF 'anaiis-dotfiles/bash/shared.bash' "$BASHRC" 2>/dev/null; then
+	echo "  ok   shared.bash source line"
+else
+	if grep -qF '.bashrc.local' "$BASHRC" 2>/dev/null; then
+		sed -i '' '/\.bashrc\.local/i\
+source "$HOME/anaiis-dotfiles/bash/shared.bash"
+' "$BASHRC"
+	else
+		printf '\nsource "$HOME/anaiis-dotfiles/bash/shared.bash"\n' >>"$BASHRC"
+	fi
+	echo "  add  source shared.bash -> $BASHRC"
+fi
 
 echo ""
 echo "=== Claude Code: Machine-local config (copy-once, then edit) ==="
@@ -59,28 +94,24 @@ copy_template "$DOTFILES/claude/CLAUDE.local.md.template" \
 
 echo ""
 echo "=== Claude Code: graphify (vendored) ==="
-bash "$DOTFILES/claude/scripts/install-graphify.sh"
+bash "$CANONICAL/claude/scripts/install-graphify.sh"
 
 echo ""
 echo "=== Claude Code: CLI tools ==="
-symlink "$DOTFILES/claude/scripts/cleanup-sessions.py" "$HOME/.local/bin/claude-cleanup"
+symlink "$CANONICAL/claude/scripts/cleanup-sessions.py" "$HOME/.local/bin/claude-cleanup"
 
 echo ""
 echo "=== R Style ==="
-symlink "$DOTFILES/.lintr" "$HOME/.lintr"
+symlink "$CANONICAL/.lintr" "$HOME/.lintr"
 
 echo ""
 echo "Done."
 echo ""
 echo "=== web-verify CLI (optional) ==="
 echo ""
-echo "If you use the web-verify command directly,"
-echo "add this single line to your shell config (~/.bashrc, ~/.zshrc, or"
-echo "~/.config/fish/config.fish, choose whichever your shell reads):"
-echo ""
+echo "The PATH and shared.bash source lines were wired into ~/.bashrc above."
+echo "For zsh or fish, add manually:"
 echo "    export PATH=\"\$HOME/anaiis-dotfiles/bin:\$PATH\""
-echo ""
-echo "Works in bash, zsh, fish, or any POSIX shell. No 'source' required."
 echo ""
 echo "Cleanup (if upgrading from a prior install):"
 echo "  rm -f \"\$HOME/.mcp.json\"   # the github MCP entry was removed; this clears any dangling symlink"
