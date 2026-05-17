@@ -4,7 +4,7 @@ description: Global settings.json and CLAUDE.md scope, set up via dotfiles
 type: reference
 ---
 
-Global config at `~/.claude/settings.json` and `~/.claude/CLAUDE.md` (symlinked from ~/.dotfiles/claude/).
+Global config at `~/.claude/settings.json` and `~/.claude/CLAUDE.md` (symlinked from ~/anaiis-dotfiles/claude/).
 **Why:** Avoids re-granting universal permissions per project and re-explaining preferences every session.
 **How to apply:** Project settings.local.json only needs project-specific additions (e.g., poetry, project-specific scripts). Do not re-add globally permitted tools to project-local settings.
 

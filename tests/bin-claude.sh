@@ -132,7 +132,7 @@ assert "3.8 git ls-files bash/ returns only shared.bash" "bash/shared.bash" "$TR
 # ── 3.9: install.sh prints PATH-extension snippet, no bash symlinks ───────
 echo "# 3.9 install.sh output shape"
 INSTALL_OUT=$(grep -E 'dotfiles/bin' "$REPO_DIR/install.sh" || true)
-assert_contains "3.9 install.sh references dotfiles/bin in PATH-extension snippet" '.dotfiles/bin' "$INSTALL_OUT"
+assert_contains "3.9 install.sh references dotfiles/bin in PATH-extension snippet" 'anaiis-dotfiles/bin' "$INSTALL_OUT"
 
 # ── Summary ───────────────────────────────────────────────────────────────
 echo

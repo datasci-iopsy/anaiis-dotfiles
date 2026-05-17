@@ -3,7 +3,7 @@
 # Usage: PYTHON=$(bash ~/.claude/skills/graphify/scripts/graphify-env.sh)
 # Exits 1 with a remediation message if the venv is missing.
 
-DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
+DOTFILES="${DOTFILES:-$HOME/anaiis-dotfiles}"
 PY="$DOTFILES/vendor/graphify-venv/bin/python"
 
 if [ ! -x "$PY" ]; then

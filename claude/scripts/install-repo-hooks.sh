@@ -65,7 +65,7 @@ if [ ! -f "$HOOK_FILE" ]; then
 	# No existing hook -- create a fresh one
 	cat >"$HOOK_FILE" <<'EOF'
 #!/usr/bin/env bash
-# Pre-commit hooks (managed by ~/.dotfiles)
+# Pre-commit hooks (managed by ~/anaiis-dotfiles)
 # To update: bash ~/.claude/scripts/install-repo-hooks.sh
 
 # Dotfiles lint hooks (managed by ~/.dotfiles -- never edit this line)

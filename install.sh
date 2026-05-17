@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ~/.dotfiles/install.sh
+# ~/anaiis-dotfiles/install.sh
 # Run once on a new machine to symlink the Claude policy stack into place.
 # Safe to re-run, skips anything already correctly linked.
 #
@@ -78,7 +78,7 @@ echo "If you use the web-verify command directly,"
 echo "add this single line to your shell config (~/.bashrc, ~/.zshrc, or"
 echo "~/.config/fish/config.fish, choose whichever your shell reads):"
 echo ""
-echo "    export PATH=\"\$HOME/.dotfiles/bin:\$PATH\""
+echo "    export PATH=\"\$HOME/anaiis-dotfiles/bin:\$PATH\""
 echo ""
 echo "Works in bash, zsh, fish, or any POSIX shell. No 'source' required."
 echo ""

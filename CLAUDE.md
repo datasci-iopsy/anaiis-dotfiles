@@ -2,17 +2,17 @@
 
 ## Source of truth
 
-This repo (`~/.dotfiles`) is the source of truth for all Claude Code config. Files under
+This repo (`~/anaiis-dotfiles`) is the source of truth for all Claude Code config. Files under
 `claude/` are symlinked into `~/.claude/` by `install.sh`. Always edit at the source path
 inside this repo, never the symlink destination.
 
 | Edit this (source, tracked) | Not this (symlink destination) |
 |---|---|
-| `~/.dotfiles/claude/settings.json` | `~/.claude/settings.json` |
-| `~/.dotfiles/claude/CLAUDE.md` | `~/.claude/CLAUDE.md` |
-| `~/.dotfiles/claude/rules/*.md` | `~/.claude/rules/*.md` |
-| `~/.dotfiles/claude/hooks/` | `~/.claude/hooks/` |
-| `~/.dotfiles/bash/shared.bash` | (no symlink; sourced by `~/.bashrc.local`) |
+| `~/anaiis-dotfiles/claude/settings.json` | `~/.claude/settings.json` |
+| `~/anaiis-dotfiles/claude/CLAUDE.md` | `~/.claude/CLAUDE.md` |
+| `~/anaiis-dotfiles/claude/rules/*.md` | `~/.claude/rules/*.md` |
+| `~/anaiis-dotfiles/claude/hooks/` | `~/.claude/hooks/` |
+| `~/anaiis-dotfiles/bash/shared.bash` | (no symlink; sourced by `~/.bashrc.local`) |
 
 ## Shell config
 

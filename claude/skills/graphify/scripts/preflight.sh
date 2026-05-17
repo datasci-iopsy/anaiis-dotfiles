@@ -3,7 +3,7 @@
 # Exits 1 with targeted remediation if anything is missing.
 # Called at the start of Step 1 in references/pipeline.md.
 
-DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
+DOTFILES="${DOTFILES:-$HOME/anaiis-dotfiles}"
 SUBMODULE="$DOTFILES/vendor/graphify"
 VENV="$DOTFILES/vendor/graphify-venv"
 

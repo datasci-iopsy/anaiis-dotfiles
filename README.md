@@ -18,10 +18,10 @@ Both are gitignored from this repo by virtue of being outside it. Your shell con
 **Install in 60 seconds.**
 
 ```bash
-git clone --recurse-submodules git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/.dotfiles
-bash ~/.dotfiles/install.sh
+git clone --recurse-submodules git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/anaiis-dotfiles
+bash ~/anaiis-dotfiles/install.sh
 # Then add to your shell config (~/.bashrc, ~/.zshrc, etc.):
-#   export PATH="$HOME/.dotfiles/bin:$PATH"
+#   export PATH="$HOME/anaiis-dotfiles/bin:$PATH"
 ```
 
 That installs the Claude policy stack and prints a one-line snippet to add to your shell config. No bash takeover, no source files, no machine-specific overrides forced on you.
@@ -31,7 +31,7 @@ That installs the Claude policy stack and prints a one-line snippet to add to yo
 ## Directory structure
 
 ```
-.dotfiles/
+anaiis-dotfiles/
 ├── install.sh                      Symlinks claude/* into ~/.claude/; prints PATH snippet
 ├── README.md                       This file
 ├── .lintr                          → ~/.lintr   Global R style config
@@ -82,19 +82,19 @@ That installs the Claude policy stack and prints a one-line snippet to add to yo
 ### 1. Clone
 
 ```bash
-git clone --recurse-submodules git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/.dotfiles
+git clone --recurse-submodules git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/anaiis-dotfiles
 ```
 
 If you already cloned without `--recurse-submodules`, run this before Step 2:
 
 ```bash
-cd ~/.dotfiles && git submodule update --init --recursive
+cd ~/anaiis-dotfiles && git submodule update --init --recursive
 ```
 
 ### 2. Run the installer
 
 ```bash
-bash ~/.dotfiles/install.sh
+bash ~/anaiis-dotfiles/install.sh
 ```
 
 Each line prints `ok` (already linked), `link` (newly created), or `SKIP` (real file present, back up and remove first). Two files are *copied* (not symlinked) as machine-local config and never overwritten on subsequent runs:
@@ -107,7 +107,7 @@ Each line prints `ok` (already linked), `link` (newly created), or `SKIP` (real 
 The installer prints this line; copy it into your shell config (one of `~/.bashrc`, `~/.zshrc`, `~/.config/fish/config.fish`, whichever your shell reads):
 
 ```bash
-export PATH="$HOME/.dotfiles/bin:$PATH"
+export PATH="$HOME/anaiis-dotfiles/bin:$PATH"
 ```
 
 This puts `web-verify` on your PATH. The old `bin/claude` CodeRabbit wrapper was removed in 2026-05-11; `which claude` now resolves to the real Homebrew-installed CLI.
@@ -309,7 +309,7 @@ install.packages(c("lintr", "styler", "languageserver"))
 
 ## Adding new dotfiles
 
-1. Move the file into `~/.dotfiles/<category>/`.
+1. Move the file into `~/anaiis-dotfiles/<category>/`.
 2. Add a `symlink` line to `install.sh`.
 3. Run `install.sh` once to create the new symlink.
 4. Commit and push.

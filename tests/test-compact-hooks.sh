@@ -78,9 +78,9 @@ setup_test_env() {
 	TEST_TRANSCRIPT="$TEST_HOME/.claude/projects/$TEST_PROJECT_KEY/${TEST_SESSION_ID}.jsonl"
 
 	cat >"$TEST_TRANSCRIPT" <<'EOF'
-{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"/Users/test/.dotfiles/claude/settings.json"}}]}}
-{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Edit","input":{"file_path":"/Users/test/.dotfiles/claude/rules/session.md","old_string":"foo","new_string":"bar"}}]}}
-{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t3","name":"Read","input":{"file_path":"/Users/test/.dotfiles/claude/settings.json"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"/Users/test/anaiis-dotfiles/claude/settings.json"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Edit","input":{"file_path":"/Users/test/anaiis-dotfiles/claude/rules/session.md","old_string":"foo","new_string":"bar"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t3","name":"Read","input":{"file_path":"/Users/test/anaiis-dotfiles/claude/settings.json"}}]}}
 EOF
 }
 
@@ -135,8 +135,8 @@ test_pre_compact_extracts_file_reads() {
 	# Hook writes to memory/handoffs/ with ISO timestamp filename
 	local handoff_file
 	handoff_file=$(ls "$TEST_MEMORY_DIR/handoffs"/handoff_*.md 2>/dev/null | head -1 || echo "")
-	assert_contains "Read tool path captured" "$handoff_file" "Read: /Users/test/.dotfiles/claude/settings.json"
-	assert_contains "Edit tool path captured" "$handoff_file" "Edit: /Users/test/.dotfiles/claude/rules/session.md"
+	assert_contains "Read tool path captured" "$handoff_file" "Read: /Users/test/anaiis-dotfiles/claude/settings.json"
+	assert_contains "Edit tool path captured" "$handoff_file" "Edit: /Users/test/anaiis-dotfiles/claude/rules/session.md"
 	teardown_test_env
 }
 

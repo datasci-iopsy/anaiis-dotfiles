@@ -1,4 +1,4 @@
-# ~/.dotfiles/bash/shared.bash
+# ~/anaiis-dotfiles/bash/shared.bash
 #
 # Tracked personal shell preferences, sourced by ~/.bashrc.local.
 # Edit here to keep both machines in sync via git pull.
