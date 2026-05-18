@@ -106,6 +106,15 @@ echo "=== R Style ==="
 symlink "$CANONICAL/.lintr" "$HOME/.lintr"
 
 echo ""
+echo "=== Homebrew packages ==="
+if command -v brew >/dev/null 2>&1; then
+	echo "  Brewfile present. Run to install or sync:"
+	echo "      bash $CANONICAL/claude/scripts/brew-sync.sh install"
+else
+	echo "  brew not found, skipping (install Homebrew first if needed)"
+fi
+
+echo ""
 echo "Done."
 echo ""
 echo "=== web-verify CLI (optional) ==="

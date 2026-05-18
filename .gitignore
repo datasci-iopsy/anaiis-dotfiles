@@ -22,5 +22,8 @@ claude/CLAUDE.local.md
 # Vendored Python environments (machine-local, reproducible from submodule)
 vendor/graphify-venv/
 
+# Homebrew bundle lockfile (regenerated on every install; not pinned)
+Brewfile.lock.json
+
 # Misc
 _archive

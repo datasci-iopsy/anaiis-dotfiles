@@ -289,6 +289,26 @@ These override `git config`. The `attribution.commit` field (currently `""`) con
 
 ---
 
+## Homebrew packages
+
+A `Brewfile` at the repo root tracks all formulae, casks, and taps. Three commands cover the full lifecycle:
+
+```bash
+# New machine: install everything in the Brewfile
+bash ~/anaiis-dotfiles/claude/scripts/brew-sync.sh install
+
+# Check for drift (packages installed but not in Brewfile, or missing)
+bash ~/anaiis-dotfiles/claude/scripts/brew-sync.sh check
+
+# After installing something new: refresh the Brewfile and commit
+bash ~/anaiis-dotfiles/claude/scripts/brew-sync.sh dump
+git add Brewfile && git commit -m "chore: add <formula> to Brewfile"
+```
+
+`install.sh` prints the `install` command as a reminder but does not run it automatically (bundle install can take several minutes on a fresh machine and may prompt for sudo).
+
+---
+
 ## Per-machine prerequisites
 
 `install.sh` only handles symlinks. The following must be installed per machine:
