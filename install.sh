@@ -11,7 +11,7 @@ set -euo pipefail
 DOTFILES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Always resolve to the main worktree — never let a linked worktree become canonical
 if git -C "$DOTFILES" rev-parse --git-dir >/dev/null 2>&1; then
-	DOTFILES="$(git -C "$DOTFILES" worktree list --porcelain | awk '/^worktree/{print $2; exit}')"
+	DOTFILES="$(git -C "$DOTFILES" worktree list --porcelain | awk '/^worktree/{sub(/^worktree /, ""); print; exit}')"
 fi
 CANONICAL="$HOME/anaiis-dotfiles"
 
