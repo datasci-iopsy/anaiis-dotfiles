@@ -12,6 +12,10 @@ DOTFILES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Always resolve to the main worktree — never let a linked worktree become canonical
 if git -C "$DOTFILES" rev-parse --git-dir >/dev/null 2>&1; then
 	DOTFILES="$(git -C "$DOTFILES" worktree list --porcelain | awk '/^worktree/{sub(/^worktree /, ""); print; exit}')"
+	if [ -z "$DOTFILES" ]; then
+		echo "error: could not resolve canonical worktree path; git repository may be corrupted" >&2
+		exit 1
+	fi
 fi
 CANONICAL="$HOME/anaiis-dotfiles"
 
