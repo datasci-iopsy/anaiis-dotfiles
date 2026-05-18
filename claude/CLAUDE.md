@@ -26,7 +26,7 @@ Rules (`~/.claude/rules/`) constrain Claude's behavior across all tasks. Skills 
 ## Rules index
 | File | Covers |
 |---|---|
-| `rules/behavioral.md` | The 4 lines: surface tradeoffs, minimum code, touch only what you must, verify before claiming done |
+| `rules/behavioral.md` | The 7 imperatives: surface tradeoffs, minimum code, surgical changes, verify, model judgment scope, surface conflicts, fail loud |
 | `rules/environment.md` | macOS, Bash, direnv, pyenv, worktree safety |
 | `rules/tools.md` | gh, jq, gcloud, make, structured CLI output |
 | `rules/code-style.md` | Writing style, shell formatting, no emojis |
@@ -38,6 +38,7 @@ Rules (`~/.claude/rules/`) constrain Claude's behavior across all tasks. Skills 
 | `rules/core.md` | Root causes, plan mode threshold, workflow, sub-agents, hook output handling |
 | `rules/duckdb.md` | DuckDB query discipline: purpose-based patterns, no re-querying context |
 | `rules/citations.md` | Citation integrity: corpus-only sources, no fabrication, web search only on explicit request |
+| `rules/testing.md` | Test-intent discipline: tests must encode why, not just what; fail-to-fail check |
 | `rules/dashboards.md` | Dashboard data provenance, manifest discipline, narrative-data alignment, audience language |
 
 ## Machine-local overrides

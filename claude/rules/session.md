@@ -7,8 +7,16 @@ description: Token efficiency and output discipline, read-once policy, scoped re
 
 ## Token efficiency
 
+### Per-task token budget
+Treat 4,000 tokens as a soft per-task budget. If a task is approaching that limit without reaching a natural checkpoint, summarize what has been done, what is verified, and what remains, then re-plan rather than pushing through. Surfacing the breach is better than silently overrunning it. The session-wide compaction threshold (80% context) is a separate, harder limit; the per-task budget is an earlier warning.
+
 ### Before reading any file
 Check whether that file path already appears in a prior Read result in this session. If it does, use that content, do not call Read again. A prior Read result is sufficient even if you did not retain every line; reference what you have and state what is missing if needed.
+
+### Before writing in a file
+Read the file's current exports, the immediate caller of the function or section you are adding to, and any shared utilities referenced nearby. If the existing structure has no obvious rationale, ask before adding alongside it. "Looks orthogonal to me" is a dangerous assumption; the conflict may exist 30 lines away.
+
+See also: `rules/behavioral.md` rule 3 (touch only what you must).
 
 ### Read scope
 - **Config and settings files:** read only the section relevant to the current task. Use offset/limit to target it. Read the full file only when understanding the file's full structure is the explicit task.

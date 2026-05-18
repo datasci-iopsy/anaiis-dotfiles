@@ -38,3 +38,9 @@ Enforcement: the `block-em-dash.sh` PreToolUse hook denies any `Write`, `Edit`, 
 - `shellcheck` runs after `shfmt` for linting. Both are informational in the post-edit hook; `shfmt` is blocking at pre-commit (`SKIP_SHFMT=1 git commit` to bypass).
 - Multi-line commands with backslash continuations are fine for readability. Only split at argument or flag boundaries, never inside a quoted string. A backslash continuation must appear outside of all quotes.
 - In code blocks containing shell commands, do not indent the command itself. Keep it flush-left within the block.
+
+## Match the codebase's conventions, even if you disagree
+
+If the codebase uses snake_case, use snake_case. If it uses class-based components, use class-based components. If it wraps errors one way, wrap them the same way. Conformance beats taste inside an existing codebase.
+
+If you genuinely believe a convention is harmful, surface it as a separate observation after the task is complete. Do not silently fork: introducing a second pattern alongside the existing one is worse than either pattern alone. The observation belongs in a comment or a follow-up, not in the code you are writing now.
