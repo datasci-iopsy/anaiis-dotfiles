@@ -239,7 +239,7 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 | `PreToolUse` | `Write\|Edit` | inline | Allow `*.env.example`/`*.env.template`; block `*.lock`, `*.env`, `*credentials*`, `*secret*`, `*.pem`, `*.key` |
 | `PreToolUse` | `Bash` | inline | Block destructive `bq rm`, `gcloud delete*`, `uv cache clean`/`pip uninstall` |
 | `PreToolUse` | `Bash` | `prefer-jq.sh` | Warns when Python is used for JSON instead of jq |
-| `PreToolUse` | `Agent\|WebFetch` | `cost-guard.sh` | Cost tiering MEDIUM/HIGH/VERY HIGH; gates general-purpose agents |
+| `PreToolUse` | `Agent\|WebFetch` | `cost-guard.sh` | Cost tiering MEDIUM/HIGH/VERY HIGH; hard-blocks (exit 2) general-purpose agents above per-session cap (default 5, override via `COST_GUARD_GP_LIMIT`); blocks logged to `~/.claude/logs/cost-guard-blocks.log` |
 | `Stop` |, | `stop-hook-git-check.sh` | Reports uncommitted changes; never blocks (status-only) |
 | `PreCompact` | `*` | `pre-compact.sh` | Writes a structured handoff to project memory |
 | `PostCompact` | `*` | `post-compact.sh` | Re-injects the handoff so Claude has continuity post-compaction |
@@ -261,6 +261,17 @@ Hook latency on this machine (measured 2026-04-29, before `surface-behavioral-ru
 | **JSON** | `post-edit-lint.sh` enforces `jq --indent 4` | `json-lint-staged.sh` checks indent | n/a |
 
 `~/.lintr` is symlinked from this repo (`.lintr`). Per-project `.lintr` overrides are honored, lintr walks up from the project root.
+
+---
+
+## Usage report
+
+Run at any time to see session counts, token totals (comma-formatted), agent spawn distribution, and cost-guard block counts. Add `--json` for raw integers suitable for `jq` pipelines or Claude audits:
+
+```bash
+bash ~/.claude/scripts/usage-report.sh --since 2026-05-01
+bash ~/.claude/scripts/usage-report.sh --since 2026-04-01 --until 2026-04-30 --json
+```
 
 ---
 
