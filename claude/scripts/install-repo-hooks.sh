@@ -50,7 +50,7 @@ _migrate() {
 
 	# Inject dispatcher after the shebang line (line 1)
 	awk -v line="$DISPATCHER_LINE" '
-        NR == 1 { print; print ""; print "# Dotfiles lint hooks (managed by ~/.dotfiles -- never edit this line)"; print line; next }
+        NR == 1 { print; print ""; print "# Dotfiles lint hooks (managed by ~/anaiis-dotfiles -- never edit this line)"; print line; next }
         { print }
     ' "${tmp}.2" >"$hook"
 
@@ -68,7 +68,7 @@ if [ ! -f "$HOOK_FILE" ]; then
 # Pre-commit hooks (managed by ~/anaiis-dotfiles)
 # To update: bash ~/.claude/scripts/install-repo-hooks.sh
 
-# Dotfiles lint hooks (managed by ~/.dotfiles -- never edit this line)
+# Dotfiles lint hooks (managed by ~/anaiis-dotfiles -- never edit this line)
 bash "$HOME/.claude/hooks/repo-pre-commit.sh"
 EOF
 	chmod +x "$HOOK_FILE"
@@ -85,7 +85,7 @@ elif grep -qF "$STALE_MARKER" "$HOOK_FILE"; then
 
 else
 	# Hook exists but has no lint hooks -- append dispatcher
-	printf '\n# Dotfiles lint hooks (managed by ~/.dotfiles -- never edit this line)\n%s\n' \
+	printf '\n# Dotfiles lint hooks (managed by ~/anaiis-dotfiles -- never edit this line)\n%s\n' \
 		"$DISPATCHER_LINE" >>"$HOOK_FILE"
 	echo "  updated  $HOOK_FILE (appended dispatcher)"
 fi

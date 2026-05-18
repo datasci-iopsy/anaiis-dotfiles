@@ -21,6 +21,10 @@ if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
 		if [ -n "$RESOLVED" ] && [ -n "$MEMORY_DIR" ] && [[ "$RESOLVED" == "$MEMORY_DIR"/* ]]; then
 			exit 0
 		fi
+		# Exempt gitignored files (e.g. *.local.json, .env) -- machine-local config editable on any branch.
+		if git -C "$FILE_DIR" check-ignore -q "$FILE" 2>/dev/null; then
+			exit 0
+		fi
 	fi
 
 	echo "[block-edit-on-main] BLOCKED: refusing to edit '${FILE}' on branch '${BRANCH}'." >&2
