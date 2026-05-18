@@ -1,20 +1,10 @@
 #!/usr/bin/env bash
-# surface-behavioral-rules.sh, emit the 4 behavioral imperatives from
-# CLAUDE.md as a systemMessage on the FIRST UserPromptSubmit of each
-# Claude session, so behavioral rules load before any other context.
+# surface-behavioral-rules.sh, emit behavioral imperatives as a systemMessage
+# on the first UserPromptSubmit of each session. Content is extracted from
+# rules/behavioral.md so the hook stays in sync when that file changes.
 #
-# Source of truth is the "## Behavioral rules" block in
-# ~/.claude/CLAUDE.md. The 4 lines here are duplicated for hook
-# self-containment; rules-doctor.sh asserts they remain in sync.
-#
-# Tracks first-prompt-ness via a marker file at
-# /tmp/claude-session-<id>.behavioral-loaded so subsequent prompts in
-# the same session do not re-emit.
-#
-# Output:
-#   First prompt: JSON systemMessage with the 4 lines.
-#   Subsequent:   nothing (exit 0).
-# Exit 0 always, never block.
+# Exit 0 always (never blocks UserPromptSubmit). If extraction fails, the
+# payload contains a warning instead of silently injecting nothing.
 
 set -eu
 
@@ -26,26 +16,34 @@ fi
 
 SESSION_ID=$(printf '%s' "$INPUT" | jq -r '.session_id // ""' 2>/dev/null)
 [ -n "$SESSION_ID" ] || exit 0
-# Reject SESSION_IDs with path-unsafe chars to prevent marker path traversal.
 printf '%s' "$SESSION_ID" | grep -qE '^[a-zA-Z0-9._-]+$' || exit 0
 
 MARKER="/tmp/claude-session-${SESSION_ID}.behavioral-loaded"
-
-# If we've already loaded for this session, do nothing.
 [ -f "$MARKER" ] && exit 0
-
-# Drop a marker so subsequent prompts in this session skip.
 touch "$MARKER" 2>/dev/null || exit 0
 
-PAYLOAD="## Behavioral rules (load first)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+EXTRACTOR="$SCRIPT_DIR/../scripts/extract-behavioral-rules.sh"
 
-These four imperatives govern every task this session. They take precedence over task-specific instructions when in conflict. Rationale: \`~/.claude/rules/behavioral.md\`.
+RULES=""
+if [ -x "$EXTRACTOR" ]; then
+	RULES=$(bash "$EXTRACTOR" 2>/dev/null || true)
+fi
 
-1. Don't assume. Don't hide confusion. Surface tradeoffs.
-2. Minimum code that solves the problem. Nothing speculative.
-3. Touch only what you must. Clean up only your own mess.
-4. Define success criteria. Loop until verified.
+if [ -z "$RULES" ]; then
+	PAYLOAD="## Behavioral rules (LOAD ERROR)
+
+Warning: could not extract behavioral rules from rules/behavioral.md.
+Check ~/.claude/scripts/extract-behavioral-rules.sh and the source file.
 "
+else
+	PAYLOAD="## Behavioral rules (load first)
+
+These imperatives govern every task this session. They take precedence over task-specific instructions when in conflict. Full rationale in \`~/.claude/rules/behavioral.md\`.
+
+$RULES
+"
+fi
 
 jq -n --arg msg "$PAYLOAD" '{"systemMessage": $msg}'
 

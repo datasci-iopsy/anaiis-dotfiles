@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 # rules-doctor.sh, verify the behavioral rules pipeline end to end.
 #
-# Reports drift between the 4 lines in CLAUDE.md, rules/behavioral.md,
-# the surface-behavioral-rules.sh hook, and its settings.json
-# registration. Synthetically exercises the hook so problems surface
-# without waiting for a real session.
+# Checks that rules/behavioral.md is the single source of truth, that
+# CLAUDE.md references (not duplicates) it, and that the hook dynamically
+# injects all imperatives at session start.
 #
 # Exits 0 if all checks pass, 1 otherwise. Output is structured so the
 # script is grep-able from a higher-level test harness.
 #
 # Checks:
-#   A. CLAUDE.md contains all 4 lines verbatim.
-#   B. The 4 lines appear before the `## Rules index` heading.
-#   C. rules/behavioral.md exists with H1 + 4 H2 sections and is
+#   A. CLAUDE.md references behavioral.md and does not hardcode imperatives.
+#   B. The Behavioral rules section precedes the Rules index heading.
+#   C. rules/behavioral.md exists, has H1 and numbered H2 sections, and is
 #      referenced from CLAUDE.md's rules-index table.
 #   D. surface-behavioral-rules.sh exists and is executable.
 #   E. The hook is registered in settings.json UserPromptSubmit array.
-#   F. Synthetic invocation: hook emits systemMessage containing all 4
-#      lines on first call; emits nothing on second call.
+#   F. Synthetic invocation: hook emits systemMessage containing all
+#      imperatives on first call; emits nothing on second call.
+#   G. extract-behavioral-rules.sh exists, is executable, and returns output.
 #
 # Usage: bash ~/.claude/scripts/rules-doctor.sh
 
@@ -27,15 +27,8 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CLAUDE_MD="$REPO_DIR/claude/CLAUDE.md"
 BEHAV_MD="$REPO_DIR/claude/rules/behavioral.md"
 HOOK="$REPO_DIR/claude/hooks/surface-behavioral-rules.sh"
+EXTRACTOR="$REPO_DIR/claude/scripts/extract-behavioral-rules.sh"
 SETTINGS="$REPO_DIR/claude/settings.json"
-
-# Canonical 4 lines. Source of truth for drift detection.
-LINES=(
-	"Don't assume. Don't hide confusion. Surface tradeoffs."
-	"Minimum code that solves the problem. Nothing speculative."
-	"Touch only what you must. Clean up only your own mess."
-	"Define success criteria. Loop until verified."
-)
 
 PASS=0
 FAIL=0
@@ -49,17 +42,27 @@ fail() {
 	FAIL=$((FAIL + 1))
 }
 
-# ── A. CLAUDE.md contains all 4 lines verbatim ────────────────────────────
-echo "## A. CLAUDE.md verbatim content"
+# ── A. CLAUDE.md references behavioral.md; does not hardcode imperatives ──
+echo "## A. CLAUDE.md behavioral rules section"
 if [ -f "$CLAUDE_MD" ]; then
 	ok "A.1 CLAUDE.md exists"
-	for line in "${LINES[@]}"; do
-		if grep -qF -- "$line" "$CLAUDE_MD"; then
-			ok "A.2 CLAUDE.md contains: $line"
-		else
-			fail "A.2 CLAUDE.md missing line" "$line"
+	if grep -qF 'rules/behavioral.md' "$CLAUDE_MD"; then
+		ok "A.2 CLAUDE.md references rules/behavioral.md"
+	else
+		fail "A.2 CLAUDE.md references behavioral.md" "link not found"
+	fi
+	if [ -f "$BEHAV_MD" ]; then
+		HARDCODED=0
+		while IFS= read -r imperative; do
+			if grep -qF -- "$imperative" "$CLAUDE_MD"; then
+				HARDCODED=$((HARDCODED + 1))
+				fail "A.3 CLAUDE.md hardcodes imperative" "$imperative"
+			fi
+		done < <(grep -E '^## [0-9]+\. ' "$BEHAV_MD" | sed 's/^## [0-9]*\. //' || true)
+		if [ "$HARDCODED" -eq 0 ]; then
+			ok "A.3 CLAUDE.md has no hardcoded imperative list"
 		fi
-	done
+	fi
 else
 	fail "A.1 CLAUDE.md exists" "missing: $CLAUDE_MD"
 fi
@@ -94,11 +97,11 @@ if [ -f "$BEHAV_MD" ]; then
 	else
 		fail "C.2 H1 title" "first non-frontmatter line is not '# Title'"
 	fi
-	H2_CT=$(grep -cE '^## [1-4]\.' "$BEHAV_MD" || true)
-	if [ "${H2_CT:-0}" -eq 4 ]; then
-		ok "C.3 has 4 numbered H2 sections"
+	H2_CT=$(grep -cE '^## [0-9]+\.' "$BEHAV_MD" || true)
+	if [ "${H2_CT:-0}" -ge 1 ]; then
+		ok "C.3 has $H2_CT numbered H2 sections"
 	else
-		fail "C.3 H2 sections" "expected 4, found $H2_CT"
+		fail "C.3 H2 sections" "expected at least 1, found $H2_CT"
 	fi
 	if grep -qF 'rules/behavioral.md' "$CLAUDE_MD"; then
 		ok "C.4 referenced from CLAUDE.md rules-index"
@@ -159,14 +162,16 @@ if [ -x "$HOOK" ] && command -v jq >/dev/null 2>&1; then
 		ok "F.1 first invocation emits systemMessage JSON"
 		MSG=$(printf '%s' "$OUT1" | jq -r '.systemMessage')
 		MISSING=0
-		for line in "${LINES[@]}"; do
-			if ! printf '%s' "$MSG" | grep -qF -- "$line"; then
-				MISSING=$((MISSING + 1))
-				fail "F.2 systemMessage line" "missing: $line"
-			fi
-		done
+		if [ -x "$EXTRACTOR" ]; then
+			while IFS= read -r imperative; do
+				if ! printf '%s' "$MSG" | grep -qF -- "$imperative"; then
+					MISSING=$((MISSING + 1))
+					fail "F.2 systemMessage line" "missing: $imperative"
+				fi
+			done < <(bash "$EXTRACTOR" 2>/dev/null | sed 's/^[0-9]*\. //' || true)
+		fi
 		if [ "$MISSING" -eq 0 ]; then
-			ok "F.2 systemMessage contains all 4 lines verbatim"
+			ok "F.2 systemMessage contains all behavioral.md imperatives"
 		fi
 	else
 		fail "F.1 first invocation" "no valid systemMessage JSON; got: $(printf '%s' "$OUT1" | head -c 80)"
@@ -177,6 +182,25 @@ if [ -x "$HOOK" ] && command -v jq >/dev/null 2>&1; then
 	else
 		fail "F.3 second invocation" "expected empty, got: $(printf '%s' "$OUT2" | head -c 80)"
 	fi
+fi
+
+# ── G. extract-behavioral-rules.sh ────────────────────────────────────────
+echo "## G. extract-behavioral-rules.sh"
+if [ -f "$EXTRACTOR" ]; then
+	ok "G.1 extractor exists"
+	if [ -x "$EXTRACTOR" ]; then
+		ok "G.2 extractor is executable"
+	else
+		fail "G.2 extractor executable bit" "chmod +x $EXTRACTOR"
+	fi
+	EXTRACTED=$(bash "$EXTRACTOR" 2>/dev/null || true)
+	if [ -n "$EXTRACTED" ]; then
+		ok "G.3 extractor returns output"
+	else
+		fail "G.3 extractor output" "returned empty; check $BEHAV_MD"
+	fi
+else
+	fail "G.1 extractor exists" "missing: $EXTRACTOR"
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────
