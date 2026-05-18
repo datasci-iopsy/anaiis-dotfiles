@@ -232,7 +232,7 @@
             }
         }
     },
-    "effortLevel": "high",
+    "effortLevel": "medium",
     "awaySummaryEnabled": true,
     "skipDangerousModePermissionPrompt": true,
     "autoCompactEnabled": true
