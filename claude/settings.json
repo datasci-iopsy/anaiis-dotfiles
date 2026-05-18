@@ -14,6 +14,7 @@
             "Read",
             "WebSearch",
             "Bash(git:*)",
+            "Bash(git reset --hard tmp/*)",
             "Bash(python:*)",
             "Bash(python3:*)",
             "Bash(ls:*)",
