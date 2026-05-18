@@ -1,15 +1,14 @@
 # Agents
 
-Named subagent type definitions for Claude Code. These are capability-bounded task agents, constrained tool sets, fixed models, specific scope.
+This directory is wired as `~/.claude/agents/` via a directory-level symlink. Claude Code
+scans it for globally-discoverable named agents.
 
-This layer is distinct from the `anaiis-agents` skill:
-- **This directory**: defines *what* named agents can do (tools, model, instructions)
-- **`anaiis-agents` skill**: defines *when and how* to spawn agents dynamically during a session
+It is currently empty. Agents are intentionally not stored here.
 
-Named agents here are invoked by the CodeRabbit triage workflow (implemented in the `anaiis-coderabbit` skill). They are not general-purpose.
+**Why:** skill-specific agents (code-surgeon, coderabbit-triage, intent-verifier) belong
+to the skill that defines their inputs and outputs. They are governed by plugin versioning
+and live in the plugin cache after install. Placing copies here creates a second source of
+truth that drifts silently.
 
-| Agent | Purpose | Tools |
-|-------|---------|-------|
-| `code-reviewer` | Review diffs or files for correctness, style, security | Read, Grep, Glob |
-| `code-surgeon` | Apply a single CodeRabbit fix minimally | Read, Grep, Glob, Edit |
-| `security-auditor` | Audit files or diff for security findings | Read, Grep, Glob |
+**When to add something here:** only for a truly cross-skill, cross-project agent whose
+contract is not tied to any specific skill's input format. That does not currently exist.
