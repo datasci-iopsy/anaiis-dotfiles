@@ -1,27 +1,27 @@
 #!/usr/bin/env bash
 # cost-guard.sh, PreToolUse cost transparency hook
 #
-# Shows estimated token cost before expensive operations.
-# Soft-gates general-purpose agent spawns (Claude pauses for user confirmation).
-# Informs silently for Explore/Plan agents and WebFetch.
+# Informs on agent and WebFetch cost; hard-gates general-purpose agent spawns
+# above a per-session count threshold so a runaway session is mechanically stopped.
+# Explore/Plan/code-surgeon spawns remain ungated.
 #
 # Exit codes:
 #   0 = allow, proceed (with optional info message)
-#   1 = soft gate: show message to Claude, Claude pauses and surfaces to user
+#   2 = hard block: tool call rejected; Claude must surface and re-decide
 #
-# Token cost reference (rough estimates):
-#   Bash/Read/Grep/Glob/Edit/Write = 0 tokens (local operations, no API call)
-#   WebFetch                       = ~1k-8k tokens (small summarization model)
-#   Agent (Explore/Plan)           = ~2k-25k tokens (bounded research task)
-#   Agent (general-purpose)        = ~10k-100k tokens (open-ended, unbounded)
+# Per-session GP cap:
+#   COST_GUARD_GP_LIMIT (env var, default 5) caps general-purpose Agent spawns per session_id.
+#   Counter stamp file: /tmp/claude-session-<session_id>.gp-count
 
 if ! command -v jq &>/dev/null; then
-	echo "[cost-guard] jq not found -- all agent spawns ungated. Install: brew install jq" >&2
+	echo "[cost-guard] jq not found, all agent spawns ungated. Install: brew install jq" >&2
 	exit 0
 fi
 
 INPUT=$(cat)
 TOOL=$(jq -r '.tool_name // empty' 2>/dev/null <<<"$INPUT")
+SESSION_ID=$(jq -r '.session_id // empty' 2>/dev/null <<<"$INPUT")
+GP_LIMIT="${COST_GUARD_GP_LIMIT:-5}"
 
 case "$TOOL" in
 
@@ -50,7 +50,7 @@ case "$TOOL" in
 					echo "[cost] code-surgeon (~2k-8k tokens, Sonnet), $DESC" >&2
 					exit 0
 				fi
-				# General-purpose agents are unbounded, gate these
+				# General-purpose agents are unbounded, count and gate above cap
 				if [ "$CHARS" -gt 3000 ]; then
 					TIER="VERY HIGH"
 					RANGE="50k-150k tokens"
@@ -61,10 +61,33 @@ case "$TOOL" in
 					TIER="MEDIUM"
 					RANGE="5k-25k tokens"
 				fi
-				echo "[COST GATE] General-purpose agent, estimated $TIER ($RANGE)" >&2
-				echo "Task: $DESC" >&2
-				echo "Pause and confirm with the user before proceeding." >&2
-				exit 1
+
+				if [ -z "$SESSION_ID" ]; then
+					# Without a session id, cannot count; inform and pass through
+					echo "[cost] general-purpose agent, $TIER ($RANGE), $DESC (no session_id; uncounted)" >&2
+					exit 0
+				fi
+
+				STAMP="/tmp/claude-session-${SESSION_ID}.gp-count"
+				COUNT=0
+				[ -f "$STAMP" ] && COUNT=$(cat "$STAMP" 2>/dev/null || echo 0)
+				NEW=$((COUNT + 1))
+
+				if [ "$NEW" -gt "$GP_LIMIT" ]; then
+					LOG_DIR="$HOME/.claude/logs"
+					mkdir -p "$LOG_DIR" 2>/dev/null
+					printf '%s\t%s\t%s\t%s\n' \
+						"$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$SESSION_ID" "$NEW" "$DESC" \
+						>>"$LOG_DIR/cost-guard-blocks.log" 2>/dev/null || true
+					echo "[COST GATE BLOCK] General-purpose agent #$NEW exceeds session cap ($GP_LIMIT)." >&2
+					echo "Estimated $TIER ($RANGE). Task: $DESC" >&2
+					echo "Surface to the user and ask whether to raise COST_GUARD_GP_LIMIT or invoke explicitly." >&2
+					exit 2
+				fi
+
+				echo "$NEW" >"$STAMP"
+				echo "[cost] general-purpose agent #$NEW/$GP_LIMIT, $TIER ($RANGE), $DESC" >&2
+				exit 0
 				;;
 		esac
 		;;
