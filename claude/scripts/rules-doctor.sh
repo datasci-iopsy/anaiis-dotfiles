@@ -23,7 +23,8 @@
 
 set -u
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_REAL="$(realpath "${BASH_SOURCE[0]}")"
+REPO_DIR="$(cd "$(dirname "$SCRIPT_REAL")/../.." && pwd)"
 CLAUDE_MD="$REPO_DIR/claude/CLAUDE.md"
 BEHAV_MD="$REPO_DIR/claude/rules/behavioral.md"
 HOOK="$REPO_DIR/claude/hooks/surface-behavioral-rules.sh"

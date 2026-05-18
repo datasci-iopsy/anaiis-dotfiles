@@ -11,7 +11,8 @@
 
 set -euo pipefail
 
-DOTFILES="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_REAL="$(realpath "${BASH_SOURCE[0]}")"
+DOTFILES="$(cd "$(dirname "$SCRIPT_REAL")/../.." && pwd)"
 TEMPLATES="$DOTFILES/claude/memory-templates"
 GLOBAL_TEMPLATES="$TEMPLATES/global"
 

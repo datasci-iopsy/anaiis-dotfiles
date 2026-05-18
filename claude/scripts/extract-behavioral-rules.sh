@@ -7,7 +7,8 @@
 
 set -eu
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_REAL="$(realpath "${BASH_SOURCE[0]}")"
+REPO_DIR="$(cd "$(dirname "$SCRIPT_REAL")/../.." && pwd)"
 BEHAV_MD="$REPO_DIR/claude/rules/behavioral.md"
 
 if [ ! -f "$BEHAV_MD" ]; then

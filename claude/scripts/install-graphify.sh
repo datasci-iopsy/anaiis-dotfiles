@@ -16,7 +16,8 @@
 
 set -euo pipefail
 
-DOTFILES="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_REAL="$(realpath "${BASH_SOURCE[0]}")"
+DOTFILES="$(cd "$(dirname "$SCRIPT_REAL")/../.." && pwd)"
 SUBMODULE="$DOTFILES/vendor/graphify"
 VENV="$DOTFILES/vendor/graphify-venv"
 

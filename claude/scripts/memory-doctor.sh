@@ -21,7 +21,8 @@
 
 set -u
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_REAL="$(realpath "${BASH_SOURCE[0]}")"
+REPO_DIR="$(cd "$(dirname "$SCRIPT_REAL")/../.." && pwd)"
 PROJECTS_DIR="$HOME/.claude/projects"
 GLOBAL_DIR="$HOME/.claude/memory"
 LOAD_HOOK="$REPO_DIR/claude/hooks/load-global-memory.sh"

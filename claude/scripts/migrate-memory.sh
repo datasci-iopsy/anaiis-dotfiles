@@ -24,7 +24,8 @@ set -euo pipefail
 DRY_RUN=false
 [ "${1:-}" = "--dry-run" ] && DRY_RUN=true
 
-DOTFILES="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_REAL="$(realpath "${BASH_SOURCE[0]}")"
+DOTFILES="$(cd "$(dirname "$SCRIPT_REAL")/../.." && pwd)"
 PROJECTS_DIR="$HOME/.claude/projects"
 GLOBAL_DIR="$HOME/.claude/memory"
 GLOBAL_TEMPLATES="$DOTFILES/claude/memory-templates/global"
