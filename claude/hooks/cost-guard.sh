@@ -70,7 +70,10 @@ case "$TOOL" in
 
 				STAMP="/tmp/claude-session-${SESSION_ID}.gp-count"
 				COUNT=0
-				[ -f "$STAMP" ] && COUNT=$(cat "$STAMP" 2>/dev/null || echo 0)
+				if [ -f "$STAMP" ]; then
+					COUNT=$(cat "$STAMP" 2>/dev/null || echo 0)
+					[[ "$COUNT" =~ ^[0-9]+$ ]] || COUNT=0
+				fi
 				NEW=$((COUNT + 1))
 
 				if [ "$NEW" -gt "$GP_LIMIT" ]; then
