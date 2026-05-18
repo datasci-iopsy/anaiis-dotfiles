@@ -4,26 +4,25 @@ Supplements `rules/git.md`. These rules govern when to create a sub-branch, when
 
 ## Trivial edits on a user feature branch
 
-When **all** of the following hold, commit directly to the user's feature branch without creating a `claude/<topic>` sub-branch:
+When **all five** of the following hold, commit directly to the user's feature branch without creating a `claude/<topic>` sub-branch:
 
-- Currently on a `<type>/<topic>` user feature branch (not `main`, not `master`, not `claude/*`).
-- Single file modified.
-- Net diff ≤ 5 lines.
-- No new function, class, import, or dependency introduced.
-- No change touches tests, hooks, or config schema.
+1. Currently on a `<type>/<topic>` user feature branch: `git branch --show-current` does not return `main`, `master`, or any name starting with `claude/`.
+2. Exactly one file changed: `git diff --name-only` lists one path (covers modified, added, and deleted files).
+3. Total lines changed ≤ 5: insertions + deletions combined, as reported by `git diff --shortstat`.
+4. No new file created and no new named symbol (function, class, method, import, or dependency) introduced in the changed file.
+5. The changed file is not under `tests/`, `claude/hooks/`, or `claude/skills/`, and does not end in `.json`, `.yaml`, `.toml`, or `.envrc`.
 
-If any condition fails, create a `claude/<topic>` sub-branch from the user's feature branch before editing.
+Each criterion has a binary answer given the file diff. If any returns "no", create a `claude/<topic>` sub-branch from the user's feature branch before editing.
 
-## Non-trivial edits from main (worktree preferred)
+## Edits from main
 
-When on `main` or `master` and the work is non-trivial:
+When on `main` or `master`, **always use a worktree**. There is no trivial exception from main.
 
-1. **Prefer a worktree** over an in-place branch checkout. The main worktree stays on `main` so the user can continue working there without interruption.
-   - Via harness: use the `EnterWorktree` tool (auto-managed path under `.claude/worktrees/`).
+1. Use the `EnterWorktree` tool (auto-managed path under `.claude/worktrees/`). The main worktree stays on `main` so the user can continue working there without interruption.
    - Manual fallback: `git worktree add ../<repo>.worktrees/<topic> -b claude/<topic>`
-2. The `block-edit-on-main.sh` hook will fire before any edit attempt on main; treat its output as the cue to create a worktree or branch before proceeding.
+2. The `block-edit-on-main.sh` hook fires before any edit attempt on main; treat its output as the cue to enter a worktree before proceeding.
 
-For genuinely trivial edits from main (rare; the trivial criteria above apply), still create a `claude/<topic>` branch. Do not commit directly to main.
+Never use `git checkout -b` from main. `EnterWorktree` first, then edit.
 
 ## Branch reuse
 
