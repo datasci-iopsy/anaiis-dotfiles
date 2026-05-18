@@ -200,17 +200,19 @@ See `claude/skills/README.md` for trigger conditions.
 
 | File | Covers |
 |---|---|
-| `rules/behavioral.md` | The 4 imperatives: surface tradeoffs, minimum code, touch only what you must, verify |
+| `rules/behavioral.md` | The 7 imperatives: surface tradeoffs, minimum code, surgical changes, verify, model judgment scope, surface conflicts, fail loud |
 | `rules/environment.md` | macOS, Bash, direnv, pyenv, worktree safety |
 | `rules/tools.md` | gh, jq, gcloud, make, structured CLI output flags |
-| `rules/code-style.md` | Writing style, shell formatting, no emojis |
+| `rules/code-style.md` | Writing style, shell formatting, no emojis, convention conformance |
 | `rules/git.md` | Branch naming, commit discipline, author identity |
+| `rules/branching.md` | Trivial-edit criteria, branch reuse, worktree-from-main, cleanup advisory |
 | `rules/r-conventions.md` | Vectorization, lapply/vapply, lintr style |
 | `rules/python.md` | uv, direnv, ruff |
 | `rules/session.md` | Token efficiency, context thresholds, output preferences |
 | `rules/duckdb.md` | DuckDB query discipline (purpose-based patterns) |
 | `rules/citations.md` | Citation integrity (corpus-only sources, no fabrication) |
-| `rules/core.md` | Simplicity, root causes, subagent discipline |
+| `rules/core.md` | Simplicity, root causes, subagent discipline, checkpoint discipline |
+| `rules/testing.md` | Test-intent discipline: tests must encode why, not just what; fail-to-fail check |
 | `rules/dashboards.md` | Dashboard data provenance, manifest discipline, narrative-data alignment, audience language |
 
 ### Agents (Sonnet, restricted tools)
