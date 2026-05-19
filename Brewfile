@@ -73,6 +73,8 @@ cask "bitwarden"
 cask "claude-code@latest"
 # AI code review CLI
 cask "coderabbit"
+# Scientific and technical publishing system
+cask "quarto"
 # OpenAI's coding agent that runs in your terminal
 cask "codex"
 # Terminal emulator as alternative to Apple's Terminal app
