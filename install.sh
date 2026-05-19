@@ -75,13 +75,17 @@ symlink "$CANONICAL/claude/scripts" "$HOME/.claude/scripts"
 echo ""
 echo "=== Shell config (~/.bashrc) ==="
 BASHRC="$HOME/.bashrc"
-if grep -qF 'anaiis-dotfiles/bin' "$BASHRC" 2>/dev/null; then
-	sed -i '' 's|.*anaiis-dotfiles/bin.*|export PATH="$HOME/anaiis-dotfiles/bin:$PATH"|' "$BASHRC"
-	echo "  ok   PATH line (canonical)"
-else
-	printf '\nexport PATH="$HOME/anaiis-dotfiles/bin:$PATH"\n' >>"$BASHRC"
-	echo "  add  PATH -> $BASHRC"
-fi
+# Strip any prior form (bare export, indented export inside an if-guard, or
+# duplicates), then append the single canonical line. Idempotent by design.
+awk '
+	/if.*anaiis-dotfiles\/bin/  { in_guard=1; next }
+	in_guard && /^[[:space:]]*fi[[:space:]]*$/ { in_guard=0; next }
+	/anaiis-dotfiles\/bin/      { next }
+	{ print }
+' "$BASHRC" >"/tmp/bashrc_path_fix" \
+	&& mv "/tmp/bashrc_path_fix" "$BASHRC"
+printf '\nexport PATH="$HOME/anaiis-dotfiles/bin:$PATH"\n' >>"$BASHRC"
+echo "  ok   PATH line (canonical)"
 if grep -qF 'anaiis-dotfiles/bash/shared.bash' "$BASHRC" 2>/dev/null; then
 	echo "  ok   shared.bash source line"
 else
