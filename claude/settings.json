@@ -238,7 +238,8 @@
         "anaiis-data@anaiis-plugins": true,
         "anaiis-writing@anaiis-plugins": true,
         "anaiis-meta@anaiis-plugins": true,
-        "dbt@dbt-agent-marketplace": true
+        "dbt@dbt-agent-marketplace": true,
+        "dbt-extras@dbt-agent-marketplace": true
     },
     "extraKnownMarketplaces": {
         "anaiis-plugins": {
