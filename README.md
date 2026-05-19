@@ -2,7 +2,7 @@
 
 **What this is.** A personal Claude Code policy stack, rules, skills, hooks, agents, slash commands, plus the `web-verify` CLI. Tracked in git, shared across two machines (personal + work), installed via symlinks in `install.sh`. macOS today; portable to Linux.
 
-**It does not manage your shell config.** The previous bash layer was deleted in the 2026-04-29 audit. The only shell-adjacent piece left in `bin/` is `web-verify`. Your `~/.bashrc` / `~/.zshrc` / `~/.config/fish/config.fish` is yours.
+**Shell config.** `bash/shared.bash` is the tracked, portable shell config (PATH, aliases, tool inits, prompt). It is sourced by `~/.bashrc`, which is machine-local and not tracked. The wiring on each machine follows a three-file hierarchy: `~/.bash_profile` (entry point only, sources `~/.bashrc`) -> `~/.bashrc` (sources `shared.bash`, then `~/.bashrc.local`) -> `~/.bashrc.local` (secrets and machine overrides, gitignored). Never add config to `~/.bash_profile` directly; put portable things in `shared.bash` and machine-local secrets in `~/.bashrc.local`.
 
 **The "anaiis-" prefix** is the namespace for this repo's custom skills, distinct from upstream Anthropic skills (which keep their unprefixed names). When you see `/anaiis-litreview` or `/anaiis-duckdb`, that's a custom skill defined in `claude/skills/`.
 

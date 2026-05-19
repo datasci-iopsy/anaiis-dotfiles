@@ -1,6 +1,6 @@
 # ~/anaiis-dotfiles/bash/shared.bash
 #
-# Tracked personal shell preferences, sourced by ~/.bashrc.local.
+# Tracked personal shell preferences, sourced by ~/.bashrc.
 # Edit here to keep both machines in sync via git pull.
 # Machine-local overrides (GCP project, API keys) stay in ~/.bashrc.local.
 
@@ -10,6 +10,7 @@ _os="$(uname -s)"
 # ── macOS-only ────────────────────────────────────────────────────────────────
 if [ "$_os" = "Darwin" ]; then
 	export BASH_SILENCE_DEPRECATION_WARNING=1
+	export CLICOLOR=1
 	export LSCOLORS=GxFxCxDxBxegedabagaced
 fi
 
@@ -50,6 +51,8 @@ fi
 if [ -d "$HOME/.pyenv" ]; then
 	export PYENV_ROOT="$HOME/.pyenv"
 	export PATH="$PYENV_ROOT/bin:$PATH"
+	eval "$(pyenv init -)"
+	eval "$(pyenv virtualenv-init -)" 2>/dev/null
 fi
 
 # ── pipx / uv tools ───────────────────────────────────────────────────────────
@@ -66,6 +69,12 @@ fi
 # ── direnv ────────────────────────────────────────────────────────────────────
 if command -v direnv >/dev/null 2>&1; then
 	eval "$(direnv hook bash)"
+fi
+
+# ── thefuck ───────────────────────────────────────────────────────────────────
+if command -v thefuck >/dev/null 2>&1; then
+	eval "$(thefuck --alias)"
+	eval "$(thefuck --alias FUCK)"
 fi
 
 # ── Prompt, hostname, directory, git branch ──────────────────────────────────
@@ -102,6 +111,8 @@ alias ..='cd ../'
 alias ...='cd ../../'
 alias .3='cd ../../../'
 alias .4='cd ../../../../'
+alias .5='cd ../../../../../'
+alias .6='cd ../../../../../../'
 alias cp='cp -iv'
 alias mv='mv -iv'
 alias mkdir='mkdir -pv'

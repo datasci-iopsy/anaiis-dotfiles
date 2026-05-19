@@ -12,14 +12,18 @@ inside this repo, never the symlink destination.
 | `~/anaiis-dotfiles/claude/CLAUDE.md` | `~/.claude/CLAUDE.md` |
 | `~/anaiis-dotfiles/claude/rules/*.md` | `~/.claude/rules/*.md` |
 | `~/anaiis-dotfiles/claude/hooks/` | `~/.claude/hooks/` |
-| `~/anaiis-dotfiles/bash/shared.bash` | (no symlink; sourced by `~/.bashrc.local`) |
+| `~/anaiis-dotfiles/bash/shared.bash` | (no symlink; sourced by `~/.bashrc`) |
 
 ## Shell config
 
-`bash/shared.bash` is tracked here and syncs across machines via git pull.
-`~/.bashrc` and `~/.bashrc.local` are real files per machine, not symlinked. Edit them
-directly when machine-local changes are needed. To propagate a change to all machines,
-put it in `bash/shared.bash`.
+Three-file hierarchy (none are symlinked; all machine-local except `shared.bash`):
+
+| File | Tracked | Purpose |
+|---|---|---|
+| `bash/shared.bash` | Yes | All portable preferences: PATH, aliases, tool inits, prompt. Edit here to sync across machines. |
+| `~/.bash_profile` | No | Entry point only. Sources `~/.bashrc`. Do not add config here. |
+| `~/.bashrc` | No | Machine-specific wiring: sources `shared.bash`, machine extras, then `~/.bashrc.local`. |
+| `~/.bashrc.local` | No (gitignored) | Secrets and machine-specific overrides (API keys, project IDs). Never re-source `shared.bash` here. |
 
 ## Install
 
