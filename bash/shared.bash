@@ -28,6 +28,15 @@ for _brew_prefix in \
 done
 unset _brew_prefix
 
+# Warn when installed packages diverge from Brewfile
+_brewfile="$HOME/anaiis-dotfiles/Brewfile"
+if command -v brew &>/dev/null && [ -f "$_brewfile" ]; then
+	if ! brew bundle check --file="$_brewfile" &>/dev/null; then
+		echo "[dotfiles] Brewfile out of sync. Run: brew bundle --file=$_brewfile"
+	fi
+fi
+unset _brewfile
+
 # ── bash-completion ───────────────────────────────────────────────────────────
 if [ -r "$(brew --prefix 2>/dev/null)/etc/profile.d/bash_completion.sh" ]; then
 	. "$(brew --prefix)/etc/profile.d/bash_completion.sh"
