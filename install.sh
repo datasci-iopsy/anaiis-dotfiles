@@ -61,6 +61,7 @@ symlink "$CANONICAL/claude/settings.json" "$HOME/.claude/settings.json"
 symlink "$CANONICAL/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 symlink "$CANONICAL/claude/keybindings.json" "$HOME/.claude/keybindings.json"
 symlink "$CANONICAL/claude/RTK.md" "$HOME/.claude/RTK.md"
+symlink "$CANONICAL/claude/rtk-filters.toml" "$HOME/Library/Application Support/rtk/filters.toml"
 
 echo ""
 echo "=== Claude Code: Directories ==="

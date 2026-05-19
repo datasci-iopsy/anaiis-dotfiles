@@ -1,0 +1,66 @@
+# User-global RTK filters, apply to all your projects.
+# Project-local .rtk/filters.toml takes precedence over these.
+# Docs: https://github.com/rtk-ai/rtk#custom-filters
+schema_version = 1
+
+# ---------------------------------------------------------------------------
+# dbt CLI: terminal output from dbt run / dbt build / dbt test
+# Global so all dbt projects benefit automatically. Project-local
+# .rtk/filters.toml can override for project-specific patterns.
+# ---------------------------------------------------------------------------
+[filters.dbt-cli]
+description = "dbt CLI terminal output: strip ANSI, boilerplate, START lines, Google auth warnings. Preserves WARN/ERROR/summary."
+match_command = "^dbt\\b"
+strip_ansi = true
+strip_lines_matching = [
+    # Boilerplate header (every run)
+    "Running with dbt=",
+    "Registered adapter:",
+    "^Concurrency: [0-9]+ threads",
+    "^Performance info:",
+
+    # Unused config path entries (WARNING header is kept)
+    "^- models\\.",
+
+    # START lines for all node types (result line follows with same name)
+    " START test ",
+    " START sql ",
+    " START view ",
+    " START incremental ",
+    " START seed ",
+    " START snapshot ",
+
+    # Repeated Google Cloud SDK / Python auth warnings (3-5x per run)
+    "google/auth/_default\\.py",
+    "UserWarning: Your application has authenticated",
+    "quota project\\. You might receive",
+    "quota exceeded.*API not enabled",
+    "https://cloud\\.google\\.com/docs/authentication/adc-troubleshooting",
+    "warnings\\.warn\\(_CLOUD_SDK_CREDENTIALS_WARNING\\)",
+
+    # Blank lines
+    "^\\s*$",
+]
+
+# ---------------------------------------------------------------------------
+# MetricFlow CLI (mf): strips repeated logger-setup boilerplate emitted on
+# every mf invocation. Preserves query requests and results.
+# ---------------------------------------------------------------------------
+[filters.metricflow]
+description = "MetricFlow CLI: strip repeated logger setup block, keep query requests and results."
+match_command = "^mf\\b"
+strip_ansi = true
+strip_lines_matching = [
+    # Repeated logger setup block emitted on every mf call
+    "Set up MF CLI logging",
+    "root_logger_level:",
+    "root_logger_handlers:",
+    "previous_root_logger_level:",
+    "previous_root_logger_handlers:",
+    "log_format:",
+    "<StreamHandler",
+    "<TimedRotatingFileHandler",
+
+    # Blank lines
+    "^\\s*$",
+]
