@@ -28,14 +28,18 @@ for _brew_prefix in \
 done
 unset _brew_prefix
 
-# Warn when installed packages diverge from Brewfile
+# Warn when installed packages diverge from Brewfile (once per day, non-blocking)
 _brewfile="$HOME/anaiis-dotfiles/Brewfile"
+_bfstamp="${XDG_CACHE_HOME:-$HOME/.cache}/brewfile-check.stamp"
 if command -v brew &>/dev/null && [ -f "$_brewfile" ]; then
-	if ! brew bundle check --file="$_brewfile" &>/dev/null; then
-		echo "[dotfiles] Brewfile out of sync. Run: brew bundle --file=$_brewfile"
+	_bfage=$(($(date +%s) - $(stat -f %m "$_bfstamp" 2>/dev/null || echo 0)))
+	if [ ! -f "$_bfstamp" ] || [ "$_bfage" -gt 86400 ]; then
+		touch "$_bfstamp"
+		(brew bundle check --file="$_brewfile" &>/dev/null \
+			|| echo "[dotfiles] Brewfile out of sync. Run: brew bundle --file=$_brewfile") &
 	fi
 fi
-unset _brewfile
+unset _brewfile _bfstamp _bfage
 
 # ── bash-completion ───────────────────────────────────────────────────────────
 if [ -r "$(brew --prefix 2>/dev/null)/etc/profile.d/bash_completion.sh" ]; then
