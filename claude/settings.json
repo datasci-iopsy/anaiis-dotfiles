@@ -86,8 +86,7 @@
     },
     "skillOverrides": {
         "dbt:configuring-dbt-mcp-server": "user-invocable-only",
-        "dbt:working-with-dbt-mesh": "off",
-        "agent-skills:spec-driven-development": "user-invocable-only"
+        "dbt:working-with-dbt-mesh": "off"
     },
     "hooks": {
         "UserPromptSubmit": [
