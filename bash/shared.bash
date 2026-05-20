@@ -84,7 +84,7 @@ fi
 # Model selection; overrides settings.json "model". Use /model or --model for
 # one-off changes; this is the baseline. Pins each class to a specific snapshot
 # so /model picks resolve deterministically across machines.
-export ANTHROPIC_MODEL="claude-opus-4-7"
+export ANTHROPIC_MODEL="opusplan"
 export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-4-7"
 export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-4-6"
 export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku-4-5-20251001"
