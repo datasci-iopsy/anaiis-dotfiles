@@ -86,7 +86,8 @@
     },
     "skillOverrides": {
         "dbt:configuring-dbt-mcp-server": "user-invocable-only",
-        "dbt:working-with-dbt-mesh": "off"
+        "dbt:working-with-dbt-mesh": "off",
+        "agent-skills:spec-driven-development": "user-invocable-only"
     },
     "hooks": {
         "UserPromptSubmit": [
@@ -237,7 +238,8 @@
         "anaiis-writing@anaiis-plugins": true,
         "anaiis-meta@anaiis-plugins": true,
         "dbt@dbt-agent-marketplace": true,
-        "dbt-extras@dbt-agent-marketplace": true
+        "dbt-extras@dbt-agent-marketplace": true,
+        "agent-skills@addy-agent-skills": true
     },
     "extraKnownMarketplaces": {
         "anaiis-plugins": {
@@ -250,6 +252,12 @@
             "source": {
                 "source": "github",
                 "repo": "dbt-labs/dbt-agent-skills"
+            }
+        },
+        "addy-agent-skills": {
+            "source": {
+                "source": "github",
+                "repo": "addyosmani/agent-skills"
             }
         }
     },
