@@ -71,7 +71,10 @@ cwd="${cwd_j:-$PWD}"
 
 # Effort level: settings.json is rewritten immediately on /effort, so this
 # always reflects the current level without needing a JSON payload change.
+# Fall back to the env var when effortLevel is absent from settings.json
+# (e.g., set via CLAUDE_CODE_EFFORT_LEVEL in shared.bash).
 effort=$(jq -r '.effortLevel // empty' "$HOME/.claude/settings.json" 2>/dev/null)
+effort="${effort:-${CLAUDE_CODE_EFFORT_LEVEL:-}}"
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
