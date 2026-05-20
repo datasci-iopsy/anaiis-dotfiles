@@ -6,7 +6,7 @@
 # Designed for dark-mode terminals. Compatible with macOS and Linux (Ubuntu/RHEL).
 #
 # Line 1, identity:   model · effort · [vim] · ⎇ branch +staged ~modified
-# Line 2, session:    ctx% · in:X · out:X · cache · $session
+# Line 2, session:    context:[bar]% · in:X · out:X · cache · $session
 # Line 3, billing:    5h:[bar]% reset · 7d% · repo:$X · all:$X
 #
 # Costs beyond the live session are read from ~/.claude/projects/<slug>/*.jsonl
@@ -71,10 +71,7 @@ cwd="${cwd_j:-$PWD}"
 
 # Effort level: settings.json is rewritten immediately on /effort, so this
 # always reflects the current level without needing a JSON payload change.
-# Fall back to the env var when effortLevel is absent from settings.json
-# (e.g., set via CLAUDE_CODE_EFFORT_LEVEL in shared.bash).
 effort=$(jq -r '.effortLevel // empty' "$HOME/.claude/settings.json" 2>/dev/null)
-effort="${effort:-${CLAUDE_CODE_EFFORT_LEVEL:-}}"
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -293,15 +290,15 @@ fi
 # Context window %
 if [ "${ctx_pct:-0}" -gt 0 ] 2>/dev/null; then
 	col=$(pct_color "$ctx_pct")
-	line2+=("$(printf "${col}ctx:%d%%${rs}" "$ctx_pct")")
+	bar=$(progress_bar "$ctx_pct" 8)
+	line2+=("$(printf "${col}context:[%s${col}]%d%%${rs}" "$bar" "$ctx_pct")")
 fi
 
-# Token counts: in/out as separate labeled segments (was: opaque tok:X+Y)
-if [ "${in_tok:-0}" -gt 0 ] 2>/dev/null; then
-	line2+=("$(printf "${dim}in:${rs}${b_grn}${dim}%s${rs}" "$(fmt_k "$in_tok")")")
-fi
-if [ "${out_tok:-0}" -gt 0 ] 2>/dev/null; then
-	line2+=("$(printf "${dim}out:${rs}${b_wht}${dim}%s${rs}" "$(fmt_k "$out_tok")")")
+# Token counts
+if [ "${in_tok:-0}" -gt 0 ] 2>/dev/null \
+	&& [ "${out_tok:-0}" -gt 0 ] 2>/dev/null; then
+	line2+=("$(printf "${dim}tok:${rs}${b_grn}${dim}%s${b_wht}${dim}+%s${rs}" \
+		"$(fmt_k "$in_tok")" "$(fmt_k "$out_tok")")")
 fi
 
 # Cache reads
@@ -324,9 +321,9 @@ if [ "${five_pct:-0}" -gt 0 ] 2>/dev/null; then
 			hrs=$((remaining / 3600))
 			mins=$(((remaining % 3600) / 60))
 			if [ "$hrs" -gt 0 ]; then
-				time_str=" ${dim}reset:${hrs}h${mins}m${rs}"
+				time_str=" ${dim}${hrs}h${mins}m${rs}"
 			else
-				time_str=" ${dim}reset:${mins}m${rs}"
+				time_str=" ${dim}${mins}m${rs}"
 			fi
 		fi
 	fi
