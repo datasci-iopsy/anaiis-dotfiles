@@ -78,33 +78,30 @@ if command -v thefuck >/dev/null 2>&1; then
 fi
 
 # ── Claude Code defaults (override in ~/.bashrc.local per machine) ────────────
+# Plain export so re-sourcing shared.bash always picks up changed defaults.
+# ~/.bashrc.local is sourced AFTER this file by ~/.bashrc, so any var set
+# there wins over these values automatically.
 # Model selection; overrides settings.json "model". Use /model or --model for
 # one-off changes; this is the baseline. Pins each class to a specific snapshot
 # so /model picks resolve deterministically across machines.
-: "${ANTHROPIC_MODEL:=claude-opus-4-7}"
-: "${ANTHROPIC_DEFAULT_OPUS_MODEL:=claude-opus-4-7}"
-: "${ANTHROPIC_DEFAULT_SONNET_MODEL:=claude-sonnet-4-6}"
-: "${ANTHROPIC_DEFAULT_HAIKU_MODEL:=claude-haiku-4-5-20251001}"
+export ANTHROPIC_MODEL="claude-opus-4-7"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-4-7"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-4-6"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku-4-5-20251001"
 
 # Effort and output sizing; overrides settings.json "effortLevel".
-: "${CLAUDE_CODE_EFFORT_LEVEL:=medium}"
-: "${CLAUDE_CODE_MAX_OUTPUT_TOKENS:=16000}"
+export CLAUDE_CODE_EFFORT_LEVEL="medium"
+export CLAUDE_CODE_MAX_OUTPUT_TOKENS="16000"
 
 # Bash and API timeouts. Research workflows can hit long-running R or DuckDB
 # commands; raise BASH_MAX_TIMEOUT_MS in ~/.bashrc.local if needed.
-: "${BASH_DEFAULT_TIMEOUT_MS:=120000}"
-: "${BASH_MAX_TIMEOUT_MS:=600000}"
-: "${API_TIMEOUT_MS:=600000}"
+export BASH_DEFAULT_TIMEOUT_MS="120000"
+export BASH_MAX_TIMEOUT_MS="600000"
+export API_TIMEOUT_MS="600000"
 
 # Hygiene: one switch disables auto-updater, feedback prompts, error reporting,
 # and telemetry. Comment out in ~/.bashrc.local if OTel is wanted.
-: "${CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:=1}"
-
-export ANTHROPIC_MODEL ANTHROPIC_DEFAULT_OPUS_MODEL \
-	ANTHROPIC_DEFAULT_SONNET_MODEL ANTHROPIC_DEFAULT_HAIKU_MODEL \
-	CLAUDE_CODE_EFFORT_LEVEL CLAUDE_CODE_MAX_OUTPUT_TOKENS \
-	BASH_DEFAULT_TIMEOUT_MS BASH_MAX_TIMEOUT_MS API_TIMEOUT_MS \
-	CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC
+export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"
 
 # ── Prompt, hostname, directory, git branch ──────────────────────────────────
 git_branch() {
