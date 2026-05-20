@@ -175,6 +175,7 @@ alias gc-authList='gcloud auth list'
 
 # ── Claude ────────────────────────────────────────────────────────────────────
 alias claude-fast='claude --permission-mode bypassPermissions'
+alias claude-turbo='CLAUDE_CODE_EFFORT_LEVEL=high claude --permission-mode bypassPermissions'
 
 # ── CodeRabbit ────────────────────────────────────────────────────────────────
 alias cr='coderabbit'
