@@ -8,7 +8,6 @@
         "commit": "",
         "pr": ""
     },
-    "includeGitInstructions": false,
     "permissions": {
         "allow": [
             "Read",
@@ -85,7 +84,6 @@
         "defaultMode": "default",
         "disableAutoMode": "disable"
     },
-    "model": "opusplan",
     "skillOverrides": {
         "dbt:configuring-dbt-mcp-server": "user-invocable-only",
         "dbt:working-with-dbt-mesh": "off"
@@ -255,8 +253,5 @@
             }
         }
     },
-    "effortLevel": "medium",
-    "awaySummaryEnabled": true,
-    "skipDangerousModePermissionPrompt": true,
-    "autoCompactEnabled": true
+    "skipDangerousModePermissionPrompt": true
 }
