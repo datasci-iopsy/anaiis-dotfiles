@@ -1,0 +1,5 @@
+# Quarto render artifacts
+*.html
+*_files/
+_output/
+.quarto/
