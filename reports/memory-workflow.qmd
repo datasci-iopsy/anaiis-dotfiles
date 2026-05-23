@@ -1,0 +1,456 @@
+---
+title: "Memory Workflow: anaiis-dotfiles"
+subtitle: "Hook-by-hook audit of the Claude Code memory pipeline"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    code-fold: false
+    theme: cosmo
+---
+
+## 1. System Overview
+
+Two distinct loading mechanisms operate in parallel at session start:
+
+- **Hook-injected (global tier):** `~/.claude/memory/` holds cross-project user facts. `load-global-memory.sh` fires on the first `UserPromptSubmit` and emits the index plus all linked topical files as a `systemMessage`. This is the only mechanism that loads the global tier; the harness does not touch it natively.
+- **Harness-native (project tier):** `~/.claude/projects/<project-key>/memory/MEMORY.md` is loaded automatically by Claude Code for the active working directory. No hook is involved. The harness follows markdown links to topical files.
+
+Compaction introduces a third mechanism: `pre-compact.sh` snapshots session state into a handoff file before context is compressed, and `post-compact.sh` re-injects that snapshot afterward so task continuity is not lost.
+
+---
+
+## 2. Session Lifecycle
+
+```{mermaid}
+sequenceDiagram
+    actor U as User
+    participant H as Claude Code Harness
+    participant SBR as surface-behavioral-rules.sh
+    participant GLM as load-global-memory.sh
+    participant EBR as extract-behavioral-rules.sh
+
+    Note over H: Session start / first prompt
+    U->>H: Submit first prompt
+    H->>SBR: UserPromptSubmit (session_id, cwd, prompt)
+    SBR->>SBR: Check /tmp/claude-session-id.behavioral-loaded
+    SBR->>EBR: Invoke extract-behavioral-rules.sh
+    EBR->>EBR: grep H2 headings from behavioral.md
+    EBR-->>SBR: Numbered rules (7 lines)
+    SBR-->>H: systemMessage (behavioral imperatives)
+    SBR->>SBR: Write /tmp/claude-session-id.behavioral-loaded
+
+    H->>GLM: UserPromptSubmit
+    GLM->>GLM: Check /tmp/claude-session-id.global-loaded
+    GLM->>GLM: Read ~/.claude/memory/MEMORY.md
+    GLM->>GLM: Parse markdown links, read each topical file
+    GLM-->>H: systemMessage (global memory tier)
+    GLM->>GLM: Write /tmp/claude-session-id.global-loaded
+
+    H->>H: Load project MEMORY.md natively (no hook)
+    H-->>U: Context fully assembled
+
+    Note over H: Subsequent prompts (same session)
+    U->>H: Submit prompt
+    H->>SBR: UserPromptSubmit
+    SBR->>SBR: Marker exists, exit 0 (silent)
+    H->>GLM: UserPromptSubmit
+    GLM->>GLM: Marker exists, exit 0 (silent)
+```
+
+---
+
+## 3. Hook Inventory
+
+### 3.1 `load-global-memory.sh`
+
+**Trigger:** `UserPromptSubmit` (no matcher, fires on every prompt until marker is set)
+**Registered in:** `settings.json` under `UserPromptSubmit[3]`
+**Source:** `claude/hooks/load-global-memory.sh` (symlinked to `~/.claude/hooks/`)
+
+Injects the global memory tier once per session. The session marker (`/tmp/`) prevents re-injection on every subsequent prompt. Path traversal on linked files is guarded: resolved target must stay under `~/.claude/memory/`.
+
+```{mermaid}
+flowchart TD
+    A([UserPromptSubmit fires]) --> B{jq present?}
+    B -->|no| Z([exit 0, silent])
+    B -->|yes| C{MEMORY.md exists?}
+    C -->|no| Z
+    C -->|yes| D{session_id matches\na-zA-Z0-9._-?}
+    D -->|no| Z
+    D -->|yes| E{/tmp/...global-loaded\nexists?}
+    E -->|yes| Z
+    E -->|no| F[touch /tmp/...global-loaded]
+    F --> G[Read MEMORY.md verbatim]
+    G --> H[grep markdown links\nfrom index]
+    H --> I{link resolves under\n~/.claude/memory/?}
+    I -->|no| J[skip, guard triggered]
+    I -->|yes| K[Read linked topical file]
+    K --> H
+    J --> L[Build PAYLOAD string]
+    K --> L
+    L --> M[jq: emit systemMessage JSON]
+    M --> N([exit 0])
+```
+
+**Reads:**
+- `~/.claude/memory/MEMORY.md`
+- `~/.claude/memory/<file>.md` for each `([file.md])` link in the index
+
+**Writes:**
+- `/tmp/claude-session-<session_id>.global-loaded` (existence marker)
+- stdout: `{"systemMessage": "..."}`
+
+---
+
+### 3.2 `surface-behavioral-rules.sh`
+
+**Trigger:** `UserPromptSubmit` (no matcher)
+**Registered in:** `settings.json` under `UserPromptSubmit[0]` (fires before `load-global-memory`)
+**Source:** `claude/hooks/surface-behavioral-rules.sh`
+
+Extracts the 7 numbered imperatives from `behavioral.md` and emits them as a `systemMessage`. Delegates extraction to `extract-behavioral-rules.sh` so the hook stays in sync when the rules file changes. On extraction failure, emits a visible warning rather than silently injecting nothing.
+
+```{mermaid}
+flowchart TD
+    A([UserPromptSubmit fires]) --> B{jq present?}
+    B -->|no| Z([exit 0, silent])
+    B -->|yes| C{session_id valid?}
+    C -->|no| Z
+    C -->|yes| D{/tmp/...behavioral-loaded\nexists?}
+    D -->|yes| Z
+    D -->|no| E[touch /tmp/...behavioral-loaded]
+    E --> F[Invoke extract-behavioral-rules.sh]
+    F --> G{Rules extracted?}
+    G -->|yes| H[Build rules payload]
+    G -->|no| I[Build LOAD ERROR payload]
+    H --> J[jq: emit systemMessage JSON]
+    I --> J
+    J --> K([exit 0])
+```
+
+**Reads:** delegates to `extract-behavioral-rules.sh`
+**Writes:**
+- `/tmp/claude-session-<session_id>.behavioral-loaded`
+- stdout: `{"systemMessage": "..."}`
+
+---
+
+### 3.3 `pre-compact.sh`
+
+**Trigger:** `PreCompact` (matcher: `*`, fires on both `/compact` and auto-compact)
+**Registered in:** `settings.json` under `PreCompact[0]`
+**Source:** `claude/hooks/pre-compact.sh`
+
+Snapshots everything needed to restore task continuity after compression: file activity (parsed from the session transcript JSONL), git branch/status/log/diff. Enforces a rolling cap of 5 handoffs per project by deleting the oldest on overflow. Also migrates any legacy flat handoffs (pre-Phase-9 layout) into the `handoffs/` subdirectory as a side effect.
+
+```{mermaid}
+flowchart TD
+    A([PreCompact fires]) --> B{jq present?}
+    B -->|no| Z([exit 0, skip])
+    B -->|yes| C[Parse: trigger, session_id,\ncwd, transcript_path]
+    C --> D{cwd present?}
+    D -->|no| Z
+    D -->|yes| E["Derive project key:\necho CWD | tr '/.' '-'"]
+    E --> F["mkdir -p\nhandoffs/"]
+    F --> G{transcript_path\nin hook input?}
+    G -->|yes| H[Use transcript_path directly]
+    G -->|no| I["Fallback: derive from session_id\nor find most recent .jsonl"]
+    H --> J["jq: select Read/Write/Edit tool_use\nfrom assistant messages"]
+    I --> J
+    J --> K["git -C cwd:\nbranch, status --short,\nlog --oneline -5, diff --stat"]
+    K --> L["Write handoffs/handoff_\nFILE_TS_SID8.md\n(YAML front matter + sections)"]
+    L --> M{"count of handoff_*.md\n> 5?"}
+    M -->|yes| N["Delete oldest\nby filename sort\n(not mtime)"]
+    M -->|no| O
+    N --> O["Migrate flat legacy\nhandoff_*.md\nfrom MEMORY_DIR root"]
+    O --> P([exit 0])
+```
+
+**Reads:**
+- Hook input JSON (stdin)
+- `~/.claude/projects/<key>/<session_id>.jsonl` (or most recent `.jsonl`)
+- `git` state from `$CWD`
+
+**Writes:**
+- `~/.claude/projects/<key>/memory/handoffs/handoff_<FILE_TS>_<SID8>.md`
+- Deletes overflow handoffs (oldest by filename sort)
+- Moves legacy flat handoffs into `handoffs/` (migration)
+
+**Handoff filename:** `handoff_YYYY-MM-DDTHH-MMZ_<first8chars-session-id>.md`
+
+**Handoff format:**
+```
+---
+name: Session handoff <FILE_TS>
+description: Pre-compact snapshot, <trigger> trigger, branch <BRANCH>
+type: project
+---
+
+**Trigger / Session / Branch / Project / Timestamp**
+
+## Files active this session
+## Git state
+## Recent commits
+## Files changed (git diff)
+```
+
+---
+
+### 3.4 `post-compact.sh`
+
+**Trigger:** `PostCompact` (matcher: `*`)
+**Registered in:** `settings.json` under `PostCompact[0]`
+**Source:** `claude/hooks/post-compact.sh`
+
+Re-injects the most recent handoff as a `systemMessage` immediately after context compression completes. Prevents Claude from re-reading files or re-exploring state that was already established. Falls back to the flat memory layout for projects not yet migrated to Phase-9.
+
+```{mermaid}
+flowchart TD
+    A([PostCompact fires]) --> B{jq present?}
+    B -->|no| Z([exit 0, silent])
+    B -->|yes| C[Parse cwd from input]
+    C --> D{cwd present?}
+    D -->|no| Z
+    D -->|yes| E["Derive project key:\necho CWD | tr '/.' '-'"]
+    E --> F["find handoffs/ -name\nhandoff_*.md | sort -r | head -1"]
+    F --> G{Found in handoffs/?}
+    G -->|no| H["Fallback: find memory/ root\nfor flat handoff_*.md"]
+    H --> I{Found in flat layout?}
+    I -->|no| Z
+    I -->|yes| J[Read handoff content]
+    G -->|yes| J
+    J --> K["jq: emit systemMessage with\n'## Restored from pre-compact handoff'\nheader + content"]
+    K --> L([exit 0])
+```
+
+**Reads:** most recent `handoff_*.md` from `handoffs/` (or flat fallback)
+**Writes:** stdout: `{"systemMessage": "## Restored from pre-compact handoff\n\n..."}`
+
+---
+
+## 4. File Inventory
+
+| File | Location | Format | Written by | Read by |
+|------|----------|--------|------------|---------|
+| Global index | `~/.claude/memory/MEMORY.md` | Markdown, `[Title](file.md)` links | User / Claude (auto-memory) | `load-global-memory.sh` |
+| Global topical | `~/.claude/memory/<name>.md` | YAML frontmatter + markdown | User / Claude, `migrate-memory.sh`, `seed-memory.sh` | `load-global-memory.sh` |
+| Project index | `~/.claude/projects/<key>/memory/MEMORY.md` | Markdown, `[Title](file.md)` links | User / Claude, `seed-memory.sh`, `migrate-memory.sh` (strips stale entries) | Harness natively |
+| Project topical | `~/.claude/projects/<key>/memory/<name>.md` | YAML frontmatter + markdown | User / Claude, `seed-memory.sh` | Harness natively, `memory-doctor.sh` |
+| Handoff | `~/.claude/projects/<key>/memory/handoffs/handoff_<ts>_<sid8>.md` | YAML frontmatter + markdown sections | `pre-compact.sh` | `post-compact.sh` |
+| Global marker | `/tmp/claude-session-<id>.global-loaded` | Empty file | `load-global-memory.sh` | `load-global-memory.sh` (existence check) |
+| Behavioral marker | `/tmp/claude-session-<id>.behavioral-loaded` | Empty file | `surface-behavioral-rules.sh` | `surface-behavioral-rules.sh` (existence check) |
+| Behavioral rules | `claude/rules/behavioral.md` | Markdown, H2 numbered headings | User (source of truth) | `extract-behavioral-rules.sh` |
+
+### Frontmatter schema (topical files)
+
+Every topical file (global and project) except `MEMORY.md` requires these three fields:
+
+```yaml
+---
+name: <short-kebab-case-slug>
+description: <one-line summary>
+type: <user | feedback | project | reference>
+---
+```
+
+`memory-doctor.sh` check B validates this across all tiers.
+
+---
+
+## 5. Dependency Graph
+
+```{mermaid}
+graph TD
+    SJ["settings.json\nhooks block"]
+
+    subgraph UserPromptSubmit
+        SBR["surface-behavioral-rules.sh\nUserPromptSubmit[0]"]
+        GLM["load-global-memory.sh\nUserPromptSubmit[3]"]
+    end
+
+    subgraph Compaction
+        PRE["pre-compact.sh\nPreCompact[0]"]
+        POST["post-compact.sh\nPostCompact[0]"]
+    end
+
+    SJ -->|registers| SBR
+    SJ -->|registers| GLM
+    SJ -->|registers| PRE
+    SJ -->|registers| POST
+
+    SBR -->|calls| EBR["extract-behavioral-rules.sh"]
+    EBR -->|reads| BEHAV["claude/rules/behavioral.md"]
+    SBR -->|checks + writes| BMARK["/tmp/...behavioral-loaded"]
+    SBR -->|emits| SM1["systemMessage\n(7 imperatives)"]
+
+    GLM -->|reads| GIDX["~/.claude/memory/MEMORY.md"]
+    GIDX -->|links to| GTOP["~/.claude/memory/*.md\n(topical files)"]
+    GLM -->|reads| GTOP
+    GLM -->|checks + writes| GMARK["/tmp/...global-loaded"]
+    GLM -->|emits| SM2["systemMessage\n(global tier)"]
+
+    PRE -->|reads| TR["transcript .jsonl\n(via transcript_path or derived)"]
+    PRE -->|reads| GIT["git: branch/status/log/diff"]
+    PRE -->|writes| HF["handoffs/handoff_*.md"]
+    PRE -->|enforces| CAP["rolling cap: 5 per project"]
+    PRE -->|migrates| FLAT["legacy flat handoffs -> handoffs/"]
+
+    POST -->|reads| HF
+    POST -->|emits| SM3["systemMessage\n(restored handoff)"]
+
+    NATIVE["Claude Code Harness\n(no hook)"] -->|loads natively| PIDX["~/.claude/projects/key/memory/MEMORY.md"]
+    PIDX -->|links to| PTOP["project topical *.md"]
+```
+
+---
+
+## 6. Session Marker Pattern
+
+The global and behavioral hooks each use a `/tmp/` marker file to enforce first-prompt-only injection. This prevents re-emitting the same `systemMessage` on every prompt in a session.
+
+```{mermaid}
+flowchart LR
+    A[Hook fires] --> B{Marker file\nexists in /tmp/?}
+    B -->|yes| C([exit 0, no output])
+    B -->|no| D[touch marker]
+    D --> E[Build and emit systemMessage]
+    E --> F([exit 0])
+```
+
+**Marker paths:**
+
+| Hook | Marker |
+|------|--------|
+| `load-global-memory.sh` | `/tmp/claude-session-<session_id>.global-loaded` |
+| `surface-behavioral-rules.sh` | `/tmp/claude-session-<session_id>.behavioral-loaded` |
+
+**Session ID validation:** both hooks reject session IDs that contain characters outside `[a-zA-Z0-9._-]` before constructing the marker path. This prevents marker path traversal if the harness ever passes a malformed session ID.
+
+**Lifecycle:** markers are created when the hook first fires and persist until the OS clears `/tmp/` or `cleanup-sessions.py` runs. `cleanup-sessions.py` is a standalone script (not hooked); it removes stale markers for expired sessions.
+
+---
+
+## 7. Compaction Pipeline
+
+```{mermaid}
+sequenceDiagram
+    actor U as User / Auto
+    participant H as Harness
+    participant PRE as pre-compact.sh
+    participant TR as Transcript JSONL
+    participant GIT as git
+    participant HD as handoffs/
+    participant COMP as Compaction Engine
+    participant POST as post-compact.sh
+
+    U->>H: /compact or context threshold (80-85%)
+    H->>PRE: PreCompact event\n(trigger, session_id, cwd, transcript_path)
+    PRE->>TR: jq: extract Read/Write/Edit tool_use\nfrom assistant messages
+    TR-->>PRE: file activity list (up to 60 lines, sort -u)
+    PRE->>GIT: git -C cwd branch/status/log/diff
+    GIT-->>PRE: branch, status, 5 recent commits, diff stat
+    PRE->>HD: Write handoff_FILE_TS_SID8.md
+    PRE->>HD: Count handoff_*.md
+    alt count > 5
+        PRE->>HD: Delete oldest by filename sort
+    end
+    PRE->>PRE: Move flat legacy handoffs into handoffs/
+    PRE-->>H: exit 0 (never blocks)
+
+    H->>COMP: Compress context window
+    COMP-->>H: Compaction complete
+
+    H->>POST: PostCompact event (cwd)
+    POST->>HD: find handoff_*.md | sort -r | head -1
+    alt found in handoffs/
+        POST->>POST: Read handoff content
+    else not found
+        POST->>POST: Fallback: find in memory/ root
+    end
+    POST-->>H: systemMessage\n("## Restored from pre-compact handoff")
+```
+
+**Rolling cap implementation detail:** `pre-compact.sh` sorts handoff filenames lexicographically (not by mtime) with `sort | head -n $OVERFLOW`. Because the filename encodes a minute-precision UTC timestamp (`YYYY-MM-DDTHH-MMZ`), lexicographic sort is equivalent to chronological sort. The oldest (lexicographically smallest) are deleted first.
+
+**Transcript fallback chain:**
+
+1. `transcript_path` from hook input (provided directly by Claude Code)
+2. `~/.claude/projects/<key>/<session_id>.jsonl`
+3. Most recent `.jsonl` in the project directory (sorted by mtime via Python one-liner)
+
+---
+
+## 8. Harness Native Load
+
+Claude Code loads the project `MEMORY.md` automatically for the active `cwd` at session start. This is built into the harness and requires no hook.
+
+```{mermaid}
+flowchart TD
+    A([Session start]) --> B["Harness resolves project key\nfrom cwd: tr '/' '-', tr '.' '-'"]
+    B --> C{~/.claude/projects/key/\nmemory/MEMORY.md\nexists?}
+    C -->|no| D([No project memory loaded])
+    C -->|yes| E[Read MEMORY.md]
+    E --> F[Parse markdown links\n[Title](file.md)]
+    F --> G{Linked file exists?}
+    G -->|yes| H[Read topical file into context]
+    G -->|no| I[Skip missing link]
+    H --> F
+    I --> F
+    F --> J([Project tier in context])
+```
+
+**Key distinction from the hook-injected global tier:**
+
+| Property | Global tier | Project tier |
+|----------|-------------|--------------|
+| Load mechanism | `load-global-memory.sh` hook | Harness native |
+| Trigger | First `UserPromptSubmit` | Session start |
+| Scope | Cross-project, machine-level | Per working directory |
+| Location | `~/.claude/memory/` | `~/.claude/projects/<key>/memory/` |
+| Index file | `MEMORY.md` (loaded by hook) | `MEMORY.md` (loaded by harness) |
+| Controllable per-session | Yes (hook can be modified/disabled) | No (harness behavior) |
+
+The project tier is loaded before any hook fires. The global tier arrives via `systemMessage` after the first prompt is submitted.
+
+---
+
+## Appendix: Supporting Scripts
+
+### `extract-behavioral-rules.sh`
+
+Called exclusively by `surface-behavioral-rules.sh`. Resolves its own path via `realpath "${BASH_SOURCE[0]}"` to navigate through symlink layers (`~/.claude/scripts/` is a symlink into the dotfiles repo). Greps `behavioral.md` for `^## [0-9]+\. ` headings and strips the `## ` prefix. Exits 1 if the file is missing or contains no numbered headings.
+
+### `memory-doctor.sh`
+
+Diagnostic tool; not hooked. Synthetically exercises checks A through G:
+
+| Check | What it verifies |
+|-------|-----------------|
+| A | Global memory directory and `MEMORY.md` exist |
+| B | Every topical file has `name`, `description`, `type` frontmatter |
+| C | Every project `handoffs/` subdir is at or under cap of 5 |
+| D | No flat `handoff_*.md` files remain outside `handoffs/` |
+| E | `load-global-memory.sh` emits on first call, silent on second |
+| F | `pre-compact.sh` writes into `handoffs/` subdir |
+| G | `post-compact.sh` reads from `handoffs/` subdir first |
+
+Run: `bash ~/.claude/scripts/memory-doctor.sh`
+
+### `migrate-memory.sh`
+
+One-shot, idempotent. Transforms the pre-Phase-9 layout into Phase-9:
+
+1. Promotes user-level files (`user_*.md`, `feedback_jq_*.md`, `feedback_memory_workflow*.md`, `feedback_agent_token_cost*.md`) from all project tiers into `~/.claude/memory/`. Conflict resolution: newer mtime wins.
+2. Moves flat `handoff_*.md` files from each project `memory/` root into `memory/handoffs/`.
+3. Strips stale MEMORY.md index entries: removes lines pointing at promoted files and at session handoff entries.
+
+Run: `bash ~/.claude/scripts/migrate-memory.sh [--dry-run]`
+
+### `seed-memory.sh`
+
+Initializes memory on a new machine from templates in `claude/memory-templates/`. Never overwrites existing files (tops up missing ones only). Creates `handoffs/` subdir under the project memory dir. Path encoding: `${PROJECT_PATH//\//-}` (replaces `/` with `-`).
+
+Templates:
+- `claude/memory-templates/*.md` (project tier)
+- `claude/memory-templates/global/*.md` (global tier)
