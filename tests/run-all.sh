@@ -5,6 +5,12 @@
 
 set -u
 
+# When run via git pre-commit, git sets GIT_DIR/GIT_WORK_TREE which causes
+# git commands inside test-created temp repos to target the real worktree
+# instead of the temp repo. Unset them so each test's isolated git repos
+# behave correctly.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY 2>/dev/null || true
+
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 TOTAL_PASS=0
