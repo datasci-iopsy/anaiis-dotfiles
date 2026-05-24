@@ -55,6 +55,8 @@ brew "rustup"
 brew "shellcheck"
 # Autoformat shell script source code
 brew "shfmt"
+# Easiest, most secure way to use WireGuard and 2FA
+brew "tailscale"
 # Programmatically correct mistyped console commands
 brew "thefuck"
 # Official tldr client written in Rust
@@ -73,18 +75,20 @@ cask "bitwarden"
 cask "claude-code@latest"
 # AI code review CLI
 cask "coderabbit"
-# Scientific and technical publishing system
-cask "quarto"
 # OpenAI's coding agent that runs in your terminal
 cask "codex"
 # Terminal emulator as alternative to Apple's Terminal app
 cask "iterm2"
 # Free cross-platform office suite, fresh version
 cask "libreoffice"
+# Scientific and technical publishing system built on Pandoc
+cask "quarto"
 # Open-source code editor
 cask "visual-studio-code"
 vscode "anthropic.claude-code"
-vscode "github.copilot-chat"
 vscode "ms-vscode-remote.remote-ssh"
 go "mvdan.cc/sh/v3/cmd/shfmt"
 uv "shandy-sqlfmt"
+npm "@bobsled/cli"
+npm "@google/clasp"
+npm "@playwright/cli"
