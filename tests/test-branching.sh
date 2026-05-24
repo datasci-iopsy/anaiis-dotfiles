@@ -62,14 +62,16 @@ assert_not_contains() {
 }
 
 # Helper: run block-edit-on-main.sh inside a temp repo on a given branch.
-# Usage: run_block_hook <branch> <file_path>
+# Usage: run_block_hook <branch> [file_path]
+# If file_path is omitted, uses a file inside the temp repo (so git can resolve the branch).
 run_block_hook() {
-	local branch="$1" file="$2"
+	local branch="$1"
 	local tmpdir
 	tmpdir=$(mktemp -d)
+	local file="${2:-$tmpdir/somefile.sh}"
 	(
 		cd "$tmpdir" || exit 1
-		git init -q
+		git init -q -b main
 		git commit -q --allow-empty -m "init"
 		if [ "$branch" != "main" ] && [ "$branch" != "master" ]; then
 			git checkout -q -b "$branch" 2>/dev/null
@@ -91,7 +93,7 @@ run_advisory_hook() {
 	local output
 	output=$(
 		cd "$tmpdir" || exit 1
-		git init -q
+		git init -q -b main
 		git commit -q --allow-empty -m "init"
 		if [ -n "$merged_branches" ]; then
 			for br in $merged_branches; do
@@ -150,18 +152,18 @@ echo "# 1. Hook files"
 
 # ── 2. block-edit-on-main regression ─────────────────────────────────────
 echo "# 2. block-edit-on-main regression"
-RC=$(run_block_hook "main" "/tmp/somefile.sh")
+RC=$(run_block_hook "main")
 assert_exit "2.1 blocks edit on main (exit 2)" "2" "$RC"
 
-RC=$(run_block_hook "feat/my-feature" "/tmp/somefile.sh")
+RC=$(run_block_hook "feat/my-feature")
 assert_exit "2.2 allows edit on feature branch (exit 0)" "0" "$RC"
 
-RC=$(run_block_hook "claude/some-topic" "/tmp/somefile.sh")
+RC=$(run_block_hook "claude/some-topic")
 assert_exit "2.3 allows edit on claude/* branch (exit 0)" "0" "$RC"
 
 # ── 3. block-edit-on-main message content ────────────────────────────────
 echo "# 3. block message suggests worktree"
-run_block_hook "main" "/tmp/somefile.sh" >/dev/null 2>/tmp/block-hook.stderr || true
+run_block_hook "main" >/dev/null 2>/tmp/block-hook.stderr || true
 STDERR=$(cat /tmp/block-hook.stderr)
 assert_contains "3.1 message mentions worktree" "worktree" "$STDERR"
 assert_contains "3.2 message mentions claude/<topic>" "claude/<topic>" "$STDERR"
