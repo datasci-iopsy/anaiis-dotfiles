@@ -19,7 +19,7 @@ Columns:
 
 import argparse
 import json
-import os
+import re
 import sys
 import time
 from datetime import datetime
@@ -27,13 +27,20 @@ from pathlib import Path
 
 
 CLAUDE_DIR = Path.home() / ".claude" / "projects"
+_MARKER_RE = re.compile(
+    r"^/tmp/claude-session-([a-zA-Z0-9._-]+)\.(global|behavioral)-loaded$"
+)
 
 
 def decode_project(encoded_name: str) -> str:
     """Convert encoded project dir name (slashes-as-hyphens) to a short readable label."""
     decoded = encoded_name.lstrip("-").replace("-", "/")
     parts = [p for p in decoded.split("/") if p]
-    return "/".join(parts[-2:]) if len(parts) >= 2 else (parts[-1] if parts else encoded_name)
+    return (
+        "/".join(parts[-2:])
+        if len(parts) >= 2
+        else (parts[-1] if parts else encoded_name)
+    )
 
 
 def format_size(bytes_: int) -> str:
@@ -137,16 +144,18 @@ def scan_sessions(older_than_days: int | None = None) -> list[dict]:
             mtime = stat.st_mtime
             if cutoff and mtime > cutoff:
                 continue
-            sessions.append({
-                "file": jsonl_file,
-                "project": decode_project(project_dir.name),
-                "session_id": jsonl_file.stem,
-                "size": stat.st_size,
-                "mtime": mtime,
-                "title": None,
-                "msgs": None,
-                "last_ctx_tokens": None,
-            })
+            sessions.append(
+                {
+                    "file": jsonl_file,
+                    "project": decode_project(project_dir.name),
+                    "session_id": jsonl_file.stem,
+                    "size": stat.st_size,
+                    "mtime": mtime,
+                    "title": None,
+                    "msgs": None,
+                    "last_ctx_tokens": None,
+                }
+            )
 
     return sessions
 
@@ -173,6 +182,66 @@ def parse_selection(selection: str, max_idx: int) -> set[int]:
     return result
 
 
+def _live_session_ids() -> set[str]:
+    """Return session IDs that have a JSONL file under ~/.claude/projects/."""
+    ids: set[str] = set()
+    if not CLAUDE_DIR.exists():
+        return ids
+    for project_dir in CLAUDE_DIR.iterdir():
+        if not project_dir.is_dir():
+            continue
+        for jsonl in project_dir.glob("*.jsonl"):
+            if "memory" not in jsonl.parts:
+                ids.add(jsonl.stem)
+    return ids
+
+
+def prune_markers(dry_run: bool = False) -> int:
+    """Remove /tmp session markers whose session has no corresponding JSONL.
+
+    Returns the count of markers removed (or that would be removed under dry-run).
+    """
+    import glob as _glob
+
+    patterns = [
+        "/tmp/claude-session-*.global-loaded",
+        "/tmp/claude-session-*.behavioral-loaded",
+    ]
+    candidates = []
+    for pat in patterns:
+        candidates.extend(_glob.glob(pat))
+
+    if not candidates:
+        print("No session markers found in /tmp.")
+        return 0
+
+    live = _live_session_ids()
+    removed = 0
+
+    for path in sorted(candidates):
+        m = _MARKER_RE.match(path)
+        if not m:
+            continue
+        sid = m.group(1)
+        if sid in live:
+            print(f"  live     {path}")
+            continue
+        if dry_run:
+            print(f"  [dry-run] would remove  {path}")
+        else:
+            try:
+                Path(path).unlink()
+                print(f"  removed  {path}")
+            except OSError as e:
+                print(f"  ERROR    {path}: {e}", file=sys.stderr)
+                continue
+        removed += 1
+
+    label = "would remove" if dry_run else "removed"
+    print(f"\nMarkers {label}: {removed}")
+    return removed
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Interactive Claude Code session cleanup",
@@ -180,18 +249,32 @@ def main():
         epilog=__doc__,
     )
     parser.add_argument(
-        "--sort", choices=["size", "age", "tokens"], default="size",
+        "--sort",
+        choices=["size", "age", "tokens"],
+        default="size",
         help="Sort by size (largest first), age (oldest first), or tokens (largest ctx first). Default: size",
     )
     parser.add_argument(
-        "--older-than", type=int, metavar="DAYS",
+        "--older-than",
+        type=int,
+        metavar="DAYS",
         help="Only show sessions last used more than N days ago",
     )
     parser.add_argument(
-        "--dry-run", action="store_true",
+        "--dry-run",
+        action="store_true",
         help="Show what would be deleted without actually deleting",
     )
+    parser.add_argument(
+        "--prune-markers",
+        action="store_true",
+        help="Remove orphaned /tmp/claude-session-* marker files and exit",
+    )
     args = parser.parse_args()
+
+    if args.prune_markers:
+        prune_markers(dry_run=args.dry_run)
+        return
 
     print("Scanning sessions...", end="", flush=True)
     sessions = scan_sessions(older_than_days=args.older_than)
@@ -279,7 +362,9 @@ def main():
     total_bytes = 0
     for idx in sorted(chosen):
         s = sessions[idx - 1]
-        print(f"  [{idx}]  {s['project']} ,  {s['title'][:55]}  ({format_size(s['size'])})")
+        print(
+            f"  [{idx}]  {s['project']} ,  {s['title'][:55]}  ({format_size(s['size'])})"
+        )
         total_bytes += s["size"]
     print()
     print(f"Space freed: {format_size(total_bytes)}")
