@@ -37,7 +37,6 @@ anaiis-dotfiles/
 ├── .lintr                          → ~/.lintr   Global R style config
 ├── .env.example                    Structural template, this repo consumes nothing from .env
 ├── bashrc.local.template           Copy-once template for machine-local bash additions
-├── _archive/                       Non-tracked artifacts (council report, transcript, etc.)
 ├── bash/
 │   └── shared.bash                 Shared bash helpers sourced by hook and test scripts
 ├── bin/
@@ -61,15 +60,25 @@ anaiis-dotfiles/
 │   ├── playwright-ggplot2/         ggplot2/htmlwidgets render template (render.R)
 │   └── playwright-static/          Static HTML smoke test scaffold (package.json, playwright.config.ts)
 ├── tests/
-│   ├── bin-claude.sh               Stale: tested the deleted bin/claude wrapper; kept for reference
 │   ├── fixtures/                   Test fixture files
+│   ├── measure-memory-injection.sh  Memory injection overhead measurement
 │   ├── measure-userpromptsubmit.sh  Hook-latency measurement (run when chain grows)
 │   ├── run-all.sh                  Runs the full test suite
+│   ├── SMOKE-TESTS.md              Manual smoke test scenarios
+│   ├── test-block-destructive-commands.sh  block-destructive-commands.sh deny/allow assertions
+│   ├── test-block-sensitive-writes.sh   block-sensitive-writes.sh deny/allow assertions
+│   ├── test-branching.sh           Trivial-edit criteria and branch-reuse logic
 │   ├── test-claude-md-rules.sh     Validates CLAUDE.md rules index against rules/ on disk
 │   ├── test-compact-hooks.sh       PreCompact / PostCompact end-to-end test
+│   ├── test-cost-guard.sh          cost-guard.sh tiering, hard-block, and limit-override assertions
 │   ├── test-em-dash-guard.sh       Verifies block-em-dash.sh hook fires on U+2014 payloads
+│   ├── test-install-bashrc.sh      install.sh symlink and bashrc wiring assertions
+│   ├── test-memory-hooks.sh        Memory seed and load hook assertions
 │   ├── test-post-edit-lint-dispatch.sh  PostToolUse lint hook dispatch tests
-│   └── test-staged-lint-dispatch.sh     Pre-commit staged-lint hook dispatch tests
+│   ├── test-prefer-jq.sh           prefer-jq.sh deny/allow assertions
+│   ├── test-r-lint-staged.sh       r-lint-staged.sh assertions
+│   ├── test-staged-lint-dispatch.sh     Pre-commit staged-lint hook dispatch tests
+│   └── test-stop-hook-git-check.sh  stop-hook-git-check.sh exit-code assertions
 └── vendor/
     └── graphify/                   git submodule (pinned to v7); source for /graphify skill
 ```
@@ -181,7 +190,7 @@ Each session writes a JSONL ledger to `~/.claude/anaiis-coderabbit/runs/<branch>
 
 ### Skills (custom, lazy-loaded)
 
-`anaiis-agents`, `anaiis-changelog`, `anaiis-coderabbit`, `anaiis-copyedit`, `anaiis-dashboard`, `anaiis-docaudit`, `anaiis-duckdb`, `anaiis-gitpr`, `anaiis-gitrebase`, `anaiis-litreview`, `anaiis-peerreview`, `anaiis-preflight`, `anaiis-skillreview`, `anaiis-webverify`, `graphify` (15 committed).
+`anaiis-agents`, `anaiis-changelog`, `anaiis-coderabbit`, `anaiis-copyedit`, `anaiis-dashboard`, `anaiis-docaudit`, `anaiis-duckdb`, `anaiis-gitpr`, `anaiis-gitrebase`, `anaiis-litreview`, `anaiis-peerreview`, `anaiis-preflight`, `anaiis-skillreview`, `anaiis-webverify`, `graphify` (15 registered; `anaiis-*` served from `datasci-iopsy/anaiis-plugins` marketplace, `graphify` vendored locally).
 
 `dbt-*` skills are served via the `dbt-labs/dbt-agent-skills` marketplace (registered in `claude/settings.json` under `extraKnownMarketplaces`). They require no local files and do not appear in this repo.
 
@@ -233,14 +242,15 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 | `UserPromptSubmit` |, | `maintenance-check.sh` | Weekly plan-file check; monthly session-storage check; weekly repo-hooks audit |
 | `UserPromptSubmit` |, | `ensure-repo-hooks.sh` | Silently installs pre-commit dispatcher in current repo if missing |
 | `UserPromptSubmit` |, | `load-global-memory.sh` | Loads global memory tier (`~/.claude/memory/`) once per session |
+| `UserPromptSubmit` |, | `list-merged-claude-branches.sh` | Advisory: lists merged `claude/*` branches and shows the delete command |
 | `PostToolUse` | `Edit\|Write` | `post-edit-lint.sh` | `.py` ruff; `.sh` shfmt (auto-fix) + shellcheck; `.sql` sqlfmt; `.R` lintr; `.json` jq --indent 4 |
 | `PreToolUse` | `Write\|Edit\|MultiEdit\|NotebookEdit` | `block-em-dash.sh` | Rejects any payload containing U+2014 (em dash); enforces no-em-dash code style rule |
 | `PreToolUse` | `Write\|Edit\|MultiEdit\|NotebookEdit` | `block-edit-on-main.sh` | Blocks all edits when the current branch is `main` or `master` |
-| `PreToolUse` | `Write\|Edit` | inline | Allow `*.env.example`/`*.env.template`; block `*.lock`, `*.env`, `*credentials*`, `*secret*`, `*.pem`, `*.key` |
-| `PreToolUse` | `Bash` | inline | Block destructive `bq rm`, `gcloud delete*`, `uv cache clean`/`pip uninstall` |
+| `PreToolUse` | `Write\|Edit` | `block-sensitive-writes.sh` | Allow `*.env.example`/`*.env.template`; block `*.lock`, `*.env`, `*credentials*`, `*secret*`, `*.pem`, `*.key` |
+| `PreToolUse` | `Bash` | `block-destructive-commands.sh` | Block destructive `bq rm`, `gcloud delete*`, `uv cache clean`/`pip uninstall` |
 | `PreToolUse` | `Bash` | `prefer-jq.sh` | Warns when Python is used for JSON instead of jq |
 | `PreToolUse` | `Agent\|WebFetch` | `cost-guard.sh` | Cost tiering MEDIUM/HIGH/VERY HIGH; hard-blocks (exit 2) general-purpose agents above per-session cap (default 5, override via `COST_GUARD_GP_LIMIT`); blocks logged to `~/.claude/logs/cost-guard-blocks.log` |
-| `Stop` |, | `stop-hook-git-check.sh` | Reports uncommitted changes; never blocks (status-only) |
+| `Stop` |, | `stop-hook-git-check.sh` | Exits 2 (continues agent loop) on uncommitted changes, untracked files, or unpushed commits; exits 0 when clean |
 | `PreCompact` | `*` | `pre-compact.sh` | Writes a structured handoff to project memory |
 | `PostCompact` | `*` | `post-compact.sh` | Re-injects the handoff so Claude has continuity post-compaction |
 | `StatusLine` | n/a | `statusline-command.sh` (in `scripts/`) | Custom status line display in the Claude Code UI |
