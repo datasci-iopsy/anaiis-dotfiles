@@ -35,4 +35,4 @@ Run `install.sh` once on a new machine to create all symlinks. Also provisions t
 
 `dbt-*` skills are served by the `dbt-labs/dbt-agent-skills` marketplace (also registered under `extraKnownMarketplaces`). No local copies or submodule needed.
 
-`graphify` is still vendored locally in `vendor/graphify/` (a git submodule) with its Python environment in `vendor/graphify-venv/`. The skill lives in `claude/skills/graphify/`. This will be migrated to marketplace-only delivery once the graphify upgrade workstream is complete.
+`graphify` is vendored locally in `vendor/graphify/` (a git submodule) with its Python environment in `vendor/graphify-venv/`. The skill lives in `claude/skills/graphify/`. It is also served as `anaiis-data:graphify` in the marketplace; the local vendor copy remains the active fallback until the marketplace version is confirmed as primary.
