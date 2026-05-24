@@ -96,39 +96,56 @@ fi
 
 rm -rf "$B1_HOME" "$B1_PROJECT"
 
-# B1-key: dot-containing path produces same key via seed script and hooks
+# B1-key: both seed-memory.sh and pre-compact.sh contain the canonical formula.
+# Fails if either script switches to a different encoding (e.g. slash-only).
 echo
-echo "--- B1-key: dot-containing path parity"
+echo "--- B1-key: encoding formula parity between seed-memory.sh and pre-compact.sh"
 
+PRE_COMPACT="$REPO_DIR/claude/hooks/pre-compact.sh"
+if grep -qF "tr '/.' '-'" "$SEED_SCRIPT"; then
+	pass "B1-key: seed-memory.sh uses canonical tr '/.' '-' formula"
+else
+	fail "B1-key: seed-memory.sh does not contain expected encoding formula"
+fi
+if grep -qF "tr '/.' '-'" "$PRE_COMPACT"; then
+	pass "B1-key: pre-compact.sh uses canonical tr '/.' '-' formula"
+else
+	fail "B1-key: pre-compact.sh does not contain expected encoding formula"
+fi
+
+# Confirm slash-only encoding diverges on a dot-containing path; this proves
+# tr '/.' '-' (not tr '/' '-') is required to produce a unique key.
 DOT_PATH="/Users/user.name/my.project/repo"
-SEED_KEY=$(echo "$DOT_PATH" | tr '/.' '-')
-HOOKS_KEY=$(echo "$DOT_PATH" | tr '/.' '-')
-assert_eq "B1-key: dot path seed key == hooks key" "$SEED_KEY" "$HOOKS_KEY"
-
-# Verify the OLD behavior (slash-only) would have diverged
-OLD_KEY="${DOT_PATH//\//-}"
-if [ "$OLD_KEY" != "$SEED_KEY" ]; then
+if [ "${DOT_PATH//\//-}" != "$(echo "$DOT_PATH" | tr '/.' '-')" ]; then
 	pass "B1-key: confirmed old slash-only encoding diverges from tr '/.' '-'"
 else
 	fail "B1-key: old and new encodings unexpectedly match for dot-containing path"
 fi
 
-# B1-pressure: multiple dots and slashes
+# B1-pressure: seed-memory.sh creates the project dir at the tr '/.' '-' encoded path.
+# Runs the real script, verifies the directory it creates matches the formula.
 echo
-echo "--- B1-pressure: multiple dots and slashes"
+echo "--- B1-pressure: seed-memory.sh writes to tr '/.' '-' encoded directory"
 
-COMPLEX_PATH="/Users/d.k.green/projects/my.repo.name/sub.dir"
-COMPLEX_SEED=$(echo "$COMPLEX_PATH" | tr '/.' '-')
-COMPLEX_HOOKS=$(echo "$COMPLEX_PATH" | tr '/.' '-')
-assert_eq "B1-pressure: complex path parity" "$COMPLEX_SEED" "$COMPLEX_HOOKS"
+B1P_HOME=$(mktemp -d)
+B1P_PROJ=$(mktemp -d)
+B1P_DOTTED="$B1P_PROJ/my.project.name"
+mkdir -p "$B1P_DOTTED"
 
-# Verify old encoding differs
-COMPLEX_OLD="${COMPLEX_PATH//\//-}"
-if [ "$COMPLEX_OLD" != "$COMPLEX_SEED" ]; then
-	pass "B1-pressure: old encoding diverges on complex path"
+B1P_REALPATH=$(cd "$B1P_DOTTED" && pwd)
+(cd "$B1P_DOTTED" && HOME="$B1P_HOME" bash "$SEED_SCRIPT" >/dev/null 2>&1) || true
+
+EXPECTED_KEY=$(echo "$B1P_REALPATH" | tr '/.' '-')
+EXPECTED_DIR="$B1P_HOME/.claude/projects/$EXPECTED_KEY/memory"
+
+if [ -d "$EXPECTED_DIR" ]; then
+	pass "B1-pressure: seed-memory.sh creates dir at tr '/.' '-' encoded path"
 else
-	fail "B1-pressure: old and new encodings match on complex path (unexpected)"
+	ACTUAL_DIRS=$(ls "$B1P_HOME/.claude/projects/" 2>/dev/null || echo "no projects dir")
+	fail "B1-pressure: expected dir not found (key: $EXPECTED_KEY, actual: $ACTUAL_DIRS)"
 fi
+
+rm -rf "$B1P_HOME" "$B1P_PROJ"
 
 # B1-regression: no-dot path produces same key as before fix
 echo
