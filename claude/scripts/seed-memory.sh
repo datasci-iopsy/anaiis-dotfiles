@@ -43,7 +43,7 @@ fi
 
 # ── Project tier ───────────────────────────────────────────────────────────
 PROJECT_PATH="$(pwd)"
-ENCODED="${PROJECT_PATH//\//-}"
+ENCODED=$(echo "$PROJECT_PATH" | tr '/.' '-')
 MEMORY_DIR="$HOME/.claude/projects/${ENCODED}/memory"
 
 mkdir -p "$MEMORY_DIR"
