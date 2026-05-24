@@ -58,6 +58,8 @@ sequenceDiagram
     GLM->>GLM: Marker exists, exit 0 (silent)
 ```
 
+Three additional `UserPromptSubmit` hooks (`maintenance-check`, `ensure-repo-hooks`, `list-merged-claude-branches`) are omitted from this diagram; none read or write memory files.
+
 ---
 
 ## 3. Hook Inventory
@@ -159,7 +161,7 @@ flowchart TD
     H --> J["jq: select Read/Write/Edit tool_use\nfrom assistant messages"]
     I --> J
     J --> K["git -C cwd:\nbranch, status --short,\nlog --oneline -5, diff --stat"]
-    K --> L["Write handoffs/handoff_\nFILE_TS_SID8.md\n(YAML front matter + sections)"]
+    K --> L["Write handoffs/handoff_\nFILE_TS_SID8.md\n(YAML frontmatter + sections)"]
     L --> M{"count of handoff_*.md\n> 5?"}
     M -->|yes| N["Delete oldest\nby filename sort\n(not mtime)"]
     M -->|no| O
@@ -327,7 +329,7 @@ flowchart LR
 
 **Session ID validation:** both hooks reject session IDs that contain characters outside `[a-zA-Z0-9._-]` before constructing the marker path. This prevents marker path traversal if the harness ever passes a malformed session ID.
 
-**Lifecycle:** markers are created when the hook first fires and persist until the OS clears `/tmp/` or `cleanup-sessions.py` runs. `cleanup-sessions.py` is a standalone script (not hooked); it removes stale markers for expired sessions.
+**Lifecycle:** markers are created when the hook first fires and persist until the OS clears `/tmp/` (on macOS, at reboot). No script currently prunes them; `cleanup-sessions.py` handles JSONL and project directory cleanup only, not these marker files.
 
 ---
 
@@ -383,11 +385,11 @@ sequenceDiagram
 
 ## 8. Harness Native Load
 
-Claude Code loads the project `MEMORY.md` automatically for the active `cwd` at session start. This is built into the harness and requires no hook.
+Claude Code loads the project `MEMORY.md` automatically for the active `cwd` at or before session start, per harness documentation. This requires no hook. The exact load order relative to `UserPromptSubmit` hooks is not confirmed from harness source.
 
 ```{mermaid}
 flowchart TD
-    A([Session start]) --> B["Harness resolves project key\nfrom cwd: tr '/' '-', tr '.' '-'"]
+    A([Session start]) --> B["Harness resolves project key\nfrom cwd: tr '/.' '-'"]
     B --> C{~/.claude/projects/key/\nmemory/MEMORY.md\nexists?}
     C -->|no| D([No project memory loaded])
     C -->|yes| E[Read MEMORY.md]
@@ -411,7 +413,7 @@ flowchart TD
 | Index file | `MEMORY.md` (loaded by hook) | `MEMORY.md` (loaded by harness) |
 | Controllable per-session | Yes (hook can be modified/disabled) | No (harness behavior) |
 
-The project tier is loaded before any hook fires. The global tier arrives via `systemMessage` after the first prompt is submitted.
+The global tier arrives via `systemMessage` after the first prompt is submitted. The project tier load timing relative to hooks is harness-internal.
 
 ---
 
@@ -451,6 +453,12 @@ Run: `bash ~/.claude/scripts/migrate-memory.sh [--dry-run]`
 
 Initializes memory on a new machine from templates in `claude/memory-templates/`. Never overwrites existing files (tops up missing ones only). Creates `handoffs/` subdir under the project memory dir. Path encoding: `${PROJECT_PATH//\//-}` (replaces `/` with `-`).
 
+**Encoding divergence (latent bug):** `seed-memory.sh` encodes with bash substitution (`//\//-`), which replaces `/` only. `pre-compact.sh` and `post-compact.sh` encode with `tr '/.' '-'`, which replaces both `/` and `.`. For paths containing a dot (e.g., `/Users/user.name/repo`), `seed-memory.sh` creates a project key that the compaction hooks cannot find. `seed-memory.sh:46` should be updated to `ENCODED=$(echo "$PROJECT_PATH" | tr '/.' '-')` to match.
+
 Templates:
 - `claude/memory-templates/*.md` (project tier)
 - `claude/memory-templates/global/*.md` (global tier)
+
+### `cleanup-sessions.py`
+
+Interactive session cleanup tool (CLI alias: `claude-cleanup`). Operates on JSONL transcript files and project directories under `~/.claude/projects/`. Supports `--sort` (size, age, tokens), `--older-than N` (days), and `--dry-run`. Does **not** touch `/tmp/claude-session-*.loaded` marker files; those are only cleared by OS reboot.
