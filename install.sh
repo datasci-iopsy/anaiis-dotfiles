@@ -71,6 +71,7 @@ symlink "$CANONICAL/claude/skills" "$HOME/.claude/skills"
 symlink "$CANONICAL/claude/agents" "$HOME/.claude/agents"
 symlink "$CANONICAL/claude/hooks" "$HOME/.claude/hooks"
 symlink "$CANONICAL/claude/scripts" "$HOME/.claude/scripts"
+symlink "$CANONICAL/claude/memory" "$HOME/.claude/memory"
 
 echo ""
 echo "=== Shell config (~/.bashrc) ==="
