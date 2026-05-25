@@ -129,6 +129,14 @@
                         "command": "bash $HOME/.claude/hooks/list-merged-claude-branches.sh"
                     }
                 ]
+            },
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash $HOME/.claude/hooks/memory-quality-check.sh"
+                    }
+                ]
             }
         ],
         "PostToolUse": [
