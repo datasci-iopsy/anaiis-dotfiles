@@ -104,7 +104,7 @@ run_advisory_hook() {
 			done
 		fi
 		# Remove the date-gated flag so the hook runs fresh.
-		rm -f "/tmp/claude-branch-hygiene-$(date +%Y%m%d)"
+		rm -f "/tmp/claude-branch-hygiene-${USER}-$(date +%Y%m%d)"
 		bash "$ADVISORY_HOOK" 2>&1
 	)
 	rm -rf "$tmpdir"
