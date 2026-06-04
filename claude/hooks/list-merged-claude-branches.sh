@@ -3,7 +3,7 @@
 # Runs at most once per calendar day (flag file in /tmp).
 # Never deletes branches. Output is advisory only.
 
-FLAG="/tmp/claude-branch-hygiene-$(date +%Y%m%d)"
+FLAG="/tmp/claude-branch-hygiene-${USER}-$(date +%Y%m%d)"
 [ -f "$FLAG" ] && exit 0
 
 MERGED=$(git branch --merged main 2>/dev/null \

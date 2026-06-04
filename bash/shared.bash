@@ -32,7 +32,9 @@ unset _brew_prefix
 # Warn when installed packages diverge from Brewfile (once per day, non-blocking)
 _brewfile="$HOME/anaiis-dotfiles/Brewfile"
 _bfstamp="${XDG_CACHE_HOME:-$HOME/.cache}/brewfile-check.stamp"
-if command -v brew &>/dev/null && [ -f "$_brewfile" ]; then
+_brew_prefix="$(brew --prefix 2>/dev/null)"
+if command -v brew &>/dev/null && [ -f "$_brewfile" ] \
+	&& [ -w "${_brew_prefix:-/opt/homebrew}" ]; then
 	_bfage=$(($(date +%s) - $(stat -f %m "$_bfstamp" 2>/dev/null || echo 0)))
 	if [ ! -f "$_bfstamp" ] || [ "$_bfage" -gt 86400 ]; then
 		touch "$_bfstamp"
@@ -40,7 +42,7 @@ if command -v brew &>/dev/null && [ -f "$_brewfile" ]; then
 			|| echo "[dotfiles] Brewfile out of sync. Run: brew bundle --file=$_brewfile") &
 	fi
 fi
-unset _brewfile _bfstamp _bfage
+unset _brewfile _bfstamp _bfage _brew_prefix
 
 # ── bash-completion ───────────────────────────────────────────────────────────
 if [ -r "$(brew --prefix 2>/dev/null)/etc/profile.d/bash_completion.sh" ]; then
@@ -215,6 +217,14 @@ cr-login() {
 	mv "$cfg.tmp" "$cfg"
 	echo "cr-login: authenticated and org set"
 }
+
+# ── API Keys (set in ~/.bashrc.local, never tracked) ─────────────────────────
+# QUALTRICS_API_KEY
+# CODERABBIT_API_KEY, CODERABBIT_ORG_ID
+# NETLIFY_AUTH_TOKEN
+# POSTMAN_API_KEY
+# TWILIO_API_SID, TWILIO_API_KEY
+# CLOUDRESEARCH_CONNECT_API_KEY
 
 # ── Shell functions ───────────────────────────────────────────────────────────
 mcd() { mkdir -p "$1" && cd "$1"; }
