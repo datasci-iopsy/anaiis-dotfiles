@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# sqlfmt-lint-staged.sh -- run sqlfmt format check on staged SQL files
+# sqlfmt-lint-staged.sh -- format staged SQL files with sqlfmt and re-stage
 #
 # Designed to be called from a repo's .git/hooks/pre-commit.
-# Exits 1 (blocks commit) if any sqlfmt findings exist.
+# Formats staged SQL files in-place; re-stages any files changed by sqlfmt.
 # Bypass: SKIP_SQLFMT=1 git commit
 
 set -euo pipefail
@@ -24,30 +24,31 @@ elif [[ -x "$HOME/.local/bin/sqlfmt" ]]; then
 fi
 
 if [[ -z "$SQLFMT" ]]; then
-	echo "[sqlfmt] sqlfmt not found -- skipping SQL format check" >&2
+	echo "[sqlfmt] sqlfmt not found -- skipping SQL format" >&2
 	exit 0
 fi
 
-echo "[sqlfmt] Checking ${#SQL_FILES[@]} staged SQL file(s)..."
+echo "[sqlfmt] Formatting ${#SQL_FILES[@]} staged SQL file(s)..."
 
 # Use project pyproject.toml config if present; otherwise default to line_length=120.
 if grep -qs '\[tool\.sqlfmt\]' pyproject.toml 2>/dev/null; then
-	if ! $SQLFMT --check "${SQL_FILES[@]}" 2>&1; then
-		echo ""
-		echo "[sqlfmt] Format issues found. Run: sqlfmt ${SQL_FILES[*]}"
-		echo "         To bypass: SKIP_SQLFMT=1 git commit ..."
-		echo ""
-		exit 1
-	fi
+	$SQLFMT "${SQL_FILES[@]}" 2>&1
 else
-	if ! $SQLFMT --check --line-length 120 "${SQL_FILES[@]}" 2>&1; then
-		echo ""
-		echo "[sqlfmt] Format issues found. Run: sqlfmt --line-length 120 ${SQL_FILES[*]}"
-		echo "         To bypass: SKIP_SQLFMT=1 git commit ..."
-		echo ""
-		exit 1
-	fi
+	$SQLFMT --line-length 120 "${SQL_FILES[@]}" 2>&1
 fi
 
-echo "[sqlfmt] No issues found."
+# Re-stage any files that sqlfmt modified
+REFORMATTED=()
+for f in "${SQL_FILES[@]}"; do
+	if ! git diff --quiet -- "$f"; then
+		git add "$f"
+		REFORMATTED+=("$f")
+	fi
+done
+
+if [[ ${#REFORMATTED[@]} -gt 0 ]]; then
+	echo "[sqlfmt] Auto-formatted and re-staged: ${REFORMATTED[*]}" >&2
+fi
+
+echo "[sqlfmt] Done."
 exit 0
