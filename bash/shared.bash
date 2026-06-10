@@ -93,7 +93,7 @@ export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku-4-5-20251001"
 
 # Effort and output sizing; overrides settings.json "effortLevel".
 export CLAUDE_CODE_EFFORT_LEVEL="medium"
-export CLAUDE_CODE_MAX_OUTPUT_TOKENS="16000"
+export CLAUDE_CODE_MAX_OUTPUT_TOKENS="32000"
 
 # Bash and API timeouts. Research workflows can hit long-running R or DuckDB
 # commands; raise BASH_MAX_TIMEOUT_MS in ~/.bashrc.local if needed.
