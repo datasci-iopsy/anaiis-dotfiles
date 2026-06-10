@@ -102,14 +102,14 @@ if [[ -n "$SQLFMT" ]]; then
 	$SQLFMT --line-length 120 "$CLEAN_SQL" &>/dev/null
 	run_staged "$SQLFMT_SCRIPT" "$CLEAN_SQL" "clean.sql"
 	assert_exit "sqlfmt.1 clean file exits 0" "0" "$?"
-	assert_contains "sqlfmt.2 clean prints No issues" "No issues found" "$RUN_OUTPUT"
+	assert_contains "sqlfmt.2 clean prints Done" "Done" "$RUN_OUTPUT"
 
-	# Dirty file blocks
+	# Dirty file: formats in-place, re-stages, exits 0
 	DIRTY_SQL=$(mktemp "$WORK/dirty.XXXXXX.sql")
 	printf 'SELECT ID,NAME FROM USERS\n' >"$DIRTY_SQL"
 	run_staged "$SQLFMT_SCRIPT" "$DIRTY_SQL" "dirty.sql"
-	assert_exit "sqlfmt.3 dirty file exits 1" "1" "$?"
-	assert_contains "sqlfmt.4 dirty prints fix hint" "SKIP_SQLFMT" "$RUN_OUTPUT"
+	assert_exit "sqlfmt.3 dirty file exits 0" "0" "$?"
+	assert_contains "sqlfmt.4 dirty prints re-staged notice" "Auto-formatted" "$RUN_OUTPUT"
 
 	# SKIP_SQLFMT=1 bypasses
 	DIRTY_SQL2=$(mktemp "$WORK/dirty2.XXXXXX.sql")
