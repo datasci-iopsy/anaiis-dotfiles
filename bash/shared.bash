@@ -4,6 +4,9 @@
 # Edit here to keep both machines in sync via git pull.
 # Machine-local overrides (GCP project, API keys) stay in ~/.bashrc.local.
 
+export LANG="en_US.UTF-8"
+export LC_ALL="en_US.UTF-8"
+
 # ── OS detection ──────────────────────────────────────────────────────────────
 _os="$(uname -s)"
 
