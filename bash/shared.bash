@@ -44,6 +44,19 @@ if command -v brew &>/dev/null && [ -f "$_brewfile" ] \
 fi
 unset _brewfile _bfstamp _bfage _brew_prefix
 
+# Wrap brew to create lock files as group-writable (664) so multiple macOS
+# profiles sharing /opt/homebrew (both in the admin group) can upgrade without
+# leaving stale 644 locks that block each other.
+brew() {
+	local _old_umask
+	_old_umask=$(umask)
+	umask 002
+	command brew "$@"
+	local _rc=$?
+	umask "$_old_umask"
+	return $_rc
+}
+
 # ── bash-completion ───────────────────────────────────────────────────────────
 if [ -r "$(brew --prefix 2>/dev/null)/etc/profile.d/bash_completion.sh" ]; then
 	. "$(brew --prefix)/etc/profile.d/bash_completion.sh"
