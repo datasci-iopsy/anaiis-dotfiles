@@ -132,7 +132,7 @@ git_branch() {
 		PS1="\[\e[1;32m\]\h\e[0m\]:\[\e[1;34m\][${dir_name}]\[\e[0m\] "
 	fi
 }
-PROMPT_COMMAND=git_branch
+PROMPT_COMMAND="git_branch${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
 
 # ── ls aliases ────────────────────────────────────────────────────────────────
 if [ "$_os" = "Darwin" ]; then
