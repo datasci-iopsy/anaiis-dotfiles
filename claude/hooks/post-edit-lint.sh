@@ -78,13 +78,21 @@ case "$FILE" in
 		if ! command -v Rscript &>/dev/null; then
 			exit 0
 		fi
-		if ! Rscript --no-init-file --quiet -e "if (!requireNamespace('lintr', quietly=TRUE)) quit(status=1)" &>/dev/null; then
+		# Auto-format with styler (indent_by=4, tidyverse_style) -- matches VS Code format-on-save
+		if Rscript --no-init-file --quiet \
+			-e "if (!requireNamespace('styler', quietly=TRUE)) quit(status=1)" &>/dev/null; then
+			echo "[lint] styler: $FILE" >&2
+			STYLER_FILE="$FILE" Rscript --no-init-file --quiet \
+				-e "styler::style_file(Sys.getenv('STYLER_FILE'), style = styler::tidyverse_style, indent_by = 4L)" \
+				>/dev/null 2>&1
+		fi
+		# Semantic checks with lintr
+		if ! Rscript --no-init-file --quiet \
+			-e "if (!requireNamespace('lintr', quietly=TRUE)) quit(status=1)" &>/dev/null; then
 			echo "[lint] lintr not installed -- run: install.packages('lintr')" >&2
 			exit 0
 		fi
 		echo "[lint] lintr: $FILE" >&2
-		# --no-init-file: bypass renv/.Rprofile so global lintr is used
-		# Pass path via env var to handle spaces and special characters safely
 		LINTR_FILE="$FILE" Rscript --no-init-file --quiet \
 			-e "lintr::lint(Sys.getenv('LINTR_FILE'))" 2>&1 | head -10
 		;;
