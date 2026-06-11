@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
-# r-lint-staged.sh -- run lintr on staged R files
+# r-lint-staged.sh -- format staged R files with styler, then check with lintr
 #
 # Designed to be called from a repo's .git/hooks/pre-commit.
-# Exits 1 (blocks commit) if any lintr findings exist.
-# Bypass: SKIP_R_LINT=1 git commit
+# Step 1: styler auto-formats staged R files in-place (indent_by=4, tidyverse_style).
+#         Re-stages any files changed by styler.
+# Step 2: lintr checks staged R files; blocks commit on semantic findings.
+#
+# Bypass flags:
+#   SKIP_R_LINT=1     git commit  -- skip entire hook (format + lint)
+#   SKIP_R_FORMAT=1   git commit  -- skip styler auto-format step only
+#   SKIP_LINTR=1      git commit  -- skip lintr check step only
 #
 # Usage in pre-commit hook:
 #   bash "$HOME/.claude/scripts/r-lint-staged.sh"
@@ -21,19 +27,48 @@ done < <(git diff --cached --name-only)
 [ ${#R_FILES[@]} -eq 0 ] && exit 0
 
 if ! command -v Rscript &>/dev/null; then
-	echo "[r-lint] Rscript not found -- skipping R lint" >&2
+	echo "[r-lint] Rscript not found -- skipping R hooks" >&2
 	exit 0
 fi
 
-if ! Rscript --no-init-file --quiet -e "if (!requireNamespace('lintr', quietly=TRUE)) quit(status=1)" &>/dev/null; then
+# --- Step 1: Auto-format with styler ---
+if [ "${SKIP_R_FORMAT:-0}" != "1" ]; then
+	if Rscript --no-init-file --quiet \
+		-e "if (!requireNamespace('styler', quietly=TRUE)) quit(status=1)" &>/dev/null; then
+		echo "[r-format] Formatting ${#R_FILES[@]} staged R file(s)..."
+		Rscript --no-init-file --quiet -e "
+      files <- commandArgs(trailingOnly = TRUE)
+      for (f in files) {
+        styler::style_file(f, style = styler::tidyverse_style, indent_by = 4L)
+      }
+    " "${R_FILES[@]}" 2>/dev/null
+		REFORMATTED=()
+		for f in "${R_FILES[@]}"; do
+			if ! git diff --quiet -- "$f"; then
+				git add "$f"
+				REFORMATTED+=("$f")
+			fi
+		done
+		if [ ${#REFORMATTED[@]} -gt 0 ]; then
+			echo "[r-format] Auto-formatted and re-staged: ${REFORMATTED[*]}" >&2
+		fi
+		echo "[r-format] Done."
+	else
+		echo "[r-format] styler not installed -- skipping auto-format" >&2
+	fi
+fi
+
+# --- Step 2: Lint with lintr ---
+[ "${SKIP_LINTR:-0}" = "1" ] && exit 0
+
+if ! Rscript --no-init-file --quiet \
+	-e "if (!requireNamespace('lintr', quietly=TRUE)) quit(status=1)" &>/dev/null; then
 	echo "[r-lint] lintr not installed -- skipping (run: install.packages('lintr'))" >&2
 	exit 0
 fi
 
 echo "[r-lint] Checking ${#R_FILES[@]} staged R file(s)..."
 
-# --no-init-file: bypass renv/.Rprofile so global lintr is used, not project-isolated one
-# Use `if !` to capture both output and non-zero exit under set -e
 FINDINGS=""
 if ! FINDINGS=$(Rscript --no-init-file --quiet -e "
   files <- commandArgs(trailingOnly = TRUE)
