@@ -9,11 +9,13 @@
 #   bash "$HOME/.claude/hooks/repo-pre-commit.sh"
 #
 # Bypass flags:
-#   SKIP_R_LINT=1   git commit    -- skip R lint
-#   SKIP_RUFF=1     git commit    -- skip Python lint
-#   SKIP_JSON_LINT=1 git commit   -- skip JSON format check
-#   SKIP_SHFMT=1    git commit    -- skip shell format check
-#   SKIP_SQLFMT=1   git commit    -- skip SQL format check
+#   SKIP_R_LINT=1     git commit  -- skip R format + lint entirely
+#   SKIP_R_FORMAT=1   git commit  -- skip styler auto-format only (lintr still runs)
+#   SKIP_LINTR=1      git commit  -- skip lintr check only (styler still runs)
+#   SKIP_RUFF=1       git commit  -- skip Python lint
+#   SKIP_JSON_LINT=1  git commit  -- skip JSON format check
+#   SKIP_SHFMT=1      git commit  -- skip shell format check
+#   SKIP_SQLFMT=1     git commit  -- skip SQL format check
 
 set -euo pipefail
 
