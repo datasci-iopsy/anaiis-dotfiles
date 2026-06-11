@@ -268,5 +268,6 @@
             }
         }
     },
-    "skipDangerousModePermissionPrompt": true
+    "skipDangerousModePermissionPrompt": true,
+    "autoCompactEnabled": true
 }
