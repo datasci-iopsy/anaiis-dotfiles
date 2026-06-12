@@ -6,10 +6,7 @@
 
 **The "anaiis-" prefix** is the namespace for this repo's custom skills, distinct from upstream Anthropic skills (which keep their unprefixed names). When you see `/anaiis-litreview` or `/anaiis-duckdb`, that's a custom skill defined in `claude/skills/`.
 
-**Two-machine model.** The same repo is checked out on personal and work machines. Machine-local config, secrets, project IDs, GCP project, lives in two files that `install.sh` *copies* (not symlinks) on first install:
-
-- `~/.claude/settings.local.json`, model override, machine-local Claude settings
-- `~/.claude/CLAUDE.local.md`, machine-local environment notes
+**Two-machine model.** The same repo is checked out on personal and work machines. Machine-local config lives in two gitignored files: `claude/settings.local.json` (real file in the repo dir, symlinked to `~/.claude/settings.local.json` so it is editable in the IDE yet never tracked) and `~/.claude/CLAUDE.local.md` (copied once by `install.sh`). Secrets are never stored in either; they are environment variables loaded per-project via direnv (see `rules/environment.md`).
 
 Both are gitignored from this repo by virtue of being outside it. Your shell config and any other machine-local secrets are your concern, not this repo's.
 
@@ -65,7 +62,7 @@ anaiis-dotfiles/
 │   ├── measure-userpromptsubmit.sh  Hook-latency measurement (run when chain grows)
 │   ├── run-all.sh                  Runs the full test suite
 │   ├── SMOKE-TESTS.md              Manual smoke test scenarios
-│   ├── test-block-destructive-commands.sh  block-destructive-commands.sh deny/allow assertions
+│   ├── test-bash-guard.sh          bash-guard.sh deny/allow assertions (destructive commands + prefer-jq)
 │   ├── test-block-sensitive-writes.sh   block-sensitive-writes.sh deny/allow assertions
 │   ├── test-branching.sh           Trivial-edit criteria and branch-reuse logic
 │   ├── test-claude-md-rules.sh     Validates CLAUDE.md rules index against rules/ on disk
@@ -75,7 +72,6 @@ anaiis-dotfiles/
 │   ├── test-install-bashrc.sh      install.sh symlink and bashrc wiring assertions
 │   ├── test-memory-hooks.sh        Memory seed and load hook assertions
 │   ├── test-post-edit-lint-dispatch.sh  PostToolUse lint hook dispatch tests
-│   ├── test-prefer-jq.sh           prefer-jq.sh deny/allow assertions
 │   ├── test-r-lint-staged.sh       r-lint-staged.sh assertions
 │   ├── test-staged-lint-dispatch.sh     Pre-commit staged-lint hook dispatch tests
 │   └── test-stop-hook-git-check.sh  stop-hook-git-check.sh exit-code assertions
@@ -105,9 +101,9 @@ cd ~/anaiis-dotfiles && git submodule update --init --recursive
 bash ~/anaiis-dotfiles/install.sh
 ```
 
-Each line prints `ok` (already linked), `link` (newly created), or `SKIP` (real file present, back up and remove first). Two files are *copied* (not symlinked) as machine-local config and never overwritten on subsequent runs:
+Each line prints `ok` (already linked), `link` (newly created), or `SKIP` (real file present, back up and remove first). Machine-local config is seeded copy-once from templates and never overwritten on subsequent runs:
 
-- `~/.claude/settings.local.json`, set `GITHUB_TOKEN`, override model, etc.
+- `claude/settings.local.json` (gitignored; symlinked to `~/.claude/settings.local.json`), machine-local model and permission overrides; no secrets
 - `~/.claude/CLAUDE.local.md`, machine-specific environment notes
 
 ### 3. Add bin/ to PATH (required for web-verify)
@@ -209,18 +205,16 @@ See `claude/skills/README.md` for trigger conditions.
 
 | File | Covers |
 |---|---|
-| `rules/behavioral.md` | The 7 imperatives: surface tradeoffs, minimum code, surgical changes, verify, model judgment scope, surface conflicts, fail loud |
-| `rules/environment.md` | macOS, Bash, direnv, pyenv, worktree safety |
+| `rules/behavioral.md` | The 9 imperatives: surface tradeoffs, minimum code, surgical changes, verify, model judgment scope, surface conflicts, fail loud, plan and checkpoint, hook output is not user input |
+| `rules/environment.md` | macOS, Bash, direnv, uv, worktree safety |
 | `rules/tools.md` | gh, jq, gcloud, make, structured CLI output flags |
 | `rules/code-style.md` | Writing style, shell formatting, no emojis, convention conformance |
-| `rules/git.md` | Branch naming, commit discipline, author identity |
-| `rules/branching.md` | Trivial-edit criteria, branch reuse, worktree-from-main, cleanup advisory |
+| `rules/git.md` | Branch naming (`claude-<category>/<short-description>`), trivial-edit criteria, commits, push, PRs, worktrees for parallel work only |
 | `rules/r-conventions.md` | Vectorization, lapply/vapply, lintr style |
 | `rules/python.md` | uv, direnv, ruff |
-| `rules/session.md` | Token efficiency, context thresholds, output preferences |
+| `rules/session.md` | Token efficiency, subagent limits, context thresholds, output preferences |
 | `rules/duckdb.md` | DuckDB query discipline (purpose-based patterns) |
 | `rules/citations.md` | Citation integrity (corpus-only sources, no fabrication) |
-| `rules/core.md` | Simplicity, root causes, subagent discipline, checkpoint discipline |
 | `rules/testing.md` | Test-intent discipline: tests must encode why, not just what; fail-to-fail check |
 | `rules/dashboards.md` | Dashboard data provenance, manifest discipline, narrative-data alignment, audience language |
 
@@ -238,7 +232,6 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 
 | Event | Matcher | Script | Behavior |
 |---|---|---|---|
-| `UserPromptSubmit` |, | `surface-behavioral-rules.sh` | Injects behavioral rules into the first prompt of each session |
 | `UserPromptSubmit` |, | `maintenance-check.sh` | Weekly plan-file check; monthly session-storage check; weekly repo-hooks audit |
 | `UserPromptSubmit` |, | `ensure-repo-hooks.sh` | Silently installs pre-commit dispatcher in current repo if missing |
 | `UserPromptSubmit` |, | `load-global-memory.sh` | Loads global memory tier (`~/.claude/memory/`) once per session |
@@ -247,8 +240,7 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 | `PreToolUse` | `Write\|Edit\|MultiEdit\|NotebookEdit` | `block-em-dash.sh` | Rejects any payload containing U+2014 (em dash); enforces no-em-dash code style rule |
 | `PreToolUse` | `Write\|Edit\|MultiEdit\|NotebookEdit` | `block-edit-on-main.sh` | Blocks all edits when the current branch is `main` or `master` |
 | `PreToolUse` | `Write\|Edit` | `block-sensitive-writes.sh` | Allow `*.env.example`/`*.env.template`; block `*.lock`, `*.env`, `*credentials*`, `*secret*`, `*.pem`, `*.key` |
-| `PreToolUse` | `Bash` | `block-destructive-commands.sh` | Block destructive `bq rm`, `gcloud delete*`, `uv cache clean`/`pip uninstall` |
-| `PreToolUse` | `Bash` | `prefer-jq.sh` | Warns when Python is used for JSON instead of jq |
+| `PreToolUse` | `Bash` | `bash-guard.sh` | Single guard: blocks destructive `bq rm`, `gcloud delete*`, `uv cache clean`/`pip uninstall`, and Python used for pure JSON parsing (jq's job) |
 | `PreToolUse` | `Agent\|WebFetch` | `cost-guard.sh` | Cost tiering MEDIUM/HIGH/VERY HIGH; hard-blocks (exit 2) general-purpose agents above per-session cap (default 5, override via `COST_GUARD_GP_LIMIT`); blocks logged to `~/.claude/logs/cost-guard-blocks.log` |
 | `Stop` |, | `stop-hook-git-check.sh` | Exits 2 (continues agent loop) on uncommitted changes, untracked files, or unpushed commits; exits 0 when clean |
 | `PreCompact` | `*` | `pre-compact.sh` | Writes a structured handoff to project memory |
@@ -256,7 +248,7 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 | `StatusLine` | n/a | `statusline-command.sh` (in `scripts/`) | Custom status line display in the Claude Code UI |
 | (in project repos) | n/a | `repo-pre-commit.sh` | Pre-commit dispatcher (R, Python, Shell, JSON) installed into repos by `install-repo-hooks.sh`; not a Claude Code hook |
 
-Hook latency on this machine (measured 2026-04-29, before `surface-behavioral-rules.sh` was added): aggregate UserPromptSubmit chain median = **98 ms** (under 100 ms target). Re-measure with `bash tests/measure-userpromptsubmit.sh` if the chain grows.
+Hook latency on this machine (measured 2026-04-29): aggregate UserPromptSubmit chain median = **98 ms** (under 100 ms target). Re-measure with `bash tests/measure-userpromptsubmit.sh` if the chain grows.
 
 ---
 
@@ -289,9 +281,9 @@ bash ~/.claude/scripts/usage-report.sh --since 2026-04-01 --until 2026-04-30 --j
 
 Per-project memory at `~/.claude/projects/<encoded-path>/memory/`. Each project memory dir contains an auto-indexed `MEMORY.md` plus topical files (user/feedback/project/reference). Pre-compact and post-compact hooks write and restore session handoffs automatically.
 
-Templates for new memory entries live in `claude/memory-templates/` (committed to this repo). Actual memory directories are per-machine and not tracked.
+Templates for new project-tier memory entries live in `claude/memory-templates/` (committed to this repo). Project memory directories are per-machine and not tracked.
 
-A global tier at `~/.claude/memory/` holds cross-project user-level facts (identity, preferences), loaded once per session by `load-global-memory.sh`. Templates live in `claude/memory-templates/global/`.
+The global tier holds cross-project user-level facts (identity, preferences), loaded once per session by `load-global-memory.sh`. It is git-tracked in this repo at `claude/memory/` and symlinked to `~/.claude/memory` by `install.sh`, so it syncs across machines via git. Memory writes from any session land in the repo working tree; commit them from a dotfiles session.
 
 ---
 
