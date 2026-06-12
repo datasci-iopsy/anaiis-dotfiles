@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # PreToolUse hook: block Edit/Write on main or master.
-# Exempt: paths under $HOME/.claude/plans/ -- plan files may be written from main;
-# implementation must run on a claude/<topic> branch (see rules/git.md).
+# Exempt: paths under $HOME/.claude/plans/, $HOME/.claude/projects/, and
+# $HOME/.claude/memory/ -- plan files and memory may be written from main;
+# implementation must run on a claude-<category>/<short-description> branch
+# (see rules/git.md).
 # Registered in claude/settings.json under PreToolUse matcher "Write|Edit|MultiEdit|NotebookEdit".
 
 FILE=$(jq -r '.tool_input.file_path // empty' 2>/dev/null)
@@ -15,10 +17,14 @@ if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
 		RESOLVED=$(python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))" "$FILE" 2>/dev/null)
 		PLANS_DIR=$(python3 -c "import os; print(os.path.realpath(os.path.expanduser('~/.claude/plans')))" 2>/dev/null)
 		MEMORY_DIR=$(python3 -c "import os; print(os.path.realpath(os.path.expanduser('~/.claude/projects')))" 2>/dev/null)
+		GLOBAL_MEM_DIR=$(python3 -c "import os; print(os.path.realpath(os.path.expanduser('~/.claude/memory')))" 2>/dev/null)
 		if [ -n "$RESOLVED" ] && [ -n "$PLANS_DIR" ] && [[ "$RESOLVED" == "$PLANS_DIR"/* ]]; then
 			exit 0
 		fi
 		if [ -n "$RESOLVED" ] && [ -n "$MEMORY_DIR" ] && [[ "$RESOLVED" == "$MEMORY_DIR"/* ]]; then
+			exit 0
+		fi
+		if [ -n "$RESOLVED" ] && [ -n "$GLOBAL_MEM_DIR" ] && [[ "$RESOLVED" == "$GLOBAL_MEM_DIR"/* ]]; then
 			exit 0
 		fi
 		# Exempt gitignored files (e.g. *.local.json, .env) -- machine-local config editable on any branch.
@@ -28,8 +34,8 @@ if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
 	fi
 
 	echo "[block-edit-on-main] BLOCKED: refusing to edit '${FILE}' on branch '${BRANCH}'." >&2
-	echo "Preferred: create a worktree: git worktree add ../<repo>.worktrees/<topic> -b claude/<topic>" >&2
-	echo "Fallback (branch in place):   git checkout -b claude/<topic>" >&2
+	echo "Branch first: git checkout -b claude-<category>/<short-description>" >&2
+	echo "Worktree (explicit parallel work only): git worktree add ../<repo>.worktrees/<topic> -b claude-<category>/<topic>" >&2
 	exit 2
 fi
 

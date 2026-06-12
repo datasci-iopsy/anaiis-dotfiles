@@ -3,11 +3,13 @@
 #
 # Tests:
 #   - block-edit-on-main.sh still fires on main (regression)
-#   - block-edit-on-main.sh message suggests worktree creation
+#   - block-edit-on-main.sh message suggests branching first (worktree is
+#     the parallel-work alternative)
 #   - block-edit-on-main.sh still exempts ~/.claude/plans/ paths
-#   - list-merged-claude-branches.sh outputs advisory when merged branches exist
-#   - list-merged-claude-branches.sh is silent when no merged claude/* branches exist
-#   - rules/branching.md exists with required section headings
+#   - list-merged-claude-branches.sh outputs advisory when merged branches
+#     exist (claude-<category>/* current convention, claude/* legacy)
+#   - list-merged-claude-branches.sh is silent when nothing is merged
+#   - rules/git.md exists with required section headings
 #   - settings.json registers list-merged-claude-branches.sh
 #
 # Note: Scenarios 01-05 from the plan (trivial vs. non-trivial edit,
@@ -19,7 +21,7 @@ set -u
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BLOCK_HOOK="$REPO_DIR/claude/hooks/block-edit-on-main.sh"
 ADVISORY_HOOK="$REPO_DIR/claude/hooks/list-merged-claude-branches.sh"
-BRANCHING_RULE="$REPO_DIR/claude/rules/branching.md"
+BRANCHING_RULE="$REPO_DIR/claude/rules/git.md"
 SETTINGS="$REPO_DIR/claude/settings.json"
 
 PASS=0
@@ -158,15 +160,15 @@ assert_exit "2.1 blocks edit on main (exit 2)" "2" "$RC"
 RC=$(run_block_hook "feat/my-feature")
 assert_exit "2.2 allows edit on feature branch (exit 0)" "0" "$RC"
 
-RC=$(run_block_hook "claude/some-topic")
-assert_exit "2.3 allows edit on claude/* branch (exit 0)" "0" "$RC"
+RC=$(run_block_hook "claude-refactor/some-topic")
+assert_exit "2.3 allows edit on claude-* branch (exit 0)" "0" "$RC"
 
 # ── 3. block-edit-on-main message content ────────────────────────────────
-echo "# 3. block message suggests worktree"
+echo "# 3. block message suggests branching first"
 run_block_hook "main" >/dev/null 2>/tmp/block-hook.stderr || true
 STDERR=$(cat /tmp/block-hook.stderr)
-assert_contains "3.1 message mentions worktree" "worktree" "$STDERR"
-assert_contains "3.2 message mentions claude/<topic>" "claude/<topic>" "$STDERR"
+assert_contains "3.1 message suggests branch first" "git checkout -b claude-<category>/<short-description>" "$STDERR"
+assert_contains "3.2 message offers worktree for parallel work only" "parallel work only" "$STDERR"
 assert_contains "3.3 message mentions git worktree add" "git worktree add" "$STDERR"
 
 # ── 4. block-edit-on-main plans exemption ────────────────────────────────
@@ -176,37 +178,38 @@ mkdir -p "$PLANS_DIR"
 RC=$(run_block_hook "main" "$PLANS_DIR/my-plan.md")
 assert_exit "4.1 plans path exempt from block on main (exit 0)" "0" "$RC"
 
-# ── 5. advisory hook with merged claude/* branches ────────────────────────
+# ── 5. advisory hook with merged Claude branches ──────────────────────────
 echo "# 5. advisory hook with merged branches"
 if command -v git >/dev/null 2>&1; then
-	OUTPUT=$(run_advisory_hook "claude/old-topic claude/another-topic")
+	OUTPUT=$(run_advisory_hook "claude-feat/old-topic claude/legacy-topic")
 	assert_contains "5.1 advisory mentions branch-hygiene" "[branch-hygiene]" "$OUTPUT"
-	assert_contains "5.2 advisory lists a merged branch" "claude/" "$OUTPUT"
-	assert_contains "5.3 advisory shows delete command" "git branch -d" "$OUTPUT"
+	assert_contains "5.2 advisory lists current-convention branch" "claude-feat/old-topic" "$OUTPUT"
+	assert_contains "5.3 advisory lists legacy-convention branch" "claude/legacy-topic" "$OUTPUT"
+	assert_contains "5.4 advisory shows delete command" "git branch -d" "$OUTPUT"
 else
 	echo "  SKIP  git not found"
 fi
 
-# ── 6. advisory hook with no merged claude/* branches ─────────────────────
+# ── 6. advisory hook with no merged Claude branches ───────────────────────
 echo "# 6. advisory hook when nothing to clean"
 OUTPUT=$(run_advisory_hook "")
-assert_not_contains "6.1 no output when no merged claude/* branches" \
+assert_not_contains "6.1 no output when no merged Claude branches" \
 	"[branch-hygiene]" "$OUTPUT"
 
-# ── 7. rules/branching.md structure ──────────────────────────────────────
-echo "# 7. branching rule file content"
+# ── 7. rules/git.md structure ─────────────────────────────────────────────
+echo "# 7. git rule file content"
 [ -f "$BRANCHING_RULE" ] \
 	&& {
 		PASS=$((PASS + 1))
-		echo "  PASS  7.1 rules/branching.md exists"
+		echo "  PASS  7.1 rules/git.md exists"
 	} \
 	|| {
 		FAIL=$((FAIL + 1))
-		echo "  FAIL  7.1 rules/branching.md missing"
+		echo "  FAIL  7.1 rules/git.md missing"
 	}
 
 if [ -f "$BRANCHING_RULE" ]; then
-	for section in "Trivial" "Branch reuse" "Worktree" "Cleanup"; do
+	for section in "Trivial" "Branch reuse" "Worktree" "cleanup" "Pull requests" "claude-<category>/<short-description>"; do
 		if grep -qi "$section" "$BRANCHING_RULE"; then
 			printf '  PASS  7.x rule contains section: %s\n' "$section"
 			PASS=$((PASS + 1))

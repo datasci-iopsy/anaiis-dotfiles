@@ -14,7 +14,6 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 N="${1:-5}"
 
 HOOKS=(
-	"$REPO_DIR/claude/hooks/surface-behavioral-rules.sh"
 	"$REPO_DIR/claude/hooks/maintenance-check.sh"
 	"$REPO_DIR/claude/hooks/ensure-repo-hooks.sh"
 	"$REPO_DIR/claude/hooks/load-global-memory.sh"

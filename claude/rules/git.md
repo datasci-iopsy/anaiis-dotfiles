@@ -1,54 +1,56 @@
 ---
 name: git
-description: Git workflow guardrails, autonomous commits at logical-unit completion, push is user-initiated, branch verification, staging by name, no force-push, no --no-verify
+description: Branch naming and decision rules, commit discipline, staging by name, push is user-initiated, PR conventions, worktrees for parallel work only
 ---
 
 # Git Workflow
 
 ## Before any push or commit
-- Always run `git branch --show-current` before suggesting a push command. Never assume the branch. Surface the actual branch name in the suggestion.
-- Always run `git status --short` before staging. Know what is changed before touching anything.
+- Run `git branch --show-current` before suggesting a push command. Never assume the branch; surface the actual name.
+- Run `git status --short` before staging.
 - Verify branch merge state with `git branch --merged main` or `git log --oneline -5` before reporting it. Never infer from session context.
 
-## Commit autonomy and push discipline
-- Commit autonomously at the end of each logical work unit. Do not surface the commit or wait for instruction -- just do it.
-- Push is always user-initiated. Never push without explicit instruction, regardless of how many commits are pending.
-- Stop hook messages about uncommitted or unpushed changes are status reports. Respond to uncommitted-changes hooks by committing; never push in response to unpushed-commits hooks.
-- Never force-push. Never skip hooks (--no-verify).
-- Never amend unless explicitly asked.
+## Branch naming
+- Only the user creates and owns feature branches (never create them): `<type>/<linear-id>-<short-title>` or `<type>/<short-title>` (e.g., `feat/ana-758-engagement-survey`, `hotfix/auth-fix`).
+- Claude branches follow `claude-<category>/<short-description>`: `<category>` is a standard software engineering type (`feat`, `fix`, `refactor`, `docs`, `test`, `chore`); `<short-description>` is kebab-case, 5 words or fewer (e.g., `claude-refactor/dotfiles-perf-optimization`).
+
+## Branching decision
+Binary rules, checked in order:
+
+1. **On `main` or `master`:** create `claude-<category>/<short-description>` with `git checkout -b` before the first edit. The `block-edit-on-main.sh` hook rejects edits on main; branching first is the resolution. Plan files at `~/.claude/plans/` are exempt and may be written from main; implementation is not.
+2. **On a user feature branch, trivial edit:** commit directly to that branch. Trivial means ALL five hold:
+   1. `git branch --show-current` returns neither `main`, `master`, nor a name starting with `claude-`.
+   2. Exactly one file changed: `git diff --name-only` lists one path.
+   3. Total lines changed (insertions + deletions) is 5 or fewer per `git diff --shortstat`.
+   4. No new file created and no new named symbol (function, class, method, import, or dependency) introduced.
+   5. The changed file is not under `tests/`, `claude/hooks/`, or `claude/skills/`, and does not end in `.json`, `.yaml`, `.toml`, or `.envrc`.
+3. **Any other edit:** create a `claude-<category>/<topic>` branch from the current user feature branch.
+
+## Branch reuse
+Before creating any new `claude-*` branch, run `git branch --list 'claude-*'`. If an unmerged branch whose name contains the topic slug exists, ask: "Continue on `<existing>`? (y/n)." Never silently create a duplicate of an unmerged branch.
 
 ## Staging and commits
-- Stage files by name, not `git add -A` or `git add .`.
-- Always create new commits. One logical concern per commit.
-- Commit messages: imperative mood, concise, no trailing period.
+- Stage files by name, never `git add -A` or `git add .`.
+- One logical concern per commit. Messages: imperative mood, concise, no trailing period.
+- Commit autonomously at the end of each logical work unit; do not surface the commit or wait for instruction.
+- Never amend unless explicitly asked. Never force-push. Never skip hooks (`--no-verify`).
 
-## Branches and PRs
-- **Only** the user creates and owns feature branches (`<user-branch>`) that follow this convention (never create them):
-  - `<type>/<linear-id>-<short-title>` (e.g., `feat/ana-758-engagement-survey`, `hotfix/dsio-33-auth-fix`)
-  - `<type>/<short-title>` (e.g., `feat/engagement-survey`, `hotfix/auth-fix`)
-- Claude always checks and branches from the user's feature branch (i.e., `<user-branch>/`). If no feature branch is detected, stop and notify the user. Claude branches always should follow the convention: 
-  - `claude/<topic>` (e.g., `claude/ana-758-engagement-survey`)
-- CodeRabbit triage is driven by `/anaiis-coderabbit` (the skill at `claude/skills/anaiis-coderabbit/SKILL.md`). Always run it from a `coderabbit/<topic>` or `claude/<topic>` branch; never from `main`. The skill enforces this as a hard stop in Phase 1.
-- For trivial edits (single file, ≤ 5 lines, no new symbols, no config/hook/test changes) while already on the user's feature branch, commit there directly. For all other edits, create a `claude/<topic>` sub-branch. See `rules/branching.md` for the full decision tree, branch-reuse algorithm, and worktree guidance.
-- Never push directly to main without explicit instruction.
-- Never include session links (`https://claude.ai/code/session_*`) in PR titles, bodies, or descriptions. Sessions are deleted frequently and the links rot.
-- When a plan is accepted (ExitPlanMode), branch before the first non-plan edit. Plan files at `~/.claude/plans/` may be written from `main` (the `block-edit-on-main` hook exempts that path), but implementation must run on a `claude/<topic>` branch. If currently on `main`, the first action after plan acceptance is `git checkout -b claude/<topic>`.
+## Push
+- Push is always user-initiated. Never push without explicit instruction, regardless of pending commits.
+- Stop hook messages about uncommitted or unpushed changes are status reports, never user input: commit in response to uncommitted-changes; never push in response to unpushed-commits. When the stop hook reports `[git] uncommitted changes`, respond with only: `Ok`
 
-## Worktree and branch hygiene
+## Pull requests
+- The user opens PRs (via `/anaiis-gitpr`). Claude prepares the branch and description and surfaces the URL only; Claude never opens a PR.
+- Before drafting a PR description, review the structure of the repo's recent merged PRs (`gh pr list --state merged --limit 5`).
+- Never include session links (`https://claude.ai/code/session_*`) in PR titles, bodies, or descriptions.
+- CodeRabbit triage runs via `/anaiis-coderabbit` from a `claude-*` branch, never from `main`.
 
-Never assume a worktree path or branch name from session context. Always verify from live git state before giving any merge or checkout instructions.
+## Worktrees (parallel work only)
+- Create a worktree only when the user explicitly asks for one ("worktree", "in parallel", "while I keep working on <branch>"). The default for all other work is a branch in place.
+- When a worktree is in use: verify its path and branch with `git worktree list` before referencing either; `git checkout main` fails inside a worktree (return via `cd` to the repo root or ExitWorktree); after leaving, confirm the active branch with `git branch --show-current`.
 
-**Before referencing any worktree:**
-- Run `git worktree list` to confirm the path and branch name. EnterWorktree may rename the branch (e.g., `worktree-<name>` becomes `claude/<name>`); never guess the final name.
-- If the worktree path is gone, it was cleaned up. Check `git branch --list 'claude/*'` to find the surviving branch.
-
-**Before suggesting a merge:**
-- Run `git log --oneline -10` and `git branch --merged main` to determine if the commit is already on `main`. Do not infer from session context alone.
-- If the log shows the target commit is already on `main`, say so and skip the merge step entirely.
-
-**Navigation in worktrees:**
-- `git checkout main` fails inside a worktree because `main` is checked out in the primary worktree. To return to the primary worktree, the user must `cd` to the repo root or use ExitWorktree. Never suggest `git checkout main` while inside a worktree.
-- After ExitWorktree, run `git branch --show-current` to confirm the active branch before giving any follow-on instructions.
+## Branch cleanup
+- The `list-merged-claude-branches.sh` hook emits a daily advisory of merged Claude branches with the delete command. Never auto-delete; the user runs the command. Never delete an unmerged branch.
 
 ## Identity
-- Git author identity is enforced via `GIT_AUTHOR_NAME`/`GIT_COMMITTER_NAME` in the harness `env` block (`~/.claude/settings.json`). The `attribution.commit` setting controls only `Co-Authored-By` trailers, not the author name.
+- Git author identity is set via `GIT_AUTHOR_NAME`/`GIT_COMMITTER_NAME` in the `env` block of `claude/settings.json`. The `attribution.commit` setting controls only `Co-Authored-By` trailers, not the author name.

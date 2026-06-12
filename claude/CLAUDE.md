@@ -2,7 +2,7 @@
 
 ## Behavioral rules
 
-Imperatives governing every task. Injected at session start from `rules/behavioral.md`; see that file for the full list and rationale.
+Imperatives governing every task live in `rules/behavioral.md`, loaded natively with every file in `~/.claude/rules/`; count and wording authoritative in that file.
 
 This file provides project context and author identity. Detailed rules live in `~/.claude/rules/`.
 
@@ -22,15 +22,13 @@ Rules (`~/.claude/rules/`) constrain Claude's behavior across all tasks. Skills 
 | File | Covers |
 |---|---|
 | `rules/behavioral.md` | Behavioral imperatives governing every task; count and wording authoritative in file |
-| `rules/environment.md` | macOS, Bash, direnv, pyenv, worktree safety |
+| `rules/environment.md` | macOS, Bash, direnv, uv, worktree safety |
 | `rules/tools.md` | gh, jq, gcloud, make, structured CLI output |
 | `rules/code-style.md` | Writing style, shell formatting, no emojis |
-| `rules/git.md` | Branch naming, commit discipline, staging |
-| `rules/branching.md` | Trivial-edit criteria, branch reuse, worktree-from-main, cleanup advisory |
+| `rules/git.md` | Branch naming (`claude-<category>/<short-description>`), trivial-edit criteria, commits, push, PRs, worktrees for parallel work only |
 | `rules/r-conventions.md` | Vectorization, lapply/vapply, lintr style |
 | `rules/python.md` | uv, direnv, ruff |
-| `rules/session.md` | Token efficiency, context thresholds, output prefs, compaction |
-| `rules/core.md` | Root causes, plan mode threshold, workflow, sub-agents, hook output handling |
+| `rules/session.md` | Token efficiency, subagent limits, context thresholds, output prefs, compaction |
 | `rules/duckdb.md` | DuckDB query discipline: purpose-based patterns, no re-querying context |
 | `rules/citations.md` | Citation integrity: corpus-only sources, no fabrication, web search only on explicit request |
 | `rules/testing.md` | Test-intent discipline: tests must encode why, not just what; fail-to-fail check |
@@ -40,9 +38,9 @@ Rules (`~/.claude/rules/`) constrain Claude's behavior across all tasks. Skills 
 `~/.claude/CLAUDE.local.md` (gitignored), machine-specific environment notes.
 
 ## Memory tiers
-Two tiers, both per-machine, both auto-loaded:
-- **Global tier** at `~/.claude/memory/`, cross-project user-level facts (identity, preferences). Loaded once per session via the `load-global-memory.sh` UserPromptSubmit hook.
-- **Project tier** at `~/.claude/projects/<project-key>/memory/`, project-specific facts. The project's `MEMORY.md` index loads natively. Session handoffs live in the `handoffs/` subdirectory (rolling cap of 5, ISO-timestamped).
+Two tiers, both auto-loaded:
+- **Global tier** at `~/.claude/memory/`, cross-project user-level facts (identity, preferences). Git-tracked in the dotfiles repo (`claude/memory/`, symlinked by `install.sh`); syncs across machines via git. Loaded once per session via the `load-global-memory.sh` UserPromptSubmit hook. Writes to it land in the dotfiles working tree; commit them from a dotfiles session.
+- **Project tier** at `~/.claude/projects/<project-key>/memory/`, project-specific facts, per-machine. The project's `MEMORY.md` index loads natively. Session handoffs live in the `handoffs/` subdirectory (rolling cap of 5, ISO-timestamped).
 Run `bash ~/.claude/scripts/memory-doctor.sh` to verify the pipeline end-to-end.
 
 @RTK.md
