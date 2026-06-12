@@ -9,8 +9,9 @@
 # script is grep-able from a higher-level test or schedule.
 #
 # Checks:
-#   A. Global tier present and indexed.
-#   B. Each topical file has valid frontmatter (name, description, type).
+#   A. Global tier is a symlink resolving into the dotfiles repo, and indexed.
+#   B. Each topical file has valid frontmatter (name, description, and a
+#      type field either top-level or nested under metadata:).
 #   C. Each project memory dir has a handoffs/ subdir; bounded ≤5.
 #   D. No flat handoff_*.md sitting at project memory root (migration done).
 #   E. load-global-memory hook emits the index on first invocation; nothing on second.
@@ -43,10 +44,13 @@ fail() {
 
 # ── A. Global tier ────────────────────────────────────────────────────────
 echo "## A. Global tier"
-if [ -d "$GLOBAL_DIR" ]; then
-	ok "A.1 global memory directory exists"
+if [ -L "$GLOBAL_DIR" ] && [ "$(cd "$GLOBAL_DIR" 2>/dev/null && pwd -P)" = "$REPO_DIR/claude/memory" ]; then
+	ok "A.1 global memory is a symlink into the dotfiles repo"
+elif [ -d "$GLOBAL_DIR" ]; then
+	fail "A.1 global memory is a symlink into the dotfiles repo" \
+		"real directory at $GLOBAL_DIR; merge its contents into claude/memory/ and replace with: ln -sfn \$HOME/anaiis-dotfiles/claude/memory $GLOBAL_DIR"
 else
-	fail "A.1 global memory directory exists" "missing: $GLOBAL_DIR"
+	fail "A.1 global memory is a symlink into the dotfiles repo" "missing: $GLOBAL_DIR (run install.sh)"
 fi
 if [ -f "$GLOBAL_DIR/MEMORY.md" ]; then
 	ok "A.2 global MEMORY.md index exists"
@@ -62,12 +66,11 @@ check_frontmatter() {
 	local f="$1"
 	[ -f "$f" ] || return 0
 	[ "$(basename "$f")" = "MEMORY.md" ] && return 0
-	local first_three
-	first_three=$(head -3 "$f")
-	if [[ "$first_three" != *"name:"*"description:"*"type:"* ]] \
-		&& ! (head -10 "$f" | grep -q '^name:' \
-			&& head -10 "$f" | grep -q '^description:' \
-			&& head -10 "$f" | grep -q '^type:'); then
+	local head10
+	head10=$(head -10 "$f")
+	if ! (printf '%s\n' "$head10" | grep -q '^name:' \
+		&& printf '%s\n' "$head10" | grep -q '^description:' \
+		&& printf '%s\n' "$head10" | grep -qE '^(type:|[[:space:]]+type:)'); then
 		INVALID_FM=$((INVALID_FM + 1))
 		INVALID_FILES+=("$f")
 	fi

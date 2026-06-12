@@ -1,7 +1,8 @@
 ---
-name: Memory workflow process
+name: memory-workflow-process
 description: How and when to update memory across projects -- three-tier approach, cost tradeoffs, what not to build
-type: feedback
+metadata:
+  type: feedback
 ---
 
 Memory, compaction, and session history are separate layers with no interaction:

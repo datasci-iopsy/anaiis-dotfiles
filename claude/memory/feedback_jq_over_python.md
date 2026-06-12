@@ -1,7 +1,8 @@
 ---
-name: Use jq for JSON, not Python inline scripts
+name: jq-over-python
 description: jq is the correct tool for JSON parsing in bash; Python inline scripts are slower, verbose, and require approvals
-type: feedback
+metadata:
+  type: feedback
 ---
 
 Use `jq` for all JSON parsing in bash. The global CLAUDE.md already states this. Do not write `python3 -c "import json..."` inline scripts to parse JSON -- that violates the tool preference rule and generates approval prompts for non-trivial scripts.
