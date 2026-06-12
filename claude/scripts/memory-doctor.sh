@@ -48,7 +48,7 @@ if [ -L "$GLOBAL_DIR" ] && [ "$(cd "$GLOBAL_DIR" 2>/dev/null && pwd -P)" = "$REP
 	ok "A.1 global memory is a symlink into the dotfiles repo"
 elif [ -d "$GLOBAL_DIR" ]; then
 	fail "A.1 global memory is a symlink into the dotfiles repo" \
-		"real directory at $GLOBAL_DIR; merge its contents into claude/memory/ and replace with: ln -sfn \$HOME/anaiis-dotfiles/claude/memory $GLOBAL_DIR"
+		"real directory at $GLOBAL_DIR; merge its contents into claude/memory/ and replace with: ln -sfn $REPO_DIR/claude/memory $GLOBAL_DIR"
 else
 	fail "A.1 global memory is a symlink into the dotfiles repo" "missing: $GLOBAL_DIR (run install.sh)"
 fi
