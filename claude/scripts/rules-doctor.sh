@@ -12,7 +12,7 @@
 #      on disk.
 #   B. Cross-reference integrity: every rules/<name>.md referenced inside any
 #      rules file exists on disk.
-#   C. behavioral.md structure: H1 title and at least 7 numbered H2
+#   C. behavioral.md structure: H1 title and at least 9 numbered H2
 #      imperatives.
 #   D. No re-injection: no UserPromptSubmit hook in settings.json references
 #      behavioral rules (native loading makes injection a duplicate).
@@ -108,10 +108,10 @@ if [ -f "$BEHAV_MD" ]; then
 		fail "C.2 H1 title" "first non-frontmatter line is not '# Title'"
 	fi
 	H2_CT=$(grep -cE '^## [0-9]+\.' "$BEHAV_MD" || true)
-	if [ "${H2_CT:-0}" -ge 7 ]; then
-		ok "C.3 has $H2_CT numbered H2 imperatives (>= 7)"
+	if [ "${H2_CT:-0}" -ge 9 ]; then
+		ok "C.3 has $H2_CT numbered H2 imperatives (>= 9)"
 	else
-		fail "C.3 H2 imperatives" "expected at least 7, found ${H2_CT:-0}"
+		fail "C.3 H2 imperatives" "expected at least 9, found ${H2_CT:-0}"
 	fi
 else
 	fail "C.1 rules/behavioral.md" "missing: $BEHAV_MD"
