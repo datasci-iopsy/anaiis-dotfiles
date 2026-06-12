@@ -122,7 +122,8 @@ assert "6.1 doctor exits 0 after restore" "0" "$?"
 
 # ── Cleanup tmp files ─────────────────────────────────────────────────────
 rm -f /tmp/test-rules.green.out /tmp/test-rules.dangling.out \
-	/tmp/test-rules.mangled.out /tmp/test-rules.reinject.out /tmp/test-rules.stale.out
+	/tmp/test-rules.mangled.out /tmp/test-rules.reinject.out \
+	/tmp/test-rules.stale.out /tmp/test-rules.denydrop.out
 
 # ── Summary ───────────────────────────────────────────────────────────────
 echo
