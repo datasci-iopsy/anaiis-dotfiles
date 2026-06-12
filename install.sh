@@ -101,9 +101,15 @@ source "$HOME/anaiis-dotfiles/bash/shared.bash"
 fi
 
 echo ""
-echo "=== Claude Code: Machine-local config (copy-once, then edit) ==="
+echo "=== Claude Code: Machine-local config ==="
+# settings.local.json: the real file lives in the repo dir (gitignored, so
+# still machine-local) and ~/.claude/ holds a symlink to it. Copy-once from
+# the template, then link; copy precedes link so the link never dangles.
 copy_template "$DOTFILES/claude/settings.local.json.template" \
+	"$CANONICAL/claude/settings.local.json"
+symlink "$CANONICAL/claude/settings.local.json" \
 	"$HOME/.claude/settings.local.json"
+# CLAUDE.local.md stays copy-once (edited in place at ~/.claude/).
 copy_template "$DOTFILES/claude/CLAUDE.local.md.template" \
 	"$HOME/.claude/CLAUDE.local.md"
 
@@ -142,7 +148,8 @@ echo "  rm -f \"\$HOME/.mcp.json\"   # the github MCP entry was removed; this cl
 echo "  rm -f \"\$HOME/.bashrc\" \"\$HOME/.bash_profile\" \"\$HOME/.bashrc.local\"   # only if these were dotfiles symlinks; back up first"
 echo ""
 echo "Next steps:"
-echo "  1. Edit ~/.claude/settings.local.json , set GITHUB_TOKEN and model"
+echo "  1. Edit ~/.claude/settings.local.json , machine-local model/permissions."
+echo "     Secrets are env vars loaded per-project via direnv, never JSON values."
 echo "  2. Edit ~/.claude/CLAUDE.local.md     , note machine-specific environment"
 echo "  3. Run ~/.claude/scripts/seed-memory.sh from any project root to init memory"
 echo "  4. Run ~/.claude/scripts/install-repo-hooks.sh in repos that need lint hooks"
