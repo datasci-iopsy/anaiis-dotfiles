@@ -65,6 +65,9 @@ assert_block "2b.6 cat global secrets file" 'cat ~/.config/secrets/global.env' "
 assert_block "2b.7 pem file" "openssl rsa -in server.pem" "BLOCK"
 assert_block "2b.8 key file" "cat signing.key" "BLOCK"
 assert_block "2b.9 aws credentials" 'cat ~/.aws/credentials' "BLOCK"
+assert_block "2b.10 cat zshrc.local" 'cat ~/.zshrc.local' "BLOCK"
+assert_block "2b.11 cat profile" 'cat ~/.profile' "BLOCK"
+assert_block "2b.12 cat gcloud config" 'cat ~/.config/gcloud/application_default_credentials.json' "BLOCK"
 
 echo "# 2c. Secrets: environment dumps blocked"
 assert_block "2c.1 bare printenv" "printenv" "BLOCK"
@@ -116,6 +119,7 @@ assert_block "5.7 clean message but second command dirty" 'git commit -m "clean 
 assert_block "5.8 secret var in --body" 'gh pr create --body "uses $QUALTRICS_API_KEY"' "BLOCK"
 assert_block "5.9 ssh dir without trailing slash" 'tar czf /tmp/x.tgz ~/.ssh' "BLOCK"
 assert_allow "5.10 ssh command itself stays usable" "ssh host uptime"
+assert_block "5.11 unquoted secret var in -m" 'git commit -m $OPENAI_API_KEY' "BLOCK"
 
 echo
 echo "──────────────────────────────────────────────"

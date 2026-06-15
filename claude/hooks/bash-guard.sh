@@ -54,7 +54,7 @@ fi
 #     no command substitution); "$(cat .env)" therefore stays visible
 # A message flag interpolating a secret-named variable is blocked outright:
 # the shell would expand the real value into the message.
-if printf '%s' "$CMD" | grep -qE '(^|[[:space:]])(-m|--message|--title|--body|--notes|--description)(=|[[:space:]]+)"[^"]*\$\{?[A-Za-z0-9_]*(TOKEN|SECRET|API_?KEY|PASSWORD)'; then
+if printf '%s' "$CMD" | grep -qE '(^|[[:space:]])(-m|--message|--title|--body|--notes|--description)(=|[[:space:]]+)("[^"]*\$\{?[A-Za-z0-9_]*(TOKEN|SECRET|API_?KEY|PASSWORD)|\$\{?[A-Za-z_][A-Za-z0-9_]*(TOKEN|SECRET|API_?KEY|PASSWORD))'; then
 	printf 'BLOCK: message flag interpolates a secret-named variable; the expanded value would land in the message text.\n' >&2
 	exit 2
 fi
@@ -72,7 +72,7 @@ fi
 # ── Secrets: protected paths ────────────────────────────────────────────────
 # Strip the allowed template forms first so they never trigger the path match.
 SCRUBBED=$(printf '%s' "$GUARD_STR" | sed -E 's/\.env\.(example|template)//g')
-if printf '%s' "$SCRUBBED" | grep -qE '(\.env\b|\.ssh\b|\.bashrc|\.bash_profile|\.zshrc|secrets/|\.pem\b|\.key\b|credentials)'; then
+if printf '%s' "$SCRUBBED" | grep -qE '(\.env\b|\.ssh\b|\.bashrc(\.local)?|\.bash_profile|\.zshrc(\.local)?|\.profile\b|secrets/|\.pem\b|\.key\b|credentials|\.aws\b|\.config/(gcloud|secrets)\b)'; then
 	printf 'BLOCK: command references a protected secrets path. If a value is needed, ask the user to provide or load it.\n' >&2
 	exit 2
 fi
