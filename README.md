@@ -62,7 +62,7 @@ anaiis-dotfiles/
 │   ├── measure-userpromptsubmit.sh  Hook-latency measurement (run when chain grows)
 │   ├── run-all.sh                  Runs the full test suite
 │   ├── SMOKE-TESTS.md              Manual smoke test scenarios
-│   ├── test-bash-guard.sh          bash-guard.sh deny/allow assertions (destructive commands + prefer-jq)
+│   ├── test-bash-guard.sh          bash-guard.sh deny/allow assertions (destructive cmds, secrets path blocking, env-dump blocking, prefer-jq)
 │   ├── test-block-sensitive-writes.sh   block-sensitive-writes.sh deny/allow assertions
 │   ├── test-branching.sh           Trivial-edit criteria and branch-reuse logic
 │   ├── test-claude-md-rules.sh     Validates CLAUDE.md rules index against rules/ on disk
@@ -240,7 +240,7 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 | `PreToolUse` | `Write\|Edit\|MultiEdit\|NotebookEdit` | `block-em-dash.sh` | Rejects any payload containing U+2014 (em dash); enforces no-em-dash code style rule |
 | `PreToolUse` | `Write\|Edit\|MultiEdit\|NotebookEdit` | `block-edit-on-main.sh` | Blocks all edits when the current branch is `main` or `master` |
 | `PreToolUse` | `Write\|Edit` | `block-sensitive-writes.sh` | Allow `*.env.example`/`*.env.template`; block `*.lock`, `*.env`, `*credentials*`, `*secret*`, `*.pem`, `*.key` |
-| `PreToolUse` | `Bash` | `bash-guard.sh` | Single guard: blocks destructive `bq rm`, `gcloud delete*`, `uv cache clean`/`pip uninstall`, and Python used for pure JSON parsing (jq's job) |
+| `PreToolUse` | `Bash` | `bash-guard.sh` | Single guard: blocks destructive commands (`bq rm`, `gcloud delete*`, `uv cache clean`/`pip uninstall`), reads/writes to `.env`, credential paths (`.key`, `.pem`, `~/.aws/**`, `~/.config/gcloud/**`), shell rc files, and environment dumps (`printenv`/`echo $SECRET`); blocks Python for pure JSON parsing (jq's job) |
 | `PreToolUse` | `Agent\|WebFetch` | `cost-guard.sh` | Cost tiering MEDIUM/HIGH/VERY HIGH; hard-blocks (exit 2) general-purpose agents above per-session cap (default 5, override via `COST_GUARD_GP_LIMIT`); blocks logged to `~/.claude/logs/cost-guard-blocks.log` |
 | `Stop` |, | `stop-hook-git-check.sh` | Exits 2 (continues agent loop) on uncommitted changes, untracked files, or unpushed commits; exits 0 when clean |
 | `PreCompact` | `*` | `pre-compact.sh` | Writes a structured handoff to project memory |
