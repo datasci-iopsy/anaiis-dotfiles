@@ -188,7 +188,7 @@ Create a throwaway fixture first: `mkdir -p /tmp/smoke-sec && echo
 **Steps:**
 1. Ask Claude to read `/tmp/smoke-sec/.env` with the Read tool.
 2. Ask Claude to read `~/.bashrc` with the Read tool.
-3. Ask Claude to read `bash/shared.bash` in the dotfiles repo.
+3. Ask Claude to read `~/anaiis-dotfiles/bash/shared.bash` (the canonical shared shell config in the repo).
 
 **Expected:** Steps 1 and 2 are denied by the permission rules. Step 3
 succeeds (the repo copy is the canonical, readable shell content).
