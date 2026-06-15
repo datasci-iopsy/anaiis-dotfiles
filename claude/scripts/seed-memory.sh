@@ -17,6 +17,10 @@ TEMPLATES="$DOTFILES/claude/memory-templates"
 if [ ! -L "$HOME/.claude/memory" ]; then
 	echo "warning: ~/.claude/memory is not a symlink into the dotfiles repo." >&2
 	echo "         Run install.sh (and merge any local files into claude/memory/ first)." >&2
+elif ! _mem_target="$(realpath "$HOME/.claude/memory" 2>/dev/null)" \
+	|| [ "$_mem_target" != "$DOTFILES/claude/memory" ]; then
+	echo "warning: ~/.claude/memory symlink does not point to $DOTFILES/claude/memory." >&2
+	echo "         Resolved: ${_mem_target:-unresolvable}. Run install.sh to fix." >&2
 fi
 
 # ── Project tier ───────────────────────────────────────────────────────────
