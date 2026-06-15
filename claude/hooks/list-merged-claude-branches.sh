@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# UserPromptSubmit hook: advisory listing merged claude/* branches.
+# UserPromptSubmit hook: advisory listing merged Claude branches
+# (claude-<category>/* current convention, claude/* legacy).
 # Runs at most once per calendar day (flag file in /tmp).
 # Never deletes branches. Output is advisory only.
 
@@ -7,7 +8,7 @@ FLAG="/tmp/claude-branch-hygiene-${USER}-$(date +%Y%m%d)"
 [ -f "$FLAG" ] && exit 0
 
 MERGED=$(git branch --merged main 2>/dev/null \
-	| grep -E '^\s*claude/' \
+	| grep -E '^\s*claude[-/]' \
 	| sed 's/^[[:space:]]*//')
 
 if [ -z "$MERGED" ]; then
@@ -15,7 +16,7 @@ if [ -z "$MERGED" ]; then
 	exit 0
 fi
 
-echo "[branch-hygiene] Merged claude/* branches you may want to delete:"
+echo "[branch-hygiene] Merged Claude branches you may want to delete:"
 while IFS= read -r br; do
 	echo "  $br"
 done <<<"$MERGED"

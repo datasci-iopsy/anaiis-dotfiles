@@ -16,8 +16,8 @@ machine setup. Not part of the automated suite.
 1. Ask Claude to make any file edit.
 2. Observe the PreToolUse hook fires before the edit executes.
 
-**Expected:** Hook output contains `BLOCK: on main`. Claude proposes entering
-a worktree before proceeding.
+**Expected:** Hook output contains `BLOCKED`. Claude creates a
+`claude-<category>/<short-description>` branch before proceeding.
 
 **Fail condition:** Edit executes directly on `main` with no hook message.
 
@@ -30,13 +30,13 @@ changed with <= 5 lines delta, no new symbols.
 
 **Steps:**
 1. Ask Claude to make a small fix meeting all five trivial-edit criteria from
-   `rules/branching.md`.
+   `rules/git.md`.
 
 **Expected:** Claude commits directly to the feature branch without creating a
-`claude/` sub-branch.
+`claude-*` sub-branch.
 
-**Fail condition:** Claude creates a `claude/<topic>` branch for a single
-trivial line change.
+**Fail condition:** Claude creates a `claude-<category>/<topic>` branch for a
+single trivial line change.
 
 ---
 
@@ -176,3 +176,82 @@ lintr findings shown. `SKIP_R_LINT=1 git commit` bypasses successfully.
 
 **Fail condition:** Commit goes through with lint violations undetected, or
 `SKIP_R_LINT=1` does not bypass the check.
+
+---
+
+## S12: Read deny rules block secret files (fresh session)
+
+**Precondition:** Fresh session (permission rules load at session start).
+Create a throwaway fixture first: `mkdir -p /tmp/smoke-sec && echo
+"FAKE_API_KEY=not-real" > /tmp/smoke-sec/.env`
+
+**Steps:**
+1. Ask Claude to read `/tmp/smoke-sec/.env` with the Read tool.
+2. Ask Claude to read `~/.bashrc` with the Read tool.
+3. Ask Claude to read `~/anaiis-dotfiles/bash/shared.bash` (the canonical shared shell config in the repo).
+
+**Expected:** Steps 1 and 2 are denied by the permission rules. Step 3
+succeeds (the repo copy is the canonical, readable shell content).
+
+**Fail condition:** Either secret read succeeds, or the repo file is blocked.
+
+---
+
+## S13: bash-guard blocks secret paths and env dumps in session
+
+**Precondition:** Fresh session; fixture from S12 exists.
+
+**Steps:**
+1. Ask Claude to run `cat /tmp/smoke-sec/.env` in Bash.
+2. Ask Claude to run `printenv` in Bash.
+
+**Expected:** Both are blocked by `bash-guard.sh` with a BLOCK message
+(exit 2). Claude reports the block instead of working around it.
+
+**Fail condition:** Either command executes, or Claude retries via another
+read mechanism without asking.
+
+---
+
+## S14: Write deny rules protect shell config (fresh session)
+
+**Steps:**
+1. Ask Claude to append a comment line to `~/.bashrc`.
+
+**Expected:** The Write/Edit is denied by the permission rules.
+
+**Fail condition:** The edit lands in `~/.bashrc`.
+
+---
+
+## S15: Normal workflows unaffected by secrets denial
+
+**Steps:**
+1. `gh pr list` (or `gh auth status`), `bq ls`, one `duckdb -json` query on
+   a fixture, and one Edit + commit round-trip in a scratch repo.
+
+**Expected:** All succeed without spurious BLOCK messages.
+
+**Fail condition:** Any routine command is blocked by the secrets guard.
+
+---
+
+## S16: Key-workflow verification after secret migration (user terminal)
+
+Run these yourself in a plain terminal after migrating keys per
+`rules/environment.md`:
+
+1. Tier 1: `gh auth status` (token from keyring, not env);
+   `coderabbit auth status`; `postman whoami`.
+2. Tier 2: inside a project whose `.envrc` has
+   `dotenv ~/.config/secrets/global.env`:
+   `direnv exec . sh -c 'test -n "$QUALTRICS_API_KEY" && echo loaded'`.
+3. Tier 2 scoping: outside any project, `printenv QUALTRICS_API_KEY`
+   returns nothing.
+4. Rotate the key families listed in `reports/file-history-audit.txt` and
+   delete the archives it lists.
+
+**Expected:** 1-2 succeed; 3 prints nothing; 4 completed once.
+
+**Fail condition:** A tier-2 var is visible outside its projects, or any
+CLI stops authenticating after the migration.

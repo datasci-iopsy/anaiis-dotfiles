@@ -19,7 +19,6 @@
             "Bash(python:*)",
             "Bash(python3:*)",
             "Bash(ls:*)",
-            "Bash(cat:*)",
             "Bash(cd:*)",
             "Bash(tree:*)",
             "Bash(wc:*)",
@@ -79,7 +78,37 @@
             "Bash(docker system prune*)",
             "Bash(kubectl delete*)",
             "Bash(terraform apply*)",
-            "Bash(terraform destroy*)"
+            "Bash(terraform destroy*)",
+            "Read(**/.env*)",
+            "Write(**/.env*)",
+            "Read(**/*.key)",
+            "Write(**/*.key)",
+            "Read(**/*.pem)",
+            "Write(**/*.pem)",
+            "Read(**/*credentials*)",
+            "Write(**/*credentials*)",
+            "Read(**/secrets/**)",
+            "Write(**/secrets/**)",
+            "Read(**/.ssh/**)",
+            "Write(**/.ssh/**)",
+            "Read(~/.bashrc)",
+            "Write(~/.bashrc)",
+            "Read(~/.bashrc.local)",
+            "Write(~/.bashrc.local)",
+            "Read(~/.bash_profile)",
+            "Write(~/.bash_profile)",
+            "Read(~/.zshrc)",
+            "Write(~/.zshrc)",
+            "Read(~/.zshrc.local)",
+            "Write(~/.zshrc.local)",
+            "Read(~/.profile)",
+            "Write(~/.profile)",
+            "Read(~/.aws/**)",
+            "Write(~/.aws/**)",
+            "Read(~/.config/gcloud/**)",
+            "Write(~/.config/gcloud/**)",
+            "Read(~/.config/secrets/**)",
+            "Write(~/.config/secrets/**)"
         ],
         "defaultMode": "default",
         "disableAutoMode": "disable"
@@ -91,14 +120,6 @@
     },
     "hooks": {
         "UserPromptSubmit": [
-            {
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "bash $HOME/.claude/hooks/surface-behavioral-rules.sh"
-                    }
-                ]
-            },
             {
                 "hooks": [
                     {
@@ -179,11 +200,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "bash $HOME/.claude/hooks/block-destructive-commands.sh"
-                    },
-                    {
-                        "type": "command",
-                        "command": "bash $HOME/.claude/hooks/prefer-jq.sh"
+                        "command": "bash $HOME/.claude/hooks/bash-guard.sh"
                     },
                     {
                         "type": "command",

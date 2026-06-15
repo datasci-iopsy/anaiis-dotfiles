@@ -6,7 +6,7 @@
 ## This machine
 
 - OS:
-- Python path / pyenv root:
+- Python path (uv-managed):
 - Active R version:
 - Notable env vars (set in ~/.bash_profile):
 

@@ -1,0 +1,65 @@
+# file-history audit, 2026-06-12
+#
+# ~/.claude/file-history/ stores snapshots of files Claude edited (the
+# /rewind feature). The 40 archive versions below matched secret-assignment
+# patterns (TWILIO_AUTH_TOKEN, QUALTRICS_API_KEY, NETLIFY_API_KEY,
+# CLOUDRESEARCH_CONNECT_API_KEY, CODERABBIT_API_KEY,
+# QUALTRICS_WEBHOOK_SECRET, ghp_/sk- prefixes). Paths only; contents were
+# not inspected or printed during the audit.
+#
+# Paths below are relative to ~/.claude/file-history/.
+#
+# Remediation (user-executed; nothing here is deleted automatically):
+#
+# 1. Delete the affected archives after any review you want:
+#      grep -v '^#' ~/anaiis-dotfiles/reports/file-history-audit.txt | \
+#        xargs -I{} rm "$HOME/.claude/file-history/{}"
+#
+# 2. Rotate every key family named above. These values sat in plaintext
+#    snapshots; rotation is the only way to be sure they are dead:
+#    Twilio, Qualtrics (API key + webhook secret), Netlify, CloudResearch,
+#    CodeRabbit, GitHub (ghp_), and any sk- prefixed API keys.
+#
+# 3. Going forward, the Write/Edit deny rules prevent Claude from editing
+#    secret-bearing files at all, so no new snapshots of them can appear.
+#
+0bae68c5-ac14-42a7-8d7f-bce4a512ba3d/f4aeed182e5be552@v2
+21c4bb6a-9542-454e-8310-7d6f6c9b84b3/0bd0d46a77ca6046@v1
+21c4bb6a-9542-454e-8310-7d6f6c9b84b3/0bd0d46a77ca6046@v2
+21c4bb6a-9542-454e-8310-7d6f6c9b84b3/0bd0d46a77ca6046@v3
+21c4bb6a-9542-454e-8310-7d6f6c9b84b3/0bd0d46a77ca6046@v4
+21c4bb6a-9542-454e-8310-7d6f6c9b84b3/b768075167d4a1f5@v6
+23b0a532-ece5-4be9-bd2f-d5c34b6ae3cf/b768075167d4a1f5@v6
+2be6df35-c911-42a0-b999-03d96990ef37/b768075167d4a1f5@v3
+3725e945-2e04-4fe7-96e3-96a0943b7a30/6c210384904773ce@v1
+3725e945-2e04-4fe7-96e3-96a0943b7a30/6c210384904773ce@v2
+3725e945-2e04-4fe7-96e3-96a0943b7a30/6c210384904773ce@v3
+3725e945-2e04-4fe7-96e3-96a0943b7a30/96f9e510509e381d@v3
+3725e945-2e04-4fe7-96e3-96a0943b7a30/96f9e510509e381d@v4
+3725e945-2e04-4fe7-96e3-96a0943b7a30/b768075167d4a1f5@v1
+3725e945-2e04-4fe7-96e3-96a0943b7a30/b768075167d4a1f5@v2
+386c0cc7-7437-4e3c-bc3e-8598bde0f12a/5de37672ab67eca7@v1
+386c0cc7-7437-4e3c-bc3e-8598bde0f12a/5de37672ab67eca7@v2
+481e3f4a-e8c1-4563-8383-7a36c2016da2/f4aeed182e5be552@v2
+48ac6c4c-9c51-4374-a948-efe4a38754f4/b768075167d4a1f5@v1
+48ac6c4c-9c51-4374-a948-efe4a38754f4/b768075167d4a1f5@v2
+48ac6c4c-9c51-4374-a948-efe4a38754f4/b768075167d4a1f5@v3
+5cfca9e2-cfe8-4c3d-a816-5481330afa21/5de37672ab67eca7@v1
+60c3fb0b-b9d3-48b0-b1e9-fd5015fcdd0a/f7a86d7b5fbf7ef1@v2
+6a34506c-c67c-4f88-aba4-d436ceb68cff/f4aeed182e5be552@v2
+6fc3eb18-06bd-49b1-bb16-2810dd8b6efd/92d00cdc68ea6753@v1
+6fc3eb18-06bd-49b1-bb16-2810dd8b6efd/92d00cdc68ea6753@v2
+6fc3eb18-06bd-49b1-bb16-2810dd8b6efd/f7a86d7b5fbf7ef1@v2
+7c4ff1de-597a-4155-b4e5-157b0d4a3e1a/b768075167d4a1f5@v6
+93ecd861-a706-4f8c-a939-ea4f19926899/5de37672ab67eca7@v1
+93ecd861-a706-4f8c-a939-ea4f19926899/5de37672ab67eca7@v2
+9d4eac8c-4bfa-42ec-808a-730b82bb2514/58434d030caddf7d@v1
+c8240520-52a5-47a9-9d96-215a6f255757/92d00cdc68ea6753@v3
+c8240520-52a5-47a9-9d96-215a6f255757/9998a09d35bf29ff@v2
+c8240520-52a5-47a9-9d96-215a6f255757/cf84eb55166159be@v2
+cc4c3c22-9a49-49f6-8281-b9299a783df8/cf84eb55166159be@v2
+d112a9cd-3798-4a79-bab4-b545382ac233/f4aeed182e5be552@v2
+e6389997-e3a2-4f65-985b-36a03f4e003f/b768075167d4a1f5@v6
+ef8648bf-2d7f-4f62-9c1b-c2a23e8460d5/b768075167d4a1f5@v3
+ef8648bf-2d7f-4f62-9c1b-c2a23e8460d5/f4aeed182e5be552@v1
+ef8648bf-2d7f-4f62-9c1b-c2a23e8460d5/f4aeed182e5be552@v2

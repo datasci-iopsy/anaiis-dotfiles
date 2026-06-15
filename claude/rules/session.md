@@ -28,6 +28,7 @@ See also: `rules/behavioral.md` rule 3 (touch only what you must).
 - Never use Bash(cat), Bash(head), or Bash(tail), use Read with offset/limit.
 - Chain independent read-only shell commands with `&&` in a single Bash call.
 - Prefer Read over Bash(cat) unless piping to another command (e.g., `cat file | jq`).
+- Subagents: reach for an Explore agent only when scope is genuinely uncertain or would span 4+ search tool calls; at most 2 in parallel; prefer sequential in plan mode. Never spawn an agent for file listing, a single-file read, or a targeted search (measured: 3 parallel Explore agents burned 24% of a weekly session).
 
 ### CLI output discipline
 `rtk` is installed and wired via a PreToolUse Bash hook. It auto-intercepts routine commands (git, gh, ls, grep, find, ruff, uv, gcloud, etc.) and reduces output by 60-80%. No action needed for supported commands; the hook runs transparently.

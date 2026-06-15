@@ -60,39 +60,25 @@ brew() {
 	return $_rc
 }
 
-# ── bash-completion ───────────────────────────────────────────────────────────
-if [ -r "$(brew --prefix 2>/dev/null)/etc/profile.d/bash_completion.sh" ]; then
-	. "$(brew --prefix)/etc/profile.d/bash_completion.sh"
-fi
-
-# ── pyenv ─────────────────────────────────────────────────────────────────────
-if [ -d "$HOME/.pyenv" ]; then
-	export PYENV_ROOT="$HOME/.pyenv"
-	export PATH="$PYENV_ROOT/bin:$PATH"
-	eval "$(pyenv init -)"
-	eval "$(pyenv virtualenv-init -)" 2>/dev/null
+# ── bash-completion (interactive shells only) ─────────────────────────────────
+if [[ $- == *i* ]] && [ -n "$_brew_prefix" ] && [ -r "$_brew_prefix/etc/profile.d/bash_completion.sh" ]; then
+	. "$_brew_prefix/etc/profile.d/bash_completion.sh"
 fi
 
 # ── pipx / uv tools ───────────────────────────────────────────────────────────
 [ -d "$HOME/.local/bin" ] && export PATH="$PATH:$HOME/.local/bin"
 
-# ── Google Cloud SDK ──────────────────────────────────────────────────────────
+# ── Google Cloud SDK (PATH always; completion in interactive shells only) ─────
 if [ -f "$HOME/google-cloud-sdk/path.bash.inc" ]; then
 	. "$HOME/google-cloud-sdk/path.bash.inc"
 fi
-if [ -f "$HOME/google-cloud-sdk/completion.bash.inc" ]; then
+if [[ $- == *i* ]] && [ -f "$HOME/google-cloud-sdk/completion.bash.inc" ]; then
 	. "$HOME/google-cloud-sdk/completion.bash.inc"
 fi
 
 # ── direnv ────────────────────────────────────────────────────────────────────
 if command -v direnv >/dev/null 2>&1; then
 	eval "$(direnv hook bash)"
-fi
-
-# ── thefuck ───────────────────────────────────────────────────────────────────
-if command -v thefuck >/dev/null 2>&1; then
-	eval "$(thefuck --alias)"
-	eval "$(thefuck --alias FUCK)"
 fi
 
 # ── Claude Code defaults (override in ~/.bashrc.local per machine) ────────────
@@ -234,13 +220,13 @@ cr-login() {
 	echo "cr-login: authenticated and org set"
 }
 
-# ── API Keys (set in ~/.bashrc.local, never tracked) ─────────────────────────
-# QUALTRICS_API_KEY
-# CODERABBIT_API_KEY, CODERABBIT_ORG_ID
-# NETLIFY_AUTH_TOKEN
-# POSTMAN_API_KEY
-# TWILIO_API_SID, TWILIO_API_KEY
-# CLOUDRESEARCH_CONNECT_API_KEY
+# ── API keys: three tiers, never in shell config (see rules/environment.md) ──
+# Tier 1, CLI-native auth (no env var at all):
+#   gh auth login / coderabbit auth login / postman login --with-api-key
+# Tier 2, cross-project vars: ~/.config/secrets/global.env (chmod 600),
+#   loaded per-project via direnv: add `dotenv ~/.config/secrets/global.env`
+#   to the project's .envrc. (QUALTRICS_*, TWILIO_*, CLOUDRESEARCH_*)
+# Tier 3, project-specific vars: that project's .envrc.
 
 # ── Shell functions ───────────────────────────────────────────────────────────
 mcd() { mkdir -p "$1" && cd "$1"; }

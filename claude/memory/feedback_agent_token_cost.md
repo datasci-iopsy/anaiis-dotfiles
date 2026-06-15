@@ -1,7 +1,8 @@
 ---
-name: Agent token cost calibration
+name: agent-token-cost-calibration
 description: Real-world data on how much Explore agents cost; guidance on when parallelism is worth it
-type: feedback
+metadata:
+  type: feedback
 ---
 
 Avoid spawning multiple broad Explore agents during planning on large codebases. A single "explore the staging layer" Explore agent read 36 files and consumed 58.7k tokens; 3 agents together burned 24% of a weekly session before any implementation began.
