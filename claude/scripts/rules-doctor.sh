@@ -204,7 +204,9 @@ if command -v jq >/dev/null 2>&1 && [ -f "$SETTINGS" ]; then
 		'Read(~/.profile)'
 		'Write(~/.profile)'
 		'Read(~/.aws/**)'
+		'Write(~/.aws/**)'
 		'Read(~/.config/gcloud/**)'
+		'Write(~/.config/gcloud/**)'
 		'Read(~/.config/secrets/**)'
 		'Write(~/.config/secrets/**)'
 	)
