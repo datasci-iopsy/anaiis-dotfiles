@@ -209,8 +209,9 @@ echo "# 7. git rule file content"
 	}
 
 if [ -f "$BRANCHING_RULE" ]; then
-	for section in "Trivial" "Branch reuse" "Worktree" "cleanup" "Pull requests" "claude-<category>/<short-description>"; do
-		if grep -qi "$section" "$BRANCHING_RULE"; then
+	for section in "Branching decision" "Branch reuse" "Worktrees" "Branch cleanup" "Pull requests" "Branch naming"; do
+		escaped=$(printf '%s' "$section" | sed 's/[][\.*^$(){}?+|/-]/\\&/g')
+		if grep -qiE "^#{1,6}[[:space:]].*${escaped}" "$BRANCHING_RULE"; then
 			printf '  PASS  7.x rule contains section: %s\n' "$section"
 			PASS=$((PASS + 1))
 		else
