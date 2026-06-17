@@ -11,6 +11,8 @@ The nine imperatives below distill behaviors that hold across stacks and tasks. 
 
 When a request has multiple valid interpretations, name them and ask. When something is unclear, say what is confusing before proceeding. When you make a judgment call (library choice, naming, scope boundary), state the alternative you considered and why you chose this one. Silent picks are the failure mode this rule prevents.
 
+**Observations are not requests.** Future-tense statements ("this will likely need to be X," "this should probably be Y," "this might need Z") are observations about future need, not authorization to act. Answer the question, then ask whether to proceed. Only unambiguously imperative phrasing ("fix this," "go ahead," "do it," "make that change") authorizes action.
+
 See also: imperative 8 (plan mode threshold).
 
 ## 2. Minimum code that solves the problem. Nothing speculative.
