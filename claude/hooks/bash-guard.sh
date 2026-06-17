@@ -6,7 +6,7 @@
 # 1. Deny destructive bq, gcloud, and uv subcommands that need regex matching
 #    beyond the settings.json deny list.
 # 2. Deny commands referencing protected secrets paths (.env, .ssh, shell rc
-#    files, secrets/ dirs, .pem/.key, credentials) and commands that dump the
+#    files, secrets/ dirs, .pem/\w.key, credentials) and commands that dump the
 #    environment (printenv/env bare, echo/printf of TOKEN/SECRET/KEY vars).
 #    Read()/Write() deny rules cover the file tools; this closes the Bash
 #    side. .env.example and .env.template stay usable.
@@ -72,7 +72,7 @@ fi
 # ── Secrets: protected paths ────────────────────────────────────────────────
 # Strip the allowed template forms first so they never trigger the path match.
 SCRUBBED=$(printf '%s' "$GUARD_STR" | sed -E 's/\.env\.(example|template)//g')
-if printf '%s' "$SCRUBBED" | grep -qE '(\.env\b|\.ssh\b|\.bashrc(\.local)?|\.bash_profile|\.zshrc(\.local)?|\.profile\b|secrets/|\.pem\b|\.key\b|credentials|\.aws\b|\.config/(gcloud|secrets)\b)'; then
+if printf '%s' "$SCRUBBED" | grep -qE '(\.env\b|\.ssh\b|\.bashrc(\.local)?|\.bash_profile|\.zshrc(\.local)?|\.profile\b|secrets/|\.pem\b|\w\.key\b|credentials|\.aws\b|\.config/(gcloud|secrets)\b)'; then
 	printf 'BLOCK: command references a protected secrets path. If a value is needed, ask the user to provide or load it.\n' >&2
 	exit 2
 fi
