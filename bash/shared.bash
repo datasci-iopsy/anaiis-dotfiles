@@ -61,8 +61,8 @@ brew() {
 }
 
 # ── bash-completion (interactive shells only) ─────────────────────────────────
-if [[ $- == *i* ]] && [ -n "$_brew_prefix" ] && [ -r "$_brew_prefix/etc/profile.d/bash_completion.sh" ]; then
-	. "$_brew_prefix/etc/profile.d/bash_completion.sh"
+if [[ $- == *i* ]] && [ -n "$HOMEBREW_PREFIX" ] && [ -r "$HOMEBREW_PREFIX/etc/profile.d/bash_completion.sh" ]; then
+	. "$HOMEBREW_PREFIX/etc/profile.d/bash_completion.sh"
 fi
 
 # ── pipx / uv tools ───────────────────────────────────────────────────────────
