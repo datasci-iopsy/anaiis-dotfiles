@@ -133,10 +133,10 @@ echo "--- 5. GP agents above cap are blocked"
 
 SID_CAP="cost-test-cap-$$-$(date +%s)"
 STAMP_CAP="/tmp/claude-session-${SID_CAP}.gp-count"
-# Pre-seed at the default cap (5) so next spawn is #6 (exceeds limit)
-echo "5" >"$STAMP_CAP"
+# Pre-seed at the default cap (10) so next spawn is #11 (exceeds limit)
+echo "10" >"$STAMP_CAP"
 
-assert_exit "5.1 GP spawn #6 blocked when cap=5" 2 \
+assert_exit "5.1 GP spawn #11 blocked when cap=10" 2 \
 	"$(make_agent_input 'general-purpose' 'over-cap task' "$SID_CAP")"
 
 assert_stderr_contains "5.2 block message emitted" "COST GATE BLOCK" \

@@ -10,7 +10,7 @@
 #   2 = hard block: tool call rejected; Claude must surface and re-decide
 #
 # Per-session GP cap:
-#   COST_GUARD_GP_LIMIT (env var, default 5) caps general-purpose Agent spawns per session_id.
+#   COST_GUARD_GP_LIMIT (env var, default 10) caps general-purpose Agent spawns per session_id.
 #   Counter stamp file: /tmp/claude-session-<session_id>.gp-count
 
 if ! command -v jq &>/dev/null; then
@@ -21,7 +21,7 @@ fi
 INPUT=$(cat)
 TOOL=$(jq -r '.tool_name // empty' 2>/dev/null <<<"$INPUT")
 SESSION_ID=$(jq -r '.session_id // empty' 2>/dev/null <<<"$INPUT")
-GP_LIMIT="${COST_GUARD_GP_LIMIT:-5}"
+GP_LIMIT="${COST_GUARD_GP_LIMIT:-10}"
 
 case "$TOOL" in
 
