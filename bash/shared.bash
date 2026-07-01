@@ -90,22 +90,24 @@ fi
 # so /model picks resolve deterministically across machines.
 export ANTHROPIC_MODEL="opusplan"
 export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-4-8"
-export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-4-6"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-5"
 export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku-4-5-20251001"
 
 # Effort and output sizing; overrides settings.json "effortLevel".
 export CLAUDE_CODE_EFFORT_LEVEL="medium"
 export CLAUDE_CODE_MAX_OUTPUT_TOKENS="32000"
 
+# Privacy-focused, minimal-traffic configuration:
+export DISABLE_TELEMETRY="1"
+export DISABLE_ERROR_REPORTING="1"
+export DISABLE_FEEDBACK_COMMAND="1"
+export DISABLE_AUTOUPDATER="1"
+
 # Bash and API timeouts. Research workflows can hit long-running R or DuckDB
 # commands; raise BASH_MAX_TIMEOUT_MS in ~/.bashrc.local if needed.
 export BASH_DEFAULT_TIMEOUT_MS="120000"
 export BASH_MAX_TIMEOUT_MS="600000"
 export API_TIMEOUT_MS="600000"
-
-# Hygiene: one switch disables auto-updater, feedback prompts, error reporting,
-# and telemetry. Comment out in ~/.bashrc.local if OTel is wanted.
-export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"
 
 # ── Prompt, hostname, directory, git branch ──────────────────────────────────
 git_branch() {
@@ -180,6 +182,8 @@ alias gc-authList='gcloud auth list'
 # ── Claude ────────────────────────────────────────────────────────────────────
 alias claude-fast='claude --permission-mode bypassPermissions'
 alias claude-turbo='CLAUDE_CODE_EFFORT_LEVEL=high claude --permission-mode bypassPermissions'
+alias claude-fable='CLAUDE_CODE_EFFORT_LEVEL=high claude --permission-mode bypassPermissions'
+alias claude-fable-max='CLAUDE_CODE_EFFORT_LEVEL=max claude --permission-mode bypassPermissions'
 
 # ── CodeRabbit ────────────────────────────────────────────────────────────────
 alias cr='coderabbit'
