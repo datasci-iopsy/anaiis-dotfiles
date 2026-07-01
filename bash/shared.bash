@@ -180,10 +180,17 @@ alias gc-auth='gcloud auth login; gcloud auth application-default login'
 alias gc-authList='gcloud auth list'
 
 # ── Claude ────────────────────────────────────────────────────────────────────
-alias claude-fast='claude --permission-mode bypassPermissions'
-alias claude-turbo='CLAUDE_CODE_EFFORT_LEVEL=high claude --permission-mode bypassPermissions'
-alias claude-fable='CLAUDE_CODE_EFFORT_LEVEL=high claude --permission-mode bypassPermissions'
-alias claude-fable-max='CLAUDE_CODE_EFFORT_LEVEL=max claude --permission-mode bypassPermissions'
+# Fast: Sonnet 5, normal effort
+alias claude-fast='claude --model opusplan --permission-mode bypassPermissions'
+
+# Turbo: Sonnet 5, high effort
+alias claude-turbo='CLAUDE_CODE_EFFORT_LEVEL=high claude --model opusplan --permission-mode bypassPermissions'
+
+# Fable: Fable 5, high effort
+alias claude-fable='CLAUDE_CODE_EFFORT_LEVEL=high claude --model claude-fable-5 --permission-mode bypassPermissions'
+
+# Fable max: Fable 5, max effort
+alias claude-fable-max='CLAUDE_CODE_EFFORT_LEVEL=max claude --model claude-fable-5 --permission-mode bypassPermissions'
 
 # ── CodeRabbit ────────────────────────────────────────────────────────────────
 alias cr='coderabbit'
