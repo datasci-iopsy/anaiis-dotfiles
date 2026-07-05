@@ -61,10 +61,10 @@ fi
 # ── Secrets: token-minting commands ─────────────────────────────────────────
 # These commands take no file path (so the protected-path check below never
 # sees them) but their sole output is a live, usable credential.
-if printf '%s' "$CMD" | grep -qE '^gcloud\s+auth\s+print-(access|identity)-token\b' \
-	|| printf '%s' "$CMD" | grep -qE '^aws\s+sts\s+get-(session|federation)-token\b' \
-	|| printf '%s' "$CMD" | grep -qE '^heroku\s+auth:token\b' \
-	|| printf '%s' "$CMD" | grep -qE '^doctl\s+auth\s+token\b'; then
+if printf '%s' "$CMD" | grep -qE '(^|[;&|]\s*)gcloud\s+auth\s+print-(access|identity)-token\b' \
+	|| printf '%s' "$CMD" | grep -qE '(^|[;&|]\s*)aws\s+sts\s+get-(session|federation)-token\b' \
+	|| printf '%s' "$CMD" | grep -qE '(^|[;&|]\s*)heroku\s+auth:token\b' \
+	|| printf '%s' "$CMD" | grep -qE '(^|[;&|]\s*)doctl\s+auth\s+token\b'; then
 	log_secret_block "bash-guard:token-mint" "$CMD"
 	printf 'BLOCK: command mints a live credential/token. Run this manually in terminal if genuinely needed.\n' >&2
 	exit 2
