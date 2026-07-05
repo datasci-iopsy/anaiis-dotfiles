@@ -76,5 +76,5 @@ The following global memory files have not been modified in over 90 days. During
 
 ${STALE}"
 
-jq -n --arg msg "$PAYLOAD" '{"systemMessage": \$msg}'
+jq -n --arg msg "$PAYLOAD" '{"systemMessage": $msg}'
 exit 0
