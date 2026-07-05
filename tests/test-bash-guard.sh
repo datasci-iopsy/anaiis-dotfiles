@@ -115,6 +115,12 @@ assert_block "2b.10 cat zshrc.local" 'cat ~/.zshrc.local' "BLOCK"
 assert_block "2b.11 cat profile" 'cat ~/.profile' "BLOCK"
 assert_block "2b.12 cat gcloud config" 'cat ~/.config/gcloud/application_default_credentials.json' "BLOCK"
 
+echo "# 2c-key. Bare .key dotfiles blocked, no literal-char false positives"
+assert_block "2c-key.1 bare dotfile with tilde slash" 'cat ~/.key' "BLOCK"
+assert_block "2c-key.2 bare dotfile after space" 'cat .key' "BLOCK"
+assert_allow "2c-key.3 word containing s is not a path separator" "echo skeleton"
+assert_allow "2c-key.4 word containing key substring" "echo monkey"
+
 echo "# 2d. Secrets: expanded credential-store paths blocked"
 assert_block "2d.1 netrc" "cat ~/.netrc" "BLOCK"
 assert_block "2d.2 gnupg keyring" "cat ~/.gnupg/pubring.kbx" "BLOCK"
