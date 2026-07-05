@@ -1,0 +1,10 @@
+python3 -c "import os; print(os.getcwd())"
+python3 -c "import os; p=os.getenv('MY_CONFIG_DIR','/tmp'); print(p)"
+python3 script.py
+node build.js
+python3 -c "import os; print(os.path.join(os.getcwd(), 'data'))"
+node -e "console.log(process.version)"
+ruby -e 'puts RUBY_VERSION'
+python3 -c "d = {'ENV_NAME': 'prod'}; print(d)"
+python3 -c "import os; print(os.getenv('LOG_LEVEL', 'info'))"
+python3 analyze.py --env production
