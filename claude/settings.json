@@ -110,7 +110,21 @@
             "Read(~/.config/gcloud/**)",
             "Write(~/.config/gcloud/**)",
             "Read(~/.config/secrets/**)",
-            "Write(~/.config/secrets/**)"
+            "Write(~/.config/secrets/**)",
+            "Read(~/.netrc)",
+            "Write(~/.netrc)",
+            "Read(~/.gnupg/**)",
+            "Write(~/.gnupg/**)",
+            "Read(~/.docker/**)",
+            "Write(~/.docker/**)",
+            "Read(~/.kube/**)",
+            "Write(~/.kube/**)",
+            "Read(~/.npmrc)",
+            "Write(~/.npmrc)",
+            "Read(~/.pypirc)",
+            "Write(~/.pypirc)",
+            "Read(~/.config/gh/**)",
+            "Write(~/.config/gh/**)"
         ],
         "defaultMode": "default",
         "disableAutoMode": "disable"
