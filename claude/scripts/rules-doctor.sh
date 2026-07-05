@@ -253,7 +253,7 @@ SETTINGS_LOCAL="$REPO_DIR/claude/settings.local.json"
 if [ ! -f "$SETTINGS_LOCAL" ]; then
 	ok "I.1 settings.local.json absent, nothing to drift-check"
 elif command -v jq >/dev/null 2>&1; then
-	DRIFT=$(diff <(jq -S '.permissions.deny' "$SETTINGS" 2>/dev/null) <(jq -S '.permissions.deny' "$SETTINGS_LOCAL" 2>/dev/null))
+	DRIFT=$(diff <(jq -cS '.permissions.deny | sort' "$SETTINGS" 2>/dev/null) <(jq -cS '.permissions.deny | sort' "$SETTINGS_LOCAL" 2>/dev/null))
 	if [ -z "$DRIFT" ]; then
 		ok "I.1 settings.local.json deny list matches settings.json"
 	else
