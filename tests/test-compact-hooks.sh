@@ -99,7 +99,9 @@ run_pre_compact() {
 		--arg cwd "$cwd" \
 		'{"trigger": $trigger, "session_id": $session_id, "cwd": $cwd, "hook_event_name": "PreCompact"}')
 	# HOME must be set for bash, not for echo, pipe passes stdin, not env
-	echo "$input" | HOME="$TEST_HOME" bash "$HOOK_DIR/pre-compact.sh" 2>/dev/null
+	# `|| true`: a hook failure must be an assertable test outcome, not a
+	# crash of this harness (which runs under set -e).
+	echo "$input" | HOME="$TEST_HOME" bash "$HOOK_DIR/pre-compact.sh" 2>/dev/null || true
 }
 
 run_post_compact() {
@@ -282,6 +284,29 @@ EOF
 	teardown_test_env
 }
 
+test_pre_compact_sanitizes_unsafe_session_id() {
+	echo
+	echo "── test_pre_compact_sanitizes_unsafe_session_id"
+	setup_test_env
+	# A session_id containing path-traversal/separator characters must not be
+	# used raw in a filesystem path; it should be treated as absent instead.
+	run_pre_compact "manual" "../../tmp/traversal-marker"
+	local handoff_file
+	handoff_file=$(find "$TEST_MEMORY_DIR/handoffs" -maxdepth 1 -name 'handoff_*.md' -type f 2>/dev/null | head -1)
+	assert_file_exists "handoff still written with unsafe session_id" "$handoff_file"
+	if [ -n "$handoff_file" ]; then
+		case "$(basename "$handoff_file")" in
+			*traversal* | *..*)
+				fail "unsafe session_id characters leaked into handoff filename: $(basename "$handoff_file")"
+				;;
+			*)
+				pass "unsafe session_id characters excluded from handoff filename"
+				;;
+		esac
+	fi
+	teardown_test_env
+}
+
 test_pre_compact_empty_cwd() {
 	echo
 	echo "── test_pre_compact_empty_cwd"
@@ -304,6 +329,7 @@ test_pre_compact_no_git_repo
 test_pre_compact_no_transcript
 test_pre_compact_auto_trigger
 test_pre_compact_memory_capped_at_five
+test_pre_compact_sanitizes_unsafe_session_id
 test_post_compact_outputs_system_message
 test_post_compact_no_handoff_exits_cleanly
 test_post_compact_picks_latest_handoff

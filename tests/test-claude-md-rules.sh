@@ -15,6 +15,7 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOCTOR="$REPO_DIR/claude/scripts/rules-doctor.sh"
 CLAUDE_MD="$REPO_DIR/claude/CLAUDE.md"
 SETTINGS="$REPO_DIR/claude/settings.json"
+SETTINGS_LOCAL="$REPO_DIR/claude/settings.local.json"
 BEHAV_MD="$REPO_DIR/claude/rules/behavioral.md"
 
 PASS=0
@@ -50,7 +51,12 @@ BACKUP_BEHAV=$(mktemp)
 cp "$CLAUDE_MD" "$BACKUP_CLAUDE_MD"
 cp "$SETTINGS" "$BACKUP_SETTINGS"
 cp "$BEHAV_MD" "$BACKUP_BEHAV"
-trap 'cp "$BACKUP_CLAUDE_MD" "$CLAUDE_MD"; cp "$BACKUP_SETTINGS" "$SETTINGS"; cp "$BACKUP_BEHAV" "$BEHAV_MD"; rm -f "$BACKUP_CLAUDE_MD" "$BACKUP_SETTINGS" "$BACKUP_BEHAV"' EXIT
+BACKUP_SETTINGS_LOCAL=""
+if [ -f "$SETTINGS_LOCAL" ]; then
+	BACKUP_SETTINGS_LOCAL=$(mktemp)
+	cp "$SETTINGS_LOCAL" "$BACKUP_SETTINGS_LOCAL"
+fi
+trap 'cp "$BACKUP_CLAUDE_MD" "$CLAUDE_MD"; cp "$BACKUP_SETTINGS" "$SETTINGS"; cp "$BACKUP_BEHAV" "$BEHAV_MD"; [ -n "$BACKUP_SETTINGS_LOCAL" ] && cp "$BACKUP_SETTINGS_LOCAL" "$SETTINGS_LOCAL" && rm -f "$BACKUP_SETTINGS_LOCAL"; rm -f "$BACKUP_CLAUDE_MD" "$BACKUP_SETTINGS" "$BACKUP_BEHAV"' EXIT
 
 # ── 1. Doctor passes on green tree ────────────────────────────────────────
 echo "# 1. Doctor on green tree"
@@ -115,6 +121,19 @@ else
 	echo "  SKIP  jq not available"
 fi
 
+# ── 5c. Doctor catches settings.local.json permission drift (check I.1) ───
+echo "# 5c. Local settings permission drift"
+if command -v jq >/dev/null 2>&1 && [ -f "$SETTINGS_LOCAL" ] && jq -e '.permissions.deny | index("Read(~/.netrc)")' "$SETTINGS_LOCAL" >/dev/null 2>&1; then
+	jq '.permissions.deny -= ["Read(~/.netrc)"]' "$SETTINGS_LOCAL" >/tmp/test-rules.local.json \
+		&& mv /tmp/test-rules.local.json "$SETTINGS_LOCAL"
+	bash "$DOCTOR" >/tmp/test-rules.localdrift.out 2>&1
+	assert "5c.1 doctor exits non-zero on local settings drift" "1" "$?"
+	assert_contains "5c.2 doctor reports I.1 drift" "I.1" "$(cat /tmp/test-rules.localdrift.out)"
+	cp "$BACKUP_SETTINGS_LOCAL" "$SETTINGS_LOCAL"
+else
+	echo "  SKIP  jq not available, settings.local.json absent, or Read(~/.netrc) not in its deny list"
+fi
+
 # ── 6. Doctor passes again after all restores ─────────────────────────────
 echo "# 6. Restore"
 bash "$DOCTOR" >/dev/null 2>&1
@@ -123,7 +142,8 @@ assert "6.1 doctor exits 0 after restore" "0" "$?"
 # ── Cleanup tmp files ─────────────────────────────────────────────────────
 rm -f /tmp/test-rules.green.out /tmp/test-rules.dangling.out \
 	/tmp/test-rules.mangled.out /tmp/test-rules.reinject.out \
-	/tmp/test-rules.stale.out /tmp/test-rules.denydrop.out
+	/tmp/test-rules.stale.out /tmp/test-rules.denydrop.out \
+	/tmp/test-rules.localdrift.out
 
 # ── Summary ───────────────────────────────────────────────────────────────
 echo

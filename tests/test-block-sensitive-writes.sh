@@ -12,6 +12,9 @@ set -u
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOOK="$REPO_DIR/claude/hooks/block-sensitive-writes.sh"
 
+TEST_HOME=$(mktemp -d)
+trap 'rm -rf "$TEST_HOME"' EXIT
+
 PASS=0
 FAIL=0
 
@@ -29,7 +32,7 @@ assert_exit() {
 	local label="$1" want="$2" json="$3"
 	local got
 	got=$(
-		printf '%s' "$json" | bash "$HOOK" 2>/dev/null
+		printf '%s' "$json" | HOME="$TEST_HOME" bash "$HOOK" 2>/dev/null
 		echo $?
 	)
 	if [ "$got" = "$want" ]; then
@@ -101,6 +104,35 @@ echo "--- 5. No file_path is a no-op"
 
 assert_exit "5.1 missing file_path passes" 0 \
 	'{"tool_name":"Write","tool_input":{"content":"x"}}'
+
+# ── 6. Secret-access block logging ────────────────────────────────────────────
+
+echo
+echo "--- 6. Secret-access block logging"
+
+LOG_FILE="$TEST_HOME/.claude/logs/secret-access-blocks.log"
+mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null
+touch "$LOG_FILE"
+
+log_lines() { wc -l <"$LOG_FILE" | tr -d ' '; }
+
+BEFORE=$(log_lines)
+printf '%s' "$(make_write_input '/project/.env')" | HOME="$TEST_HOME" bash "$HOOK" >/dev/null 2>&1
+AFTER=$(log_lines)
+if [ "$AFTER" -gt "$BEFORE" ] && tail -1 "$LOG_FILE" | grep -qE $'\twrite-guard:sensitive-file\t'; then
+	pass "6.1 sensitive write block appends a log line"
+else
+	fail "6.1 sensitive write block should append a log line (before=$BEFORE after=$AFTER)"
+fi
+
+BEFORE=$(log_lines)
+printf '%s' "$(make_write_input '/project/README.md')" | HOME="$TEST_HOME" bash "$HOOK" >/dev/null 2>&1
+AFTER=$(log_lines)
+if [ "$AFTER" -eq "$BEFORE" ]; then
+	pass "6.2 allowed write appends no log line"
+else
+	fail "6.2 allowed write should not log (before=$BEFORE after=$AFTER)"
+fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 

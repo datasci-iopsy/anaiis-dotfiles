@@ -1,0 +1,10 @@
+python3 -c "import os; print(os.environ)"
+python3 -c "import os, json; print(json.dumps(dict(os.environ)))"
+node -e "console.log(process.env)"
+ruby -e 'puts ENV.to_h'
+env | base64
+python3 -c "import os; print(os.getenv('ANTHROPIC_API_KEY'))"
+python3 -c "print(os.environ['GITHUB_TOKEN'])"
+node -e "console.log(process.env.OPENAI_API_KEY)"
+ruby -e 'puts ENV["AWS_SECRET_ACCESS_KEY"]'
+python3 -c "import os; [print(k,v) for k,v in os.environ.items()]"

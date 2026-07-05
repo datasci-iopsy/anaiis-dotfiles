@@ -180,10 +180,14 @@ alias gc-auth='gcloud auth login; gcloud auth application-default login'
 alias gc-authList='gcloud auth list'
 
 # ── Claude ────────────────────────────────────────────────────────────────────
-# Fast: Sonnet 5, normal effort
+# bypassPermissions below removes the interactive prompt-mode safety net for
+# anything not already on the allow/deny lists; protection then depends
+# entirely on permissions.deny and the bash-guard/block-sensitive-writes hooks
+# catching it. Deliberate tradeoff for a trusted personal workflow.
+# Fast: opusplan, normal effort
 alias claude-fast='claude --model opusplan --permission-mode bypassPermissions'
 
-# Turbo: Sonnet 5, high effort
+# Turbo: opusplan, high effort
 alias claude-turbo='CLAUDE_CODE_EFFORT_LEVEL=high claude --model opusplan --permission-mode bypassPermissions'
 
 # Fable: Fable 5, high effort

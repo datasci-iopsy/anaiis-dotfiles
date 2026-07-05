@@ -25,8 +25,22 @@ INPUT=$(cat)
 command -v jq >/dev/null 2>&1 || exit 0
 
 CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')
+SESSION_ID=$(printf '%s' "$INPUT" | jq -r '.session_id // empty')
 
 [ -z "$CMD" ] && exit 0
+
+# Append a line to the secret-access block log; best-effort, never blocks.
+log_secret_block() {
+	local surface="$1" detail="$2"
+	local log_dir="$HOME/.claude/logs"
+	local safe_session safe_detail
+	safe_session=$(printf '%s' "${SESSION_ID:-unknown}" | tr -d '\n\r\t')
+	safe_detail=$(printf '%s' "$detail" | tr -d '\n\r\t')
+	mkdir -p "$log_dir" 2>/dev/null
+	printf '%s\t%s\t%s\t%s\n' \
+		"$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$safe_session" "$surface" "$safe_detail" \
+		>>"$log_dir/secret-access-blocks.log" 2>/dev/null || true
+}
 
 # ── Destructive commands ────────────────────────────────────────────────────
 if printf '%s' "$CMD" | grep -qE '^bq\s+rm\b'; then
@@ -41,6 +55,18 @@ fi
 
 if printf '%s' "$CMD" | grep -qE '^uv\s+(cache\s+(clean|prune)|publish|tool\s+uninstall|pip\s+uninstall)'; then
 	printf 'BLOCK: Destructive uv command detected. Run this manually in terminal.\n' >&2
+	exit 2
+fi
+
+# ── Secrets: token-minting commands ─────────────────────────────────────────
+# These commands take no file path (so the protected-path check below never
+# sees them) but their sole output is a live, usable credential.
+if printf '%s' "$CMD" | grep -qE '(^|[;&|]\s*)gcloud\s+auth\s+print-(access|identity)-token\b' \
+	|| printf '%s' "$CMD" | grep -qE '(^|[;&|]\s*)aws\s+sts\s+get-(session|federation)-token\b' \
+	|| printf '%s' "$CMD" | grep -qE '(^|[;&|]\s*)heroku\s+auth:token\b' \
+	|| printf '%s' "$CMD" | grep -qE '(^|[;&|]\s*)doctl\s+auth\s+token\b'; then
+	log_secret_block "bash-guard:token-mint" "$CMD"
+	printf 'BLOCK: command mints a live credential/token. Run this manually in terminal if genuinely needed.\n' >&2
 	exit 2
 fi
 
@@ -72,7 +98,8 @@ fi
 # ── Secrets: protected paths ────────────────────────────────────────────────
 # Strip the allowed template forms first so they never trigger the path match.
 SCRUBBED=$(printf '%s' "$GUARD_STR" | sed -E 's/\.env\.(example|template)//g')
-if printf '%s' "$SCRUBBED" | grep -qE '(\.env\b|\.ssh\b|\.bashrc(\.local)?|\.bash_profile|\.zshrc(\.local)?|\.profile\b|secrets/|\.pem\b|\w\.key\b|credentials|\.aws\b|\.config/(gcloud|secrets)\b)'; then
+if printf '%s' "$SCRUBBED" | grep -qE '(\.env\b|\.ssh\b|\.bashrc(\.local)?|\.bash_profile|\.zshrc(\.local)?|\.profile\b|secrets/|\.pem\b|(^|[/[:space:]])\.?\w*\.key\b|credentials|\.aws\b|\.config/(gcloud|secrets|gh)\b|\.netrc\b|\.gnupg\b|\.docker/config|\.kube/config|\.npmrc\b|\.pypirc\b)'; then
+	log_secret_block "bash-guard:protected-path" "$CMD"
 	printf 'BLOCK: command references a protected secrets path. If a value is needed, ask the user to provide or load it.\n' >&2
 	exit 2
 fi
@@ -81,7 +108,25 @@ fi
 if printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*($|\|)' \
 	|| printf '%s' "$GUARD_STR" | grep -qE 'printenv[[:space:]]+.*(TOKEN|SECRET|API_?KEY|PASSWORD)' \
 	|| printf '%s' "$GUARD_STR" | grep -qE '\b(echo|printf)\b[^|;&]*\$\{?[A-Za-z0-9_]*(TOKEN|SECRET|API_?KEY|PASSWORD)'; then
+	log_secret_block "bash-guard:env-dump" "$CMD"
 	printf 'BLOCK: command would print environment secrets. If a value is needed, ask the user to provide it.\n' >&2
+	exit 2
+fi
+
+# ── Secrets: language-level environment dumps ───────────────────────────────
+# Data-calibrated against tests/fixtures/env-dump/{malicious,benign}.txt (see
+# calibrate.sh): blocks full/untargeted dumps (os.environ printed or dict()'d,
+# .items()/.keys()/.values(), process.env printed bare, ENV.to_h/inspect) plus
+# targeted getenv/index access when it co-occurs with a secret-shaped name
+# (TOKEN/SECRET/API_?KEY/PASSWORD). Ordinary os.getenv('CONFIG_VAR', default)
+# calls with no secret-shaped name pass through.
+if printf '%s' "$CMD" | grep -qE '(os\.environ|process\.env)\)' \
+	|| printf '%s' "$CMD" | grep -qE 'os\.environ\.(items|keys|values)\(\)' \
+	|| printf '%s' "$CMD" | grep -qE '\bENV\.(to_h|inspect)\b' \
+	|| { printf '%s' "$CMD" | grep -qE '(os\.getenv|os\.environ\[|process\.env\.|ENV\[)' \
+		&& printf '%s' "$CMD" | grep -qiE '(TOKEN|SECRET|API_?KEY|PASSWORD)'; }; then
+	log_secret_block "bash-guard:env-dump-lang" "$CMD"
+	printf 'BLOCK: command would print language-level environment secrets (python/node/ruby). If a value is needed, ask the user to provide it.\n' >&2
 	exit 2
 fi
 
