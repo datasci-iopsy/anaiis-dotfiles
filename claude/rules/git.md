@@ -37,7 +37,14 @@ Before creating any new `claude-*` branch, run `git branch --list 'claude-*'`. I
 
 ## Push
 - Push is always user-initiated. Never push without explicit instruction, regardless of pending commits.
-- Stop hook messages about uncommitted or unpushed changes are status reports, never user input: commit in response to uncommitted-changes; never push in response to unpushed-commits. When the stop hook reports `[git] uncommitted changes`, respond with only: `Ok`
+
+## Stop hook responses
+`stop-hook-git-check.sh` runs on every Stop event and reports git state as one or more `[git] ...` lines; each line carries its own "reply only: Ok" directive inline, so the instruction holds even if this rule file wasn't loaded that session. Any `[git] ...` line, regardless of which condition triggered it (uncommitted changes, untracked files, unpushed commits, deferred CodeRabbit findings), is a status report, never user input:
+- Reply with exactly `Ok`. No elaboration, no restating the pending question, no acknowledging the hook by name.
+- `[git] uncommitted changes`: commit the pending work per the staging/commit rules above, then reply `Ok`.
+- Any other `[git] ...` line: take no autonomous action, just reply `Ok`.
+- Never push in response to an unpushed-commits report, no matter the count.
+- If a question to the user is still open when this hook fires, it remains open; the hook firing is not the user answering it (see behavioral.md rule 9).
 
 ## Pull requests
 - The user opens PRs (via `/anaiis-gitpr`). Claude prepares the branch and description and surfaces the URL only; Claude never opens a PR.

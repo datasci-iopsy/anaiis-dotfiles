@@ -25,16 +25,21 @@ if [[ -z "$(git remote)" ]]; then
 	exit 0
 fi
 
+# Every message below is a status report, not a question. The suffix is
+# repeated inline (not just documented in rules/git.md) so the instruction
+# survives even if the rule wasn't loaded or recalled this session.
+REPLY_DIRECTIVE="status report, not a question, reply only: Ok"
+
 # Check for uncommitted changes (both staged and unstaged)
 if ! git diff --quiet || ! git diff --cached --quiet; then
-	echo "[git] uncommitted changes" >&2
+	echo "[git] uncommitted changes ($REPLY_DIRECTIVE)" >&2
 	exit 2
 fi
 
 # Check for untracked files that might be important
 untracked_files=$(git ls-files --others --exclude-standard)
 if [[ -n "$untracked_files" ]]; then
-	echo "[git] untracked files" >&2
+	echo "[git] untracked files ($REPLY_DIRECTIVE)" >&2
 	exit 2
 fi
 
@@ -43,13 +48,13 @@ if [[ -n "$current_branch" ]]; then
 	if git rev-parse "origin/$current_branch" >/dev/null 2>&1; then
 		unpushed=$(git rev-list "origin/$current_branch..HEAD" --count 2>/dev/null) || unpushed=0
 		if [[ "$unpushed" -gt 0 ]]; then
-			echo "[git] $unpushed unpushed commit(s) on '$current_branch'" >&2
+			echo "[git] $unpushed unpushed commit(s) on '$current_branch' ($REPLY_DIRECTIVE, never push unprompted)" >&2
 			exit 2
 		fi
 	else
 		unpushed=$(git rev-list "origin/HEAD..HEAD" --count 2>/dev/null) || unpushed=0
 		if [[ "$unpushed" -gt 0 ]]; then
-			echo "[git] $unpushed unpushed commit(s), no remote for '$current_branch'" >&2
+			echo "[git] $unpushed unpushed commit(s), no remote for '$current_branch' ($REPLY_DIRECTIVE, never push unprompted)" >&2
 			exit 2
 		fi
 	fi
@@ -59,7 +64,7 @@ fi
 DEFERRED="$HOME/.claude/coderabbit-deferred.md"
 if [[ -f "$DEFERRED" ]] && grep -qv '^#' "$DEFERRED" 2>/dev/null && grep -q '[^[:space:]]' "$DEFERRED" 2>/dev/null; then
 	count=$(grep -c '^## ' "$DEFERRED" 2>/dev/null || echo "some")
-	echo "[git] $count deferred CodeRabbit finding(s)" >&2
+	echo "[git] $count deferred CodeRabbit finding(s) ($REPLY_DIRECTIVE)" >&2
 fi
 
 exit 0
