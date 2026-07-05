@@ -3,7 +3,8 @@
 #
 # Confirms: exits 0 on clean repo with no remote; exits 2 for uncommitted
 # changes; exits 2 for untracked files; exits 2 for unpushed commits;
-# exits 0 when up to date with remote; recursion guard exits 0 immediately.
+# exits 0 when up to date with remote; recursion guard exits 0 immediately;
+# every blocking [git] message carries the "reply only: Ok" directive inline.
 #
 # Exit 0 if all tests pass; non-zero on any failure.
 
@@ -38,6 +39,18 @@ assert_exit() {
 	else
 		fail "$label (got exit=$got, want $want)"
 	fi
+}
+
+# Every [git] status line must carry the reply directive inline, so the
+# terse-reply rule holds even in a session where rules/git.md wasn't loaded.
+assert_stderr_has_reply_directive() {
+	local label="$1" dir="$2" json="$3"
+	local stderr_out
+	stderr_out=$(cd "$dir" && printf '%s' "$json" | bash "$HOOK" 2>&1 >/dev/null)
+	case "$stderr_out" in
+		*"reply only: Ok"*) pass "$label" ;;
+		*) fail "$label (stderr missing reply directive: $stderr_out)" ;;
+	esac
 }
 
 CLEAN_INPUT='{"stop_hook_active":false}'
@@ -147,6 +160,7 @@ if [ "$got" = "2" ]; then
 else
 	fail "4.1 unstaged changes should exit 2 (got $got)"
 fi
+assert_stderr_has_reply_directive "4.2 uncommitted-changes message carries reply directive" "$DIRTY" "$CLEAN_INPUT"
 rm -rf "$(dirname "$DIRTY")"
 
 # ── 5. Untracked files blocked ────────────────────────────────────────────────
@@ -166,6 +180,7 @@ if [ "$got" = "2" ]; then
 else
 	fail "5.1 untracked file should exit 2 (got $got)"
 fi
+assert_stderr_has_reply_directive "5.2 untracked-files message carries reply directive" "$UNTRACKED" "$CLEAN_INPUT"
 rm -rf "$(dirname "$UNTRACKED")"
 
 # ── 6. Unpushed commits blocked ───────────────────────────────────────────────
@@ -193,6 +208,7 @@ if [ "$got" = "2" ]; then
 else
 	fail "6.1 unpushed commit should exit 2 (got $got)"
 fi
+assert_stderr_has_reply_directive "6.2 unpushed-commits message carries reply directive" "$UNPUSHED" "$CLEAN_INPUT"
 rm -rf "$(dirname "$UNPUSHED")"
 
 # ── 7. Clean repo with remote exits 0 ────────────────────────────────────────
