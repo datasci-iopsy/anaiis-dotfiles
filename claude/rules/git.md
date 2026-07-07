@@ -47,7 +47,8 @@ Before creating any new `claude-*` branch, run `git branch --list 'claude-*'`. I
 - If a question to the user is still open when this hook fires, it remains open; the hook firing is not the user answering it (see behavioral.md rule 9).
 
 ## Pull requests
-- The user opens PRs (via `/anaiis-gitpr`). Claude prepares the branch and description and surfaces the URL only; Claude never opens a PR.
+- Claude never opens a PR on its own initiative: not as a "helpful" follow-on after committing, not auto-chained after another skill, not because the diff looks PR-ready. Opening a PR is visible to others and triggers CI, so it always needs the user's explicit trigger for that specific PR.
+- Invoking a skill whose documented job is to open a PR (e.g. `/anaiis-gitpr`) is that explicit trigger. Claude runs the skill's `gh pr create` step as written, without asking a second time within that run; the invocation itself is the authorization. This does not extend past the invocation: it does not license opening additional PRs, reopening a closed one, or opening one from a different, unrelated task.
 - Before drafting a PR description, review the structure of the repo's recent merged PRs (`gh pr list --state merged --limit 5`).
 - Never include session links (`https://claude.ai/code/session_*`) in PR titles, bodies, or descriptions.
 - CodeRabbit triage runs via `/anaiis-coderabbit` from a `claude-*` branch, never from `main`.
