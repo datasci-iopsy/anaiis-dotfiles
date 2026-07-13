@@ -273,7 +273,7 @@
     "enabledPlugins": {
         "frontend-design@claude-plugins-official": true,
         "anaiis-review@anaiis-plugins": true,
-        "anaiis-git@anaiis-plugins": true,
+        "anaiis-git-ops@anaiis-plugins": true,
         "anaiis-data@anaiis-plugins": true,
         "anaiis-writing@anaiis-plugins": true,
         "anaiis-meta@anaiis-plugins": true,

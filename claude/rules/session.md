@@ -53,7 +53,7 @@ Output tier is determined by the nature of the task, not by whether a skill is r
 - **Terse** (default): confirmations, status updates, progress, summaries, simple changes, operational actions. 1–3 sentences. Skills that perform operations (git, PR, rebase, code fixes, preflight, DuckDB ad hoc) stay terse.
 - **Standard**: when a change is non-obvious or has tradeoffs worth naming. A short paragraph or a few bullets, no prose padding.
 - **Deliverable**: when the output itself is the product, research synthesis, manuscript review, copyedits, knowledge graphs, skill reviews, doc audits. Write to a file, not terminal. Skills in this tier: anaiis-litreview, anaiis-peerreview, anaiis-copyedit, anaiis-docaudit, anaiis-skillreview, graphify.
-- **anaiis-changelog** is standard tier: its output is structured inline text for copy-paste into a PR description, not a file deliverable.
+- **anaiis-git-ops:changelog** is standard tier: its output is structured inline text for copy-paste into a PR description, not a file deliverable.
 
 Plan mode is its own context: comprehensiveness is appropriate regardless of tier, it exists to surface tradeoffs before committing to work.
 
