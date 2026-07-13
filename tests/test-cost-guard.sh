@@ -9,6 +9,10 @@
 
 set -u
 
+# Isolate from the user's shell config (shared.bash exports this var);
+# section 5 tests the default cap, section 6 sets its own value inline.
+unset COST_GUARD_GP_LIMIT
+
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOOK="$REPO_DIR/claude/hooks/cost-guard.sh"
 
