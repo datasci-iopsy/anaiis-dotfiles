@@ -28,3 +28,4 @@ _archive
 
 # Ephemeral planning artifacts (persisted in ~/.claude/plans/ instead)
 tasks/
+tmp/
