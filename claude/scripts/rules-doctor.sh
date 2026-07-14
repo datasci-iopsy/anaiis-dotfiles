@@ -23,10 +23,6 @@
 #      A rule must state its threshold, not defer to judgment.
 #   H. Secrets denial: settings.json denies the protected Read/Write paths
 #      and does not auto-approve Bash(cat:*), which would bypass them.
-#   I. Local settings drift: settings.local.json's permissions block (if the
-#      gitignored file exists on this machine) matches settings.json's, so a
-#      future deny-list fix can't land in the tracked file while silently
-#      leaving the machine-local copy unprotected.
 #
 # Usage: bash ~/.claude/scripts/rules-doctor.sh
 
@@ -245,22 +241,6 @@ if command -v jq >/dev/null 2>&1 && [ -f "$SETTINGS" ]; then
 	fi
 else
 	fail "H.* prerequisites" "jq missing or settings.json absent"
-fi
-
-# ── I. Local settings drift ─────────────────────────────────────────────────
-echo "## I. Local settings drift"
-SETTINGS_LOCAL="$REPO_DIR/claude/settings.local.json"
-if [ ! -f "$SETTINGS_LOCAL" ]; then
-	ok "I.1 settings.local.json absent, nothing to drift-check"
-elif command -v jq >/dev/null 2>&1; then
-	DRIFT=$(diff <(jq -cS '.permissions.deny | sort' "$SETTINGS" 2>/dev/null) <(jq -cS '.permissions.deny | sort' "$SETTINGS_LOCAL" 2>/dev/null))
-	if [ -z "$DRIFT" ]; then
-		ok "I.1 settings.local.json deny list matches settings.json"
-	else
-		fail "I.1 settings.local.json deny list matches settings.json" "deny list diverges: $(printf '%s' "$DRIFT" | head -5)"
-	fi
-else
-	fail "I.* prerequisites" "jq missing"
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────

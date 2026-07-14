@@ -32,17 +32,6 @@ symlink() {
 	fi
 }
 
-copy_template() {
-	local src="$1" dst="$2"
-	mkdir -p "$(dirname "$dst")"
-	if [ -e "$dst" ]; then
-		echo "  ok   $dst (already exists)"
-	else
-		cp "$src" "$dst"
-		echo "  copy $dst (from template)"
-	fi
-}
-
 echo "=== Canonical path ==="
 if [ "$DOTFILES" != "$CANONICAL" ]; then
 	if [ -e "$CANONICAL" ] && [ ! -L "$CANONICAL" ]; then
@@ -101,19 +90,6 @@ source "$HOME/anaiis-dotfiles/bash/shared.bash"
 fi
 
 echo ""
-echo "=== Claude Code: Machine-local config ==="
-# settings.local.json: the real file lives in the repo dir (gitignored, so
-# still machine-local) and ~/.claude/ holds a symlink to it. Copy-once from
-# the template, then link; copy precedes link so the link never dangles.
-copy_template "$DOTFILES/claude/settings.local.json.template" \
-	"$CANONICAL/claude/settings.local.json"
-symlink "$CANONICAL/claude/settings.local.json" \
-	"$HOME/.claude/settings.local.json"
-# CLAUDE.local.md stays copy-once (edited in place at ~/.claude/).
-copy_template "$DOTFILES/claude/CLAUDE.local.md.template" \
-	"$HOME/.claude/CLAUDE.local.md"
-
-echo ""
 echo "=== Claude Code: graphify (vendored) ==="
 bash "$CANONICAL/claude/scripts/install-graphify.sh"
 
@@ -146,13 +122,11 @@ echo ""
 echo "Cleanup (if upgrading from a prior install):"
 echo "  rm -f \"\$HOME/.mcp.json\"   # the github MCP entry was removed; this clears any dangling symlink"
 echo "  rm -f \"\$HOME/.bashrc\" \"\$HOME/.bash_profile\" \"\$HOME/.bashrc.local\"   # only if these were dotfiles symlinks; back up first"
+echo "  rm -f \"\$HOME/.claude/settings.local.json\" \"\$HOME/.claude/CLAUDE.local.md\"   # dead user-level local-config layer, removed 2026-07 (Claude Code never reads either path)"
 echo ""
 echo "Next steps:"
-echo "  1. Edit ~/.claude/settings.local.json , machine-local model/permissions."
-echo "     Secrets are env vars loaded per-project via direnv, never JSON values."
-echo "  2. Edit ~/.claude/CLAUDE.local.md     , note machine-specific environment"
-echo "  3. Run ~/.claude/scripts/seed-memory.sh from any project root to init memory"
-echo "  4. Run ~/.claude/scripts/install-repo-hooks.sh in repos that need lint hooks"
+echo "  1. Run ~/.claude/scripts/seed-memory.sh from any project root to init memory"
+echo "  2. Run ~/.claude/scripts/install-repo-hooks.sh in repos that need lint hooks"
 echo ""
 echo "=== Suggested tools (not installed by this script) ==="
 echo ""

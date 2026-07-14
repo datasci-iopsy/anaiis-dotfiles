@@ -35,7 +35,7 @@ Rules (`~/.claude/rules/`) constrain Claude's behavior across all tasks. Skills 
 | `rules/dashboards.md` | Dashboard data provenance, manifest discipline, narrative-data alignment, audience language |
 
 ## Machine-local overrides
-`~/.claude/CLAUDE.local.md` (gitignored), machine-specific environment notes.
+Shell-side machine config lives in `~/.bashrc.local` (untracked). For machine-local Claude instructions, create a file under `~/.claude/` and import it from this file with `@~/.claude/<name>.md`; Claude Code does not read any user-level `CLAUDE.local.md` or `settings.local.json`.
 
 ## Memory tiers
 Two tiers, both auto-loaded:

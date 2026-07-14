@@ -6,9 +6,7 @@
 
 **The "anaiis-" prefix** is the namespace for this repo's custom skills, distinct from upstream Anthropic skills (which keep their unprefixed names). When you see `/anaiis-litreview` or `/anaiis-duckdb`, that's a custom skill defined in `claude/skills/`.
 
-**Two-machine model.** The same repo is checked out on personal and work machines. Machine-local config lives in two gitignored files: `claude/settings.local.json` (real file in the repo dir, symlinked to `~/.claude/settings.local.json` so it is editable in the IDE yet never tracked) and `~/.claude/CLAUDE.local.md` (copied once by `install.sh`). Secrets are never stored in either; they are environment variables loaded per-project via direnv (see `rules/environment.md`).
-
-Both are gitignored from this repo by virtue of being outside it. Your shell config and any other machine-local secrets are your concern, not this repo's.
+**Two-machine model.** The same repo is checked out on personal and work machines. `claude/settings.json` (symlinked to `~/.claude/settings.json`) is the single tracked source of truth for Claude Code config on both; Claude Code reads no user-level `settings.local.json` or `CLAUDE.local.md`, so this repo ships neither. Machine-local shell config and secrets live in `~/.bashrc.local` (untracked); secrets are environment variables loaded per-project via direnv (see `rules/environment.md`). Machine-local Claude instructions, when needed, are files under `~/.claude/` imported explicitly from `claude/CLAUDE.md` with `@~/.claude/<name>.md`.
 
 **Audit artifacts.** The current state of this repo is the result of a 5-advisor LLM Council audit on 2026-04-29. The full transcript, visual report, and remediation plan are archived in `_archive/`: `council-report-2026-04-29.html`, `council-transcript-2026-04-29.md` (gitignored; exists only on machines where the audit was originally run). They explain *why* the structure looks the way it does.
 
@@ -33,16 +31,13 @@ anaiis-dotfiles/
 ├── README.md                       This file
 ├── .lintr                          → ~/.lintr   Global R style config
 ├── .env.example                    Structural template, this repo consumes nothing from .env
-├── bashrc.local.template           Copy-once template for machine-local bash additions
 ├── bash/
 │   └── shared.bash                 Shared bash helpers sourced by hook and test scripts
 ├── bin/
 │   └── web-verify                  CLI wrapper: serve + Playwright verify + teardown
 ├── claude/
 │   ├── CLAUDE.md                   → ~/.claude/CLAUDE.md   Short index; rules live in rules/
-│   ├── CLAUDE.local.md.template    Copy-once template for machine-local Claude notes
 │   ├── settings.json               → ~/.claude/settings.json   Permissions, hooks, model, status line
-│   ├── settings.local.json.template  Copy-once template for machine-local settings
 │   ├── keybindings.json            → ~/.claude/keybindings.json   shift+enter / alt+enter = newline
 │   ├── rules/                      → ~/.claude/rules/   Behavioral constraints (auto-loaded)
 │   ├── commands/                   → ~/.claude/commands/   Custom slash commands
@@ -101,10 +96,7 @@ cd ~/anaiis-dotfiles && git submodule update --init --recursive
 bash ~/anaiis-dotfiles/install.sh
 ```
 
-Each line prints `ok` (already linked), `link` (newly created), or `SKIP` (real file present, back up and remove first). Machine-local config is seeded copy-once from templates and never overwritten on subsequent runs:
-
-- `claude/settings.local.json` (gitignored; symlinked to `~/.claude/settings.local.json`), machine-local model and permission overrides; no secrets
-- `~/.claude/CLAUDE.local.md`, machine-specific environment notes
+Each line prints `ok` (already linked), `link` (newly created), or `SKIP` (real file present, back up and remove first).
 
 ### 3. Add bin/ to PATH (required for web-verify)
 
