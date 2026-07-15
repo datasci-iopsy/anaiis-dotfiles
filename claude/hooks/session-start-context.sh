@@ -47,8 +47,8 @@ $(cat "$INDEX")
 
 	while IFS= read -r f; do
 		target="$GLOBAL_DIR/$f"
-		# Guard against path traversal: target must resolve under GLOBAL_DIR.
-		case "$target" in "$GLOBAL_DIR/"*) ;; *) continue ;; esac
+		# Guard against path traversal.
+		case "$f" in *"/"* | *".."*) continue ;; esac
 		if [ -f "$target" ] && [ "$f" != "MEMORY.md" ]; then
 			GLOBAL_PAYLOAD="$GLOBAL_PAYLOAD
 ### $f
@@ -69,7 +69,7 @@ case "$SOURCE" in
 		if [ -n "$CWD" ]; then
 			PROJECT_KEY=$(printf '%s' "$CWD" | tr '/.' '-')
 			HANDOFFS_DIR="$HOME/.claude/projects/$PROJECT_KEY/memory/handoffs"
-			LATEST_HANDOFF=$(find "$HANDOFFS_DIR" -maxdepth 1 -name 'handoff_*.md' -type f 2>/dev/null | sort -r | head -1 || echo "")
+			LATEST_HANDOFF=$(ls -t "$HANDOFFS_DIR"/handoff_*.md 2>/dev/null | head -1 || echo "")
 			if [ -n "$LATEST_HANDOFF" ] && [ -f "$LATEST_HANDOFF" ]; then
 				EXTRA_PAYLOAD="## Restored from pre-compact handoff
 
