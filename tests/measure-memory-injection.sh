@@ -30,12 +30,14 @@ MEAS_SID="measure-$$-$(date +%s)"
 MEAS_INPUT=$(jq -n --arg sid "$MEAS_SID" --arg cwd "$(pwd)" \
 	'{"source": "startup", "session_id": $sid, "cwd": $cwd, "hook_event_name": "SessionStart"}')
 
-RESULT=$(printf '%s' "$MEAS_INPUT" | bash "$HOOK" 2>/dev/null) || RESULT=""
-
-if [ -n "$RESULT" ]; then
-	GLOBAL_MSG=$(printf '%s' "$RESULT" | jq -r '.hookSpecificOutput.additionalContext // ""' 2>/dev/null)
-else
-	GLOBAL_MSG=""
+if ! RESULT=$(printf '%s' "$MEAS_INPUT" | bash "$HOOK" 2>/dev/null); then
+	echo "  SKIP  SessionStart hook failed"
+	exit 0
+fi
+if ! GLOBAL_MSG=$(printf '%s' "$RESULT" \
+	| jq -er '.hookSpecificOutput.additionalContext | strings | select(length > 0)' 2>/dev/null); then
+	echo "  SKIP  hook returned no valid additionalContext payload"
+	exit 0
 fi
 
 GLOBAL_BYTES=$(printf '%s' "$GLOBAL_MSG" | wc -c | tr -d ' ')
