@@ -53,18 +53,25 @@ assert_contains() {
 # directory in its place on the next mkdir. BSD find (macOS default) also
 # will not descend into a symlink given as its own starting argument, so
 # operate on the realpath-resolved target, not the symlink path.
-GLOBAL_REAL="$(realpath "$GLOBAL_DIR")"
+if ! GLOBAL_REAL="$(realpath "$GLOBAL_DIR")" || [ -z "$GLOBAL_REAL" ]; then
+	echo "Unable to resolve global memory directory" >&2
+	exit 1
+fi
 BACKUP_DIR=$(mktemp -d)
-cp -R "$GLOBAL_REAL"/. "$BACKUP_DIR"/ 2>/dev/null
+OUT_DIR=$(mktemp -d)
+if ! cp -R "$GLOBAL_REAL"/. "$BACKUP_DIR"/; then
+	rm -rf "$BACKUP_DIR" "$OUT_DIR"
+	exit 1
+fi
 restore_global() {
-	find "$GLOBAL_REAL" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null
-	cp -R "$BACKUP_DIR"/. "$GLOBAL_REAL"/ 2>/dev/null
+	find "$GLOBAL_REAL" -mindepth 1 -maxdepth 1 -exec rm -rf {} + \
+		&& cp -R "$BACKUP_DIR"/. "$GLOBAL_REAL"/
 }
-trap 'restore_global; rm -rf "$BACKUP_DIR"' EXIT
+trap 'restore_global; rm -rf "$BACKUP_DIR" "$OUT_DIR"' EXIT
 
 # ── 0. Doctor passes on the green tree ────────────────────────────────────
 echo "# 0. Doctor on green tree"
-bash "$DOCTOR" >/tmp/test-mdg.green.out 2>&1
+bash "$DOCTOR" >"$OUT_DIR/green.out" 2>&1
 assert "0.1 doctor exits 0 on green tree" "0" "$?"
 
 # ── 1. Cross-tier basename collision (check I) ────────────────────────────
@@ -86,9 +93,9 @@ for candidate in "$GLOBAL_DIR"/*.md; do
 done
 if [ -n "$GLOBAL_BASENAME" ]; then
 	printf 'collision fixture' >"$T1_MEM/$GLOBAL_BASENAME"
-	bash "$DOCTOR" >/tmp/test-mdg.collision.out 2>&1
+	bash "$DOCTOR" >"$OUT_DIR/collision.out" 2>&1
 	assert "1.1 doctor exits non-zero on cross-tier collision" "1" "$?"
-	assert_contains "1.2 doctor names the collision check" "I.1 cross-tier collision" "$(cat /tmp/test-mdg.collision.out)"
+	assert_contains "1.2 doctor names the collision check" "I.1 cross-tier collision" "$(cat "$OUT_DIR/collision.out")"
 else
 	echo "  SKIP  no global topical file to collide with"
 fi
@@ -98,26 +105,26 @@ rm -rf "$T1_PROJ" "$PROJECTS_DIR/${T1_KEY:?}"
 echo "# 2. Unlinked global memory file"
 printf -- '---\nname: orphan-fixture\ndescription: test\nmetadata:\n  type: feedback\n---\n\norphan\n' \
 	>"$GLOBAL_DIR/zz_test_orphan_fixture.md"
-bash "$DOCTOR" >/tmp/test-mdg.unlinked.out 2>&1
+bash "$DOCTOR" >"$OUT_DIR/unlinked.out" 2>&1
 assert "2.1 doctor exits non-zero on unlinked file" "1" "$?"
-assert_contains "2.2 doctor names J.1 unlinked files" "J.1 unlinked files" "$(cat /tmp/test-mdg.unlinked.out)"
+assert_contains "2.2 doctor names J.1 unlinked files" "J.1 unlinked files" "$(cat "$OUT_DIR/unlinked.out")"
 rm -f "$GLOBAL_DIR/zz_test_orphan_fixture.md"
 
 # ── 3. Dead link (check J.2) ───────────────────────────────────────────────
 echo "# 3. Dead link in index"
 printf '\n- [Dangling](zz_test_nonexistent.md) -- fixture\n' >>"$INDEX"
-bash "$DOCTOR" >/tmp/test-mdg.deadlink.out 2>&1
+bash "$DOCTOR" >"$OUT_DIR/deadlink.out" 2>&1
 assert "3.1 doctor exits non-zero on dead link" "1" "$?"
-assert_contains "3.2 doctor names J.2 dead links" "J.2 dead links" "$(cat /tmp/test-mdg.deadlink.out)"
+assert_contains "3.2 doctor names J.2 dead links" "J.2 dead links" "$(cat "$OUT_DIR/deadlink.out")"
 restore_global
 
 # ── 4. Filename lint (check K) ─────────────────────────────────────────────
 echo "# 4. Filename the index-link regex cannot match"
 printf -- '---\nname: bad-name-fixture\ndescription: test\nmetadata:\n  type: feedback\n---\n\nfixture\n' \
 	>"$GLOBAL_DIR/zz test with spaces.md"
-bash "$DOCTOR" >/tmp/test-mdg.badname.out 2>&1
+bash "$DOCTOR" >"$OUT_DIR/badname.out" 2>&1
 assert "4.1 doctor exits non-zero on unmatchable filename" "1" "$?"
-assert_contains "4.2 doctor names K.1 filename lint" "K.1 filename lint" "$(cat /tmp/test-mdg.badname.out)"
+assert_contains "4.2 doctor names K.1 filename lint" "K.1 filename lint" "$(cat "$OUT_DIR/badname.out")"
 rm -f "$GLOBAL_DIR/zz test with spaces.md"
 
 # ── 5. Payload budget (check L) ────────────────────────────────────────────
@@ -125,9 +132,9 @@ echo "# 5. Payload exceeds the 2k token budget"
 python3 -c "print('x' * 8000)" >"$GLOBAL_DIR/zz_test_oversized.md" 2>/dev/null \
 	|| yes x | head -c 8000 >"$GLOBAL_DIR/zz_test_oversized.md"
 printf '\n- [Oversized](zz_test_oversized.md) -- fixture\n' >>"$INDEX"
-bash "$DOCTOR" >/tmp/test-mdg.budget.out 2>&1
+bash "$DOCTOR" >"$OUT_DIR/budget.out" 2>&1
 assert "5.1 doctor exits non-zero over the 2k token budget" "1" "$?"
-assert_contains "5.2 doctor names L.1 payload budget" "L.1 payload budget" "$(cat /tmp/test-mdg.budget.out)"
+assert_contains "5.2 doctor names L.1 payload budget" "L.1 payload budget" "$(cat "$OUT_DIR/budget.out")"
 restore_global
 
 # ── 6. Pending migration (check M) ─────────────────────────────────────────
@@ -137,9 +144,9 @@ T6_KEY=$(printf '%s' "$T6_PROJ" | tr '/.' '-')
 T6_MEM="$PROJECTS_DIR/$T6_KEY/memory"
 mkdir -p "$T6_MEM"
 printf 'unmigrated stub' >"$T6_MEM/user_pending_fixture.md"
-bash "$DOCTOR" >/tmp/test-mdg.pending.out 2>&1
+bash "$DOCTOR" >"$OUT_DIR/pending.out" 2>&1
 assert "6.1 doctor exits non-zero on pending migration" "1" "$?"
-assert_contains "6.2 doctor names M.1 pending migration" "M.1 pending migration" "$(cat /tmp/test-mdg.pending.out)"
+assert_contains "6.2 doctor names M.1 pending migration" "M.1 pending migration" "$(cat "$OUT_DIR/pending.out")"
 rm -rf "$T6_PROJ" "$PROJECTS_DIR/${T6_KEY:?}"
 
 # ── 7. Receipt detection (check H) ─────────────────────────────────────────
@@ -189,8 +196,6 @@ rm -rf "$T7_TRANSCRIPTS"
 echo "# 8. Restore"
 bash "$DOCTOR" >/dev/null 2>&1
 assert "8.1 doctor exits 0 after restore" "0" "$?"
-
-rm -f /tmp/test-mdg.*.out
 
 # ── Summary ───────────────────────────────────────────────────────────────
 echo
