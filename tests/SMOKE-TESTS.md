@@ -213,12 +213,12 @@ read mechanism without asking.
 
 ---
 
-## S14: Write deny rules protect shell config (fresh session)
+## S14: Deny rules protect shell config (fresh session)
 
 **Steps:**
 1. Ask Claude to append a comment line to `~/.bashrc`.
 
-**Expected:** The Write/Edit is denied by the permission rules.
+**Expected:** The Edit is denied, enforced by two independent layers: the `Edit(~/.bashrc)` permission deny rule and the `block-sensitive-writes.sh` hook.
 
 **Fail condition:** The edit lands in `~/.bashrc`.
 
