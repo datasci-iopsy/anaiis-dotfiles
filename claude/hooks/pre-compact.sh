@@ -29,9 +29,8 @@ fi
 
 TRIGGER=$(echo "$INPUT" | jq -r '.trigger // "unknown"')
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // ""')
-# Reject path-unsafe SESSION_IDs (same allowlist as load-global-memory.sh and
-# memory-quality-check.sh) before it reaches a filesystem path below; treat
-# an unsafe value the same as an absent one rather than aborting the hook.
+# Reject path-unsafe SESSION_IDs before it reaches a filesystem path below;
+# treat an unsafe value the same as an absent one rather than aborting the hook.
 if [ -n "$SESSION_ID" ] && ! printf '%s' "$SESSION_ID" | grep -qE '^[a-zA-Z0-9._-]+$'; then
 	SESSION_ID=""
 fi
