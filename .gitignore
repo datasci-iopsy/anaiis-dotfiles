@@ -27,5 +27,6 @@ Brewfile.lock.json
 _archive
 
 # Ephemeral planning artifacts (persisted in ~/.claude/plans/ instead)
+spec/
 tasks/
 tmp/
