@@ -108,10 +108,10 @@ if [ -f "$BEHAV_MD" ]; then
 		fail "C.2 H1 title" "first non-frontmatter line is not '# Title'"
 	fi
 	H2_CT=$(grep -cE '^## [0-9]+\.' "$BEHAV_MD" || true)
-	if [ "${H2_CT:-0}" -ge 9 ]; then
-		ok "C.3 has $H2_CT numbered H2 imperatives (>= 9)"
+	if [ "${H2_CT:-0}" -ge 10 ]; then
+		ok "C.3 has $H2_CT numbered H2 imperatives (>= 10)"
 	else
-		fail "C.3 H2 imperatives" "expected at least 9, found ${H2_CT:-0}"
+		fail "C.3 H2 imperatives" "expected at least 10, found ${H2_CT:-0}"
 	fi
 else
 	fail "C.1 rules/behavioral.md" "missing: $BEHAV_MD"

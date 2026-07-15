@@ -16,7 +16,7 @@ N="${1:-5}"
 HOOKS=(
 	"$REPO_DIR/claude/hooks/maintenance-check.sh"
 	"$REPO_DIR/claude/hooks/ensure-repo-hooks.sh"
-	"$REPO_DIR/claude/hooks/load-global-memory.sh"
+	"$REPO_DIR/claude/hooks/list-merged-claude-branches.sh"
 )
 
 # Synthetic UserPromptSubmit input, what Claude Code sends to hooks.

@@ -8,21 +8,36 @@
 #      Heuristic: file basename matches user_*.md, feedback_jq_*.md,
 #      feedback_memory_workflow*.md, or feedback_agent_token_cost*.md.
 #      If a target already exists in the global tier, the newer-by-mtime
-#      copy wins.
+#      copy wins, UNLESS the candidate's content matches a known
+#      memory-templates/ stub (current or retired), in which case it is
+#      refused outright: a freshly seeded template file always has a newer
+#      mtime than a curated real file, and would otherwise silently clobber
+#      it (demonstrated in tmp/memory-system-review-2026-07-15.md gap G3).
 #
 #   2. Handoff subdirectory: any flat handoff_*.md files at the top level
 #      of a project memory dir are moved into that project's handoffs/
 #      subdirectory.
 #
+# Defaults to a dry run; pass --apply to actually write changes. --dry-run
+# is accepted as an explicit synonym for the default.
+#
 # Idempotent: re-running is a no-op once both transformations have completed.
 # Reports actions taken; non-zero exit means an unexpected error.
 #
-# Usage: bash ~/.claude/scripts/migrate-memory.sh [--dry-run]
+# Usage: bash ~/.claude/scripts/migrate-memory.sh [--apply|--dry-run]
 
 set -euo pipefail
 
-DRY_RUN=false
-[ "${1:-}" = "--dry-run" ] && DRY_RUN=true
+DRY_RUN=true
+case "${1:-}" in
+	--apply) DRY_RUN=false ;;
+	--dry-run | "") DRY_RUN=true ;;
+	*)
+		echo "Unknown argument: ${1}" >&2
+		echo "Usage: bash ~/.claude/scripts/migrate-memory.sh [--apply|--dry-run]" >&2
+		exit 1
+		;;
+esac
 
 SCRIPT_REAL="$(realpath "${BASH_SOURCE[0]}")"
 DOTFILES="$(cd "$(dirname "$SCRIPT_REAL")/../.." && pwd)"
@@ -48,6 +63,38 @@ is_user_level() {
 	return 1
 }
 
+# Checksums (sha256) of known project-tier template stubs: current templates
+# in claude/memory-templates/ plus the pre-slim stubs retired when the
+# global-tier templates were removed from that directory. A candidate whose
+# content matches any of these is unedited placeholder text, never a
+# genuine, promotable user fact.
+TEMPLATE_STUB_CHECKSUMS=(
+	"ba82258e9dbd44315d830cd4e23a05824d8d29b855b1a0cabfecb61e8b9fb0e8" # retired user_profile.md stub
+	"becdd14fc0cffced38f8e74a35630fe8ae7e2fc2b60ca406dda35cbb4eb43202" # retired feedback_environment.md stub
+	"f2defe835860f0a65e7ae5b3b7aabb6f79705a8057bdf7747096836e14183d45" # retired feedback_plan_mode.md stub
+	"be071686817f4953f4b8ce4e92bcec03ea609627c08aee267f51c814fee52187" # retired feedback_shell_config.md stub
+	"72ce1dfd7c7109b80ba0917a88af92e92f2eb73c5770e69fc3598cfaa57a71d4" # retired reference_global_config.md stub
+)
+
+is_template_stub() {
+	local f="$1"
+	local sum
+	sum=$(shasum -a 256 "$f" 2>/dev/null | cut -d' ' -f1)
+	[ -n "$sum" ] || return 1
+	local known
+	for known in "${TEMPLATE_STUB_CHECKSUMS[@]}"; do
+		[ "$sum" = "$known" ] && return 0
+	done
+	if [ -d "$DOTFILES/claude/memory-templates" ]; then
+		local tmpl
+		for tmpl in "$DOTFILES/claude/memory-templates"/*.md; do
+			[ -f "$tmpl" ] || continue
+			[ "$sum" = "$(shasum -a 256 "$tmpl" 2>/dev/null | cut -d' ' -f1)" ] && return 0
+		done
+	fi
+	return 1
+}
+
 action() {
 	if $DRY_RUN; then
 		echo "  WOULD: $*"
@@ -70,6 +117,7 @@ fi
 # ── 2. Promote user-level files from each project memory dir ──────────────
 PROMOTED=0
 SKIPPED=0
+REFUSED=0
 [ -d "$PROJECTS_DIR" ] || { echo "No projects dir at $PROJECTS_DIR; skipping promotion."; }
 
 if [ -d "$PROJECTS_DIR" ]; then
@@ -80,6 +128,12 @@ if [ -d "$PROJECTS_DIR" ]; then
 			fn="$(basename "$f")"
 			[ "$fn" = "MEMORY.md" ] && continue
 			is_user_level "$fn" || continue
+
+			if is_template_stub "$f"; then
+				action "refuse (unedited template stub) $f"
+				REFUSED=$((REFUSED + 1))
+				continue
+			fi
 
 			target="$GLOBAL_DIR/$fn"
 			if [ -f "$target" ]; then
@@ -187,6 +241,7 @@ echo "Memory migration summary"
 $DRY_RUN && echo "(DRY RUN, no changes written)"
 echo "  user-level files promoted to global tier:  $PROMOTED"
 echo "  user-level files skipped (older copy):     $SKIPPED"
+echo "  user-level files refused (template stub):  $REFUSED"
 echo "  flat handoffs moved into handoffs/ subdir: $HANDOFFS_MOVED"
 echo "  project MEMORY.md indexes cleaned:         $INDEXES_CLEANED"
 echo "──────────────────────────────────────────────"

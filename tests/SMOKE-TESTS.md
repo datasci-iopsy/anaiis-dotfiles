@@ -248,8 +248,9 @@ Run these yourself in a plain terminal after migrating keys per
    `direnv exec . sh -c 'test -n "$QUALTRICS_API_KEY" && echo loaded'`.
 3. Tier 2 scoping: outside any project, `printenv QUALTRICS_API_KEY`
    returns nothing.
-4. Rotate the key families listed in `reports/file-history-audit.txt` and
-   delete the archives it lists.
+4. Rotate the key families listed in `tmp/file-history-audit.txt` and
+   delete the archives it lists. This file is untracked (gitignored) and
+   local to whichever machine it was generated on; it does not sync via git.
 
 **Expected:** 1-2 succeed; 3 prints nothing; 4 completed once.
 

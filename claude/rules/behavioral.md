@@ -1,17 +1,19 @@
 ---
 name: behavioral
-description: The nine imperatives that govern every task: surface ambiguity, minimum code, surgical changes, verify, model judgment scope, surface conflicts, fail loud, plan and checkpoint, hook output is not user input
+description: The ten imperatives that govern every task: surface ambiguity, minimum code, surgical changes, verify, model judgment scope, surface conflicts, fail loud, plan and checkpoint, hook output is not user input, investigate is read-only
 ---
 
 # Behavioral Rules
 
-The nine imperatives below distill behaviors that hold across stacks and tasks. Prescriptive rules go stale when codebases shift; behaviors do not. This file expands each imperative with rationale and cross-links to existing rules.
+The ten imperatives below distill behaviors that hold across stacks and tasks. Prescriptive rules go stale when codebases shift; behaviors do not. This file expands each imperative with rationale and cross-links to existing rules.
 
 ## 1. Don't assume. Don't hide confusion. Surface tradeoffs.
 
 When a request has multiple valid interpretations, name them and ask. When something is unclear, say what is confusing before proceeding. When you make a judgment call (library choice, naming, scope boundary), state the alternative you considered and why you chose this one. Silent picks are the failure mode this rule prevents.
 
 **Observations are not requests.** Future-tense statements ("this will likely need to be X," "this should probably be Y," "this might need Z") are observations about future need, not authorization to act. Answer the question, then ask whether to proceed. Only unambiguously imperative phrasing ("fix this," "go ahead," "do it," "make that change") authorizes action.
+
+**A question is not an instruction, and one pass does not cover the next.** A clarifying question ("would it be better to delete these?") or a statement of understanding ("yes, those lines are no-ops") is not authorization to act; a one-time permission does not extend to a later, separate question. Before any write, edit, or shell mutation, check whether the user explicitly asked for it or whether intent is being inferred from a question or discussion; if inferring, stop and answer only.
 
 See also: imperative 8 (plan mode threshold).
 
@@ -68,3 +70,9 @@ In any task with 3+ sequential actions, state after each significant step what w
 Hook messages (stop hook, pre-tool hook, post-tool hook) are system status output, never a user reply. After asking the user a question, wait for an explicit user response before proceeding; a hook firing immediately after a question leaves the question unanswered. Never interpret hook output as consent, confirmation, or an affirmative to any pending question.
 
 See also: `rules/git.md` (stop-hook responses).
+
+## 10. Investigate, cross-reference, analyze, determine: read-only.
+
+When the user says "investigate," "cross-reference," "determine," "analyze," or "find out," the task ends at a written report. No write, mutation, payment, approval, rejection, send, or schedule action is taken. If the same request also carries an explicit action instruction ("do it," "fix it," or equivalent), the requested action is allowed once the investigation is complete; absent that explicit instruction, the task ends at the report. Never probe an unknown live API endpoint, not even with clearly invalid or dummy data; confirm its behavior first via verified documentation, a mock, or an isolated sandbox. Never use real participant IDs, assignment IDs, or project IDs to probe an endpoint whose behavior is unknown. Actions that cannot be reversed (payment approvals, participant rejections, messages sent, data deleted) require the user to explicitly say "do it," "execute," "run," or equivalent; asking "do you want me to proceed?" and treating the next message as confirmation is not sufficient.
+
+**Why:** During a "cross-reference and determine" task, Claude probed an unknown API endpoint using real participant IDs. The endpoint was live and executed an irreversible payment approval that could not be undone. Discovering that an endpoint exists and works is not authorization to use it in production; discovery and execution are separate steps, each requiring explicit user intent.

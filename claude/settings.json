@@ -155,23 +155,18 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "bash $HOME/.claude/hooks/load-global-memory.sh"
-                    }
-                ]
-            },
-            {
-                "hooks": [
-                    {
-                        "type": "command",
                         "command": "bash $HOME/.claude/hooks/list-merged-claude-branches.sh"
                     }
                 ]
-            },
+            }
+        ],
+        "SessionStart": [
             {
+                "matcher": "startup|resume|clear|compact",
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "bash $HOME/.claude/hooks/memory-quality-check.sh"
+                        "command": "bash $HOME/.claude/hooks/session-start-context.sh"
                     }
                 ]
             }
@@ -183,6 +178,15 @@
                     {
                         "type": "command",
                         "command": "bash $HOME/.claude/hooks/post-edit-lint.sh"
+                    }
+                ]
+            },
+            {
+                "matcher": "*",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash $HOME/.claude/hooks/context-watch.sh"
                     }
                 ]
             }
@@ -250,17 +254,6 @@
                     {
                         "type": "command",
                         "command": "bash $HOME/.claude/hooks/pre-compact.sh"
-                    }
-                ]
-            }
-        ],
-        "PostCompact": [
-            {
-                "matcher": "*",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "bash $HOME/.claude/hooks/post-compact.sh"
                     }
                 ]
             }

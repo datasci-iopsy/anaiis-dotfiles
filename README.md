@@ -45,7 +45,7 @@ anaiis-dotfiles/
 │   ├── agents/                     → ~/.claude/agents/   Specialized sub-agents
 │   ├── hooks/                      → ~/.claude/hooks/   Hook scripts (referenced by settings.json)
 │   ├── scripts/                    → ~/.claude/scripts/   Utility scripts
-│   └── memory-templates/           Templates copied per-project by seed-memory.sh
+│   └── memory-templates/           Project-tier templates copied by seed-memory.sh (MEMORY.md, project_current_phase.md)
 ├── templates/
 │   ├── dashboard/                  anaiis-dashboard: manifest validator, bootstrap.js, inline helper, Playwright spec
 │   ├── playwright-plotly/          Plotly render template (render.py + index.html.tmpl)
@@ -61,14 +61,19 @@ anaiis-dotfiles/
 │   ├── test-block-sensitive-writes.sh   block-sensitive-writes.sh deny/allow assertions
 │   ├── test-branching.sh           Trivial-edit criteria and branch-reuse logic
 │   ├── test-claude-md-rules.sh     Validates CLAUDE.md rules index against rules/ on disk
-│   ├── test-compact-hooks.sh       PreCompact / PostCompact end-to-end test
+│   ├── test-compact-hooks.sh       PreCompact handoff-writing end-to-end test
+│   ├── test-context-watch.sh       context-watch.sh 60% directive emit/one-shot assertions
 │   ├── test-cost-guard.sh          cost-guard.sh tiering, hard-block, and limit-override assertions
 │   ├── test-em-dash-guard.sh       Verifies block-em-dash.sh hook fires on U+2014 payloads
 │   ├── test-install-bashrc.sh      install.sh symlink and bashrc wiring assertions
-│   ├── test-memory-hooks.sh        Memory seed and load hook assertions
+│   ├── test-memory-doctor-guardrails.sh  Proves memory-doctor.sh checks I-M fail-then-pass
+│   ├── test-memory-hooks.sh        Memory seed hook and marker-pruning assertions
+│   ├── test-migrate-memory-guard.sh  migrate-memory.sh dry-run-default and template-stub-refusal assertions
 │   ├── test-post-edit-lint-dispatch.sh  PostToolUse lint hook dispatch tests
 │   ├── test-r-lint-staged.sh       r-lint-staged.sh assertions
+│   ├── test-session-start-context.sh  session-start-context.sh additionalContext delivery assertions
 │   ├── test-staged-lint-dispatch.sh     Pre-commit staged-lint hook dispatch tests
+│   ├── test-statusline-context-bridge.sh  statusline pct-file write and 60% marker assertions
 │   └── test-stop-hook-git-check.sh  stop-hook-git-check.sh exit-code assertions
 └── vendor/
     └── graphify/                   git submodule (pinned to v7); source for /graphify skill
@@ -126,6 +131,30 @@ When working in Claude Code, hooks install automatically on the first prompt in 
 ```bash
 bash ~/.claude/scripts/install-repo-hooks.sh
 ```
+
+---
+
+## Memory system
+
+Memory, compaction, and session history are three separate layers:
+
+- **Memory files** (`claude/memory/` global tier, `~/.claude/projects/<key>/memory/` project tier): stable facts explicitly saved; persist across sessions; delivered to the model by `session-start-context.sh` (a SessionStart hook, matchers `startup|resume|clear|compact`) via `hookSpecificOutput.additionalContext`. This is the channel that actually reaches Claude, not `systemMessage`, which is display-only and never delivered to the model, a bug that went undetected for months before the 2026-07-15 memory-system review.
+- **Compaction**: triggered manually (`/compact`) or automatically by the harness at ~85% context (a safety backstop, not the target; policy is to compact at 60%, see `rules/session.md`). The compactor summarizes the conversation itself and does not read memory files to decide what to keep.
+- **Session history**: full JSONL transcript on disk, persists until pruned.
+
+**Compaction continuity is a separate mechanism from compaction itself.** `pre-compact.sh` (PreCompact hook) writes a structured handoff file to the current project's `memory/handoffs/` subdirectory (rolling cap of 5) before compaction runs. `session-start-context.sh`, invoked again immediately after compaction completes (`source: compact`), restores the newest handoff as context. The compacted conversation summary itself does not carry this; the handoff file is what survives the boundary.
+
+Templates for new project-tier memory entries live in `claude/memory-templates/` (committed to this repo). Project memory directories are per-machine and not tracked.
+
+### Three-tier update process
+
+**Tier 1, passive (zero cost):** Claude saves memories during sessions when it encounters something non-obvious (quirks, strategic decisions, user corrections). No trigger needed.
+
+**Tier 2, end-of-session prompt (~5-10k tokens):** After sessions covering substantive work, end with: "Update memory with anything worth preserving from this session." Use for heavy sessions (100+ msgs, complex multi-file work); skip for routine sessions.
+
+**Tier 3, manual for strategic context (no cost):** `project_current_phase.md` is maintained by the user, not Claude. Update it in a few sentences when a milestone is reached or focus shifts.
+
+**Why:** A post-session memory agent would cost 20-50k tokens per run and most sessions don't produce new memories. The three-tier approach concentrates effort where it adds value.
 
 ---
 
@@ -226,9 +255,10 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 |---|---|---|---|
 | `UserPromptSubmit` |, | `maintenance-check.sh` | Weekly plan-file check; monthly session-storage check; weekly repo-hooks audit |
 | `UserPromptSubmit` |, | `ensure-repo-hooks.sh` | Silently installs pre-commit dispatcher in current repo if missing |
-| `UserPromptSubmit` |, | `load-global-memory.sh` | Loads global memory tier (`~/.claude/memory/`) once per session |
 | `UserPromptSubmit` |, | `list-merged-claude-branches.sh` | Advisory: lists merged `claude/*` branches and shows the delete command |
+| `SessionStart` | `startup\|resume\|clear\|compact` | `session-start-context.sh` | Delivers the global memory tier via `additionalContext` (startup/clear/compact); restores the newest pre-compact handoff (compact); advises `/seed-project` when the current project has no memory dir; delivery-gated monthly staleness advisory |
 | `PostToolUse` | `Edit\|Write` | `post-edit-lint.sh` | `.py` ruff; `.sh` shfmt (auto-fix) + shellcheck; `.sql` sqlfmt; `.R` lintr; `.json` jq --indent 4 |
+| `PostToolUse` | `*` | `context-watch.sh` | At >=60% context (read from the statusline's per-session pct file), emits a one-shot directive to checkpoint and request `/compact` |
 | `PreToolUse` | `Write\|Edit\|MultiEdit\|NotebookEdit` | `block-em-dash.sh` | Rejects any payload containing U+2014 (em dash); enforces no-em-dash code style rule |
 | `PreToolUse` | `Write\|Edit\|MultiEdit\|NotebookEdit` | `block-edit-on-main.sh` | Blocks all edits when the current branch is `main` or `master` |
 | `PreToolUse` | `Write\|Edit` | `block-sensitive-writes.sh` | Allow `*.env.example`/`*.env.template`; block `*.lock`, `*.env`, `*credentials*`, `*secret*`, `*.pem`, `*.key` |
@@ -236,11 +266,10 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 | `PreToolUse` | `Agent\|WebFetch` | `cost-guard.sh` | Cost tiering MEDIUM/HIGH/VERY HIGH; hard-blocks (exit 2) general-purpose agents above per-session cap (default 5, override via `COST_GUARD_GP_LIMIT`); blocks logged to `~/.claude/logs/cost-guard-blocks.log` |
 | `Stop` |, | `stop-hook-git-check.sh` | Exits 2 (continues agent loop) on uncommitted changes, untracked files, or unpushed commits; exits 0 when clean |
 | `PreCompact` | `*` | `pre-compact.sh` | Writes a structured handoff to project memory |
-| `PostCompact` | `*` | `post-compact.sh` | Re-injects the handoff so Claude has continuity post-compaction |
-| `StatusLine` | n/a | `statusline-command.sh` (in `scripts/`) | Custom status line display in the Claude Code UI |
+| `StatusLine` | n/a | `statusline-command.sh` (in `scripts/`) | Custom status line display; also bridges the exact context percentage to `context-watch.sh` via a per-session `/tmp` file |
 | (in project repos) | n/a | `repo-pre-commit.sh` | Pre-commit dispatcher (R, Python, Shell, JSON) installed into repos by `install-repo-hooks.sh`; not a Claude Code hook |
 
-Hook latency on this machine (measured 2026-04-29): aggregate UserPromptSubmit chain median = **98 ms** (under 100 ms target). Re-measure with `bash tests/measure-userpromptsubmit.sh` if the chain grows.
+Hook latency on this machine (measured 2026-07-15, 3-hook chain after the memory-delivery hooks moved to SessionStart): aggregate UserPromptSubmit chain median = **81 ms** (under 100 ms target). Re-measure with `bash tests/measure-userpromptsubmit.sh` if the chain grows.
 
 ---
 
@@ -266,16 +295,6 @@ Run at any time to see session counts, token totals (comma-formatted), agent spa
 bash ~/.claude/scripts/usage-report.sh --since 2026-05-01
 bash ~/.claude/scripts/usage-report.sh --since 2026-04-01 --until 2026-04-30 --json
 ```
-
----
-
-## Memory system
-
-Per-project memory at `~/.claude/projects/<encoded-path>/memory/`. Each project memory dir contains an auto-indexed `MEMORY.md` plus topical files (user/feedback/project/reference). Pre-compact and post-compact hooks write and restore session handoffs automatically.
-
-Templates for new project-tier memory entries live in `claude/memory-templates/` (committed to this repo). Project memory directories are per-machine and not tracked.
-
-The global tier holds cross-project user-level facts (identity, preferences), loaded once per session by `load-global-memory.sh`. It is git-tracked in this repo at `claude/memory/` and symlinked to `~/.claude/memory` by `install.sh`, so it syncs across machines via git. Memory writes from any session land in the repo working tree; commit them from a dotfiles session.
 
 ---
 

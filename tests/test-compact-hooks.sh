@@ -1,7 +1,11 @@
 #!/bin/bash
-# test-compact-hooks.sh, verify pre-compact.sh and post-compact.sh behavior
+# test-compact-hooks.sh, verify pre-compact.sh behavior
 #
-# Usage: bash ~/.claude/hooks/test-compact-hooks.sh
+# Usage: bash tests/test-compact-hooks.sh
+#
+# post-compact.sh was retired (its systemMessage restore never reached the
+# model). The compact-source restore path now lives in session-start-context.sh
+# and is covered by tests/test-session-start-context.sh.
 #
 # Tests: automated assertions on hook outputs and file creation.
 # Manual scenarios are documented at the bottom and require a live session.
@@ -41,16 +45,6 @@ assert_contains() {
 assert_not_contains() {
 	local label="$1" file="$2" pattern="$3"
 	! grep -q "$pattern" "$file" 2>/dev/null && pass "$label" || fail "$label, unexpected pattern found: '$pattern'"
-}
-
-assert_json_field() {
-	local label="$1" json="$2" field="$3"
-	echo "$json" | jq -e ".$field" &>/dev/null && pass "$label" || fail "$label, missing field: $field"
-}
-
-assert_exit_zero() {
-	local label="$1" cmd="$2"
-	eval "$cmd" &>/dev/null && pass "$label" || fail "$label, expected exit 0"
 }
 
 # ── Test environment setup ────────────────────────────────────────────────────
@@ -102,13 +96,6 @@ run_pre_compact() {
 	# `|| true`: a hook failure must be an assertable test outcome, not a
 	# crash of this harness (which runs under set -e).
 	echo "$input" | HOME="$TEST_HOME" bash "$HOOK_DIR/pre-compact.sh" 2>/dev/null || true
-}
-
-run_post_compact() {
-	local cwd="${1:-$TEST_CWD}"
-	local input
-	input=$(jq -n --arg cwd "$cwd" '{"cwd": $cwd, "hook_event_name": "PostCompact"}')
-	echo "$input" | HOME="$TEST_HOME" bash "$HOOK_DIR/post-compact.sh" 2>/dev/null
 }
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
@@ -228,62 +215,6 @@ test_pre_compact_memory_capped_at_five() {
 	teardown_test_env
 }
 
-test_post_compact_outputs_system_message() {
-	echo
-	echo "── test_post_compact_outputs_system_message"
-	setup_test_env
-	run_pre_compact "manual"
-	local output
-	output=$(run_post_compact)
-	assert_json_field "output is valid JSON with systemMessage" "$output" "systemMessage"
-	echo "$output" | jq -r '.systemMessage' | grep -q "pre-compact handoff" \
-		&& pass "systemMessage contains handoff marker" \
-		|| fail "systemMessage missing handoff marker"
-	echo "$output" | jq -r '.systemMessage' | grep -q "Files active this session" \
-		&& pass "systemMessage contains file list section" \
-		|| fail "systemMessage missing file list section"
-	teardown_test_env
-}
-
-test_post_compact_no_handoff_exits_cleanly() {
-	echo
-	echo "── test_post_compact_no_handoff_exits_cleanly"
-	setup_test_env
-	# memory dir is empty, no handoff files
-	local output
-	output=$(run_post_compact)
-	[ -z "$output" ] && pass "empty output when no handoff exists" || fail "expected empty output, got: $output"
-	teardown_test_env
-}
-
-test_post_compact_picks_latest_handoff() {
-	echo
-	echo "── test_post_compact_picks_latest_handoff"
-	setup_test_env
-	# Seed an older handoff in handoffs/ so post-compact has two candidates
-	mkdir -p "$TEST_MEMORY_DIR/handoffs"
-	cat >"$TEST_MEMORY_DIR/handoffs/handoff_2026-04-20T00-00Z_aabbccdd.md" <<'EOF'
----
-name: Session handoff 2026-04-20
-description: older handoff
-type: project
----
-**Trigger:** manual
-**Branch:** old-branch
-EOF
-	run_pre_compact "manual" # creates today's handoff in handoffs/
-	local output
-	output=$(run_post_compact)
-	echo "$output" | jq -r '.systemMessage' | grep -q "branch" \
-		&& pass "systemMessage includes branch from latest handoff" \
-		|| fail "systemMessage missing branch info"
-	# Should NOT be the old branch
-	echo "$output" | jq -r '.systemMessage' | grep -q "old-branch" \
-		&& fail "post-compact returned stale handoff" \
-		|| pass "post-compact returned most recent handoff"
-	teardown_test_env
-}
-
 test_pre_compact_sanitizes_unsafe_session_id() {
 	echo
 	echo "── test_pre_compact_sanitizes_unsafe_session_id"
@@ -330,9 +261,6 @@ test_pre_compact_no_transcript
 test_pre_compact_auto_trigger
 test_pre_compact_memory_capped_at_five
 test_pre_compact_sanitizes_unsafe_session_id
-test_post_compact_outputs_system_message
-test_post_compact_no_handoff_exits_cleanly
-test_post_compact_picks_latest_handoff
 test_pre_compact_empty_cwd
 
 echo
@@ -351,9 +279,11 @@ SCENARIO 1: Pre-compact hook fires on /compact
   Expect: A new handoff_<today>_*.md file, timestamp within the last minute.
   Expect: ~/.claude/projects/<project>/memory/MEMORY.md updated with pointer.
 
-SCENARIO 2: Post-compact injects handoff
+SCENARIO 2: SessionStart(compact) restores the handoff
   Step:   After /compact, ask: "What files did we read before compaction?"
-  Expect: Claude lists files from the injected handoff without calling Read.
+  Expect: Claude lists files from the restored handoff without calling Read.
+          session-start-context.sh (source=compact) delivers this via
+          hookSpecificOutput.additionalContext, not the retired post-compact.sh.
   Fail:   Claude says it doesn't know, or calls Read on a file from the list.
 
 SCENARIO 3: File re-read prevention (session.md rule)

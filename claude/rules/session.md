@@ -8,7 +8,7 @@ description: Token efficiency and output discipline, read-once policy, scoped re
 ## Token efficiency
 
 ### Per-task token budget
-Treat 4,000 tokens as a soft per-task budget. If a task is approaching that limit without reaching a natural checkpoint, summarize what has been done, what is verified, and what remains, then re-plan rather than pushing through. Surfacing the breach is better than silently overrunning it. The session-wide compaction threshold (80% context) is a separate, harder limit; the per-task budget is an earlier warning.
+Treat 4,000 tokens as a soft per-task budget. If a task is approaching that limit without reaching a natural checkpoint, summarize what has been done, what is verified, and what remains, then re-plan rather than pushing through. Surfacing the breach is better than silently overrunning it. The session-wide compaction threshold (60% context, see Session discipline below) is a separate, harder limit; the per-task budget is an earlier warning.
 
 ### Before reading any file
 Check whether that file path already appears in a prior Read result in this session. If it does, use that content, do not call Read again. A prior Read result is sufficient even if you did not retain every line; reference what you have and state what is missing if needed.
@@ -28,7 +28,7 @@ See also: `rules/behavioral.md` rule 3 (touch only what you must).
 - Never use Bash(cat), Bash(head), or Bash(tail), use Read with offset/limit.
 - Chain independent read-only shell commands with `&&` in a single Bash call.
 - Prefer Read over Bash(cat) unless piping to another command (e.g., `cat file | jq`).
-- Subagents: reach for an Explore agent only when scope is genuinely uncertain or would span 4+ search tool calls; at most 2 in parallel; prefer sequential in plan mode. Never spawn an agent for file listing, a single-file read, or a targeted search (measured: 3 parallel Explore agents burned 24% of a weekly session).
+- Subagents: reach for an Explore agent only when scope is genuinely uncertain or would span 4+ search tool calls; at most 2 in parallel; prefer sequential in plan mode. Never spawn an agent for file listing, a single-file read, or a targeted search (measured: a single broad Explore agent read 36 files for 58.7k tokens; 3 parallel Explore agents burned 24% of a weekly session before implementation began).
 
 ### CLI output discipline
 `rtk` is installed and wired via a PreToolUse Bash hook. It auto-intercepts routine commands (git, gh, ls, grep, find, ruff, uv, gcloud, etc.) and reduces output by 60-80%. No action needed for supported commands; the hook runs transparently.
@@ -41,8 +41,8 @@ See also: `rules/behavioral.md` rule 3 (touch only what you must).
 ## Session discipline
 - One deliverable per session. If scope shifts (e.g., planning to implementation), ask whether to continue or start fresh.
 - When the user corrects your approach, save a feedback memory before continuing.
-- Auto-compact is enabled and fires at ~80–85% context. The user prefers to compact manually before auto-compact triggers. When context approaches 80%, stop any long-running process and flag it, do not push past the threshold.
-- The PreCompact hook writes a timestamped handoff file and PostCompact restores it; compacting mid-session is safe and preserves continuity.
+- Compact at 60% context, not later. Models perform best in the 60-70% utilization band; the harness's own auto-compact is a safety backstop at ~85%, not the target. `statusline-command.sh` writes the exact context percentage to a per-session file; `context-watch.sh` reads it and, at ≥60%, emits a one-shot directive to finish the current step, state a one-sentence checkpoint, and request `/compact` immediately, rather than continuing toward the 85% backstop. CC exposes no configurable auto-compact threshold and no programmatic way to trigger compaction, so this directive-plus-`/compact` is the deterministic mechanism, not a fully automatic one.
+- On `/compact`, auto-continue from the restored handoff without re-orientation: do not ask "where were we?" or summarize the prior session. The PreCompact hook writes a timestamped handoff file; the SessionStart hook (`source: compact`) restores it as context immediately after compaction completes. Read the restored content, identify the item marked in progress, and execute it.
 - When context is high, prefer writing output to a file over long in-context responses.
 - Do not re-explore what was already explored in this session. Summarize prior findings from context.
 

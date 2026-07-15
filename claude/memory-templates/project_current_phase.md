@@ -1,5 +1,5 @@
 ---
-name: Current Project Phase
+name: project-current-phase
 description: Active project workstreams and state (update manually when milestones change)
 type: project
 ---

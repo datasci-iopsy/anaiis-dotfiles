@@ -53,6 +53,7 @@ SEP="${dim}·${rs}"
 _jq=$(printf '%s\n' "$input" | jq -r '
     "model_raw=\(.model.id // "" | @sh)",
     "cwd_j=\(.workspace.current_dir // .cwd // "" | @sh)",
+    "sid_j=\(.session_id // "" | @sh)",
     "ctx_pct=\(.context_window.used_percentage // 0 | floor)",
     "in_tok=\(.context_window.current_usage.input_tokens // 0)",
     "out_tok=\(.context_window.current_usage.output_tokens // 0)",
@@ -68,6 +69,13 @@ _jq=$(printf '%s\n' "$input" | jq -r '
 eval "$_jq" 2>/dev/null || exit 0
 
 cwd="${cwd_j:-$PWD}"
+
+# ─── Context-watch bridge: expose the harness's exact context_window ────────
+# ─── percentage to context-watch.sh (a PostToolUse hook, which receives no ──
+# ─── context metrics of its own) via a per-session /tmp file. ───────────────
+if [ -n "${sid_j:-}" ] && printf '%s' "$sid_j" | grep -qE '^[a-zA-Z0-9._-]+$'; then
+	printf '%s' "${ctx_pct:-0}" >"/tmp/claude-context-${sid_j}.pct" 2>/dev/null || true
+fi
 
 # Effort level: settings.json is rewritten immediately on /effort, so this
 # always reflects the current level without needing a JSON payload change.
@@ -294,7 +302,13 @@ fi
 if [ "${ctx_pct:-0}" -gt 0 ] 2>/dev/null; then
 	col=$(pct_color "$ctx_pct")
 	bar=$(progress_bar "$ctx_pct" 8)
-	line2+=("$(printf "${col}context:[%s${col}]%d%%${rs}" "$bar" "$ctx_pct")")
+	# 60% is the compaction policy threshold (rules/session.md); no native
+	# harness knob exists to trigger compaction at this point (only ~85%
+	# auto-compact), so context-watch.sh directs a checkpoint-and-/compact
+	# request instead. This marker is the deterministic visual companion.
+	compact_marker=""
+	[ "$ctx_pct" -ge 60 ] && compact_marker="$(printf " ${b_yel}${bd}compact:60+${rs}")"
+	line2+=("$(printf "${col}context:[%s${col}]%d%%${rs}%s" "$bar" "$ctx_pct" "$compact_marker")")
 fi
 
 # Token counts: in/out as separate labeled segments
