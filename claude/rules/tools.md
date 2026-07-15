@@ -7,7 +7,7 @@ description: Preferred CLIs (gh, jq, duckdb, gcloud, make, tmux) and the always-
 
 - Use `gh` for all GitHub operations (PRs, issues, checks, repo links, etc.), never raw curl to the API.
 - Use `jq` for JSON processing in shell.
-- Use `duckdb` CLI as the default engine for querying local parquet, CSV, JSON, and Excel files. Never load these into pandas for ad hoc analysis. Pass `-json` for machine-readable output.
+- Use `duckdb` CLI as the default engine for querying local parquet, CSV, JSON, and Excel files. Never load these into pandas, or reach for Python's `duckdb` module, for ad hoc analysis. Pass `-json` for machine-readable output.
 - Use `gcloud` for GCP operations (read-only unless user confirms).
 - Prefer `make` targets over raw commands when a Makefile exists.
 - Use `tmux` for processes that are projected to take longer than 5 minutes
