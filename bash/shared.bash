@@ -89,12 +89,13 @@ fi
 # one-off changes; this is the baseline. Pins each class to a specific snapshot
 # so /model picks resolve deterministically across machines.
 export ANTHROPIC_MODEL="opusplan"
-export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-4-8"
+export ANTHROPIC_DEFAULT_FABLE_MODEL="claude-fable-5"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-5"
 export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-5"
 export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku-4-5-20251001"
 
 # Effort and output sizing; overrides settings.json "effortLevel".
-export CLAUDE_CODE_EFFORT_LEVEL="medium"
+export CLAUDE_CODE_EFFORT_LEVEL="high"
 export CLAUDE_CODE_MAX_OUTPUT_TOKENS="32000"
 
 # cost-guard.sh PreToolUse hook: per-session cap on general-purpose Agent
@@ -195,7 +196,7 @@ alias gc-authList='gcloud auth list'
 alias claude-fast='claude --model opusplan --permission-mode bypassPermissions'
 
 # Turbo: opusplan, high effort
-alias claude-turbo='CLAUDE_CODE_EFFORT_LEVEL=high claude --model opusplan --permission-mode bypassPermissions'
+alias claude-turbo='CLAUDE_CODE_EFFORT_LEVEL=xhigh claude --model opusplan --permission-mode bypassPermissions'
 
 # Fable: Fable 5, high effort
 alias claude-fable='CLAUDE_CODE_EFFORT_LEVEL=high claude --model claude-fable-5 --permission-mode bypassPermissions'
