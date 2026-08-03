@@ -103,7 +103,7 @@ export CLAUDE_CODE_MAX_OUTPUT_TOKENS="32000"
 # Hooks are child processes of the claude CLI, so they inherit this like any
 # other exported var; settings.json's "env" block does NOT reach hooks, only
 # Bash tool commands and MCP servers, so this must stay a plain shell export.
-export COST_GUARD_GP_LIMIT="50"
+export COST_GUARD_GP_LIMIT="75"
 
 # Privacy-focused, minimal-traffic configuration:
 export DISABLE_TELEMETRY="1"
