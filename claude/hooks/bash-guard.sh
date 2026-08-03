@@ -58,6 +58,20 @@ if printf '%s' "$CMD" | grep -qE '^uv\s+(cache\s+(clean|prune)|publish|tool\s+un
 	exit 2
 fi
 
+# ── Force-push safety ────────────────────────────────────────────────────────
+# Bare --force/-f (unsafe, no remote-side check) is always blocked, everywhere.
+# --force-with-lease (safe, refuses to overwrite a remote ref with commits the
+# local repo hasn't seen) is allowed. settings.json's deny-list glob matching
+# can't express this distinction (substring matching, no negation --
+# --force-with-lease always also matches a git push --force* deny), so this
+# hook is the real enforcement point for the --force/--force-with-lease split,
+# not settings.json.
+if printf '%s' "$CMD" | grep -qE '(^|[;&|]\s*)git\s+push\b' \
+	&& printf '%s' "$CMD" | grep -qE '(^|[[:space:]])(-f|--force)([[:space:]=]|$)'; then
+	printf 'BLOCK: bare --force/-f push is unsafe (no remote-side check). Use --force-with-lease instead.\n' >&2
+	exit 2
+fi
+
 # ── Secrets: token-minting commands ─────────────────────────────────────────
 # These commands take no file path (so the protected-path check below never
 # sees them) but their sole output is a live, usable credential.
@@ -97,7 +111,16 @@ fi
 
 # ── Secrets: protected paths ────────────────────────────────────────────────
 # Strip the allowed template forms first so they never trigger the path match.
-SCRUBBED=$(printf '%s' "$GUARD_STR" | sed -E 's/\.env\.(example|template)//g')
+# Also strip a jq filter's leading .env key reference (jq '.env', jq -r
+# '.env.FOO') -- that operates on in-memory JSON already piped/passed to jq,
+# never reads an actual .env file from disk, so it isn't a path reference at
+# all. Only the occurrence immediately after a jq invocation is stripped; a
+# real file argument elsewhere in the same command (cat .env | jq '.foo')
+# still matches below. The trailing char class stands in for \b (word
+# boundary) -- BSD sed's -E doesn't support \b, unlike this file's grep -E
+# calls, which run through a GNU-compatible grep on this system.
+SCRUBBED=$(printf '%s' "$GUARD_STR" | sed -E 's/\.env\.(example|template)//g' \
+	| sed -E "s/(jq([[:space:]]+--?[A-Za-z][A-Za-z-]*)*[[:space:]]+)(['\"])\.env([^A-Za-z0-9_]|\$)/\1\3\4/g")
 if printf '%s' "$SCRUBBED" | grep -qE '(\.env\b|\.ssh\b|\.bashrc(\.local)?|\.bash_profile|\.zshrc(\.local)?|\.profile\b|secrets/|\.pem\b|(^|[/[:space:]])\.?\w*\.key\b|credentials|\.aws\b|\.config/(gcloud|secrets|gh)\b|\.netrc\b|\.gnupg\b|\.docker/config|\.kube/config|\.npmrc\b|\.pypirc\b)'; then
 	log_secret_block "bash-guard:protected-path" "$CMD"
 	printf 'BLOCK: command references a protected secrets path. If a value is needed, ask the user to provide or load it.\n' >&2

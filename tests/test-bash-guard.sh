@@ -98,6 +98,15 @@ assert_allow "1c.2 aws sts get-caller-identity" "aws sts get-caller-identity"
 assert_allow "1c.3 gcloud config list" "gcloud config list"
 assert_allow "1c.4 doctl auth init" "doctl auth init"
 
+echo "# 1d. Unsafe force-push blocked, --force-with-lease stays allowed"
+assert_block "1d.1 bare --force" "git push --force" "BLOCK"
+assert_block "1d.2 bare --force with remote/branch" "git push --force origin main" "BLOCK"
+assert_block "1d.3 short -f" "git push -f" "BLOCK"
+assert_block "1d.4 short -f with remote/branch" "git push -f origin feature-branch" "BLOCK"
+assert_allow "1d.5 --force-with-lease explicit sha" "git push --force-with-lease=feature-branch:abc123 origin feature-branch"
+assert_allow "1d.6 --force-with-lease implicit" "git push --force-with-lease origin feature-branch"
+assert_allow "1d.7 plain push unaffected" "git push origin feature-branch"
+
 echo "# 2. Python-for-JSON blocked"
 assert_block "2.1 import json only" "python3 -c 'import json; print(json.load(open(\"f.json\")))'" "jq"
 
@@ -167,6 +176,12 @@ assert_allow "2g.7 ruby RUBY_VERSION" "ruby -e 'puts RUBY_VERSION'"
 assert_allow "2g.8 dict literal named ENV_NAME" "python3 -c \"d = {'ENV_NAME': 'prod'}; print(d)\""
 assert_allow "2g.9 python getenv non-secret with fallback" "python3 -c \"import os; print(os.getenv('LOG_LEVEL', 'info'))\""
 assert_allow "2g.10 script flag named --env" "python3 analyze.py --env production"
+
+echo "# 2h. jq filter referencing .env key is not a path reference"
+assert_allow "2h.1 jq dot-env filter, no flags" "jq '.env' ~/.claude/settings.json"
+assert_allow "2h.2 jq dot-env filter with -r flag" "jq -r '.env.API_KEY' response.json"
+assert_allow "2h.3 jq dot-env filter, double-quoted" 'jq ".env" data.json'
+assert_block "2h.4 real .env read alongside an unrelated jq call still blocked" "cat .env | jq '.foo'" "BLOCK"
 
 echo "# 3. Allowed commands pass"
 assert_allow "3.1 git status" "git status"
