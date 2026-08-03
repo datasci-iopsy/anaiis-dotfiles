@@ -39,3 +39,8 @@ content), not a bug to fix. Respect it silently rather than proposing to un-igno
 note in the session summary that the spec exists locally but isn't tracked. Confirmed in
 `anaiis-plugins` on 2026-08-01: `spec/` was already gitignored there pre-existing this
 change, and the user chose to keep it that way rather than un-ignore it.
+
+**Recurred in `anaiis-dotfiles` on 2026-08-03** despite `spec/` already confirmed to exist
+earlier in the same session for an unrelated check; that context wasn't reapplied at
+write-time. Re-verify `spec/`/`specs/` right before every spec `Write`, don't rely on an
+earlier check. Second confirmed gitignored-`spec/` instance too.
