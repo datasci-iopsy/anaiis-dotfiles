@@ -367,7 +367,7 @@ assert_block "7c.7 catastrophic operand on a later line of a multiline command" 
 	$'echo start\nrm -rf /' "catastrophic"
 
 echo "# 7d. Placement-ordering regression guard: existing hard-blocks still fire first"
-assert_block "7d.1 rm -rf ~/.ssh still exit-2-blocks (protected-path check)" "rm -rf ~/.ssh" "BLOCK"
+assert_block "7d.1 rm -rf ~/.ssh still exit-2-blocks (protected-path check)" "rm -rf ~/.ssh" "protected secrets path"
 
 echo "# 7e. Non-recursive / unrelated rm: section never engages, no decision JSON"
 assert_decision "7e.1 non-recursive rm: no JSON" "rm -f single.txt" "none"
