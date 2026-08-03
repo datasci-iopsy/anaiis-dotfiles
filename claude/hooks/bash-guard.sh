@@ -277,7 +277,7 @@ if printf '%s' "$RM_GATE_SCAN_STR" | grep -qE "$RM_GATE_RE"; then
 	# compound-operator check treats as a shell metacharacter) is exactly as
 	# dangerous whether or not it's chained with other commands, so this
 	# takes priority over everything else in this section, including ask.
-	read -r -a RM_WORDS <<<"$CMD"
+	read -r -a RM_WORDS <<<"${CMD//$'\n'/ }"
 	for RM_I in "${!RM_WORDS[@]}"; do
 		RM_W="${RM_WORDS[$RM_I]}"
 		RM_W_LEN=${#RM_W}

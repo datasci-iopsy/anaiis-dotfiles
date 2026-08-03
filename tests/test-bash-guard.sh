@@ -363,6 +363,8 @@ assert_block "7c.3 bare tilde" "rm -rf ~" "catastrophic"
 assert_block "7c.4 literal \$HOME" 'rm -rf $HOME' "catastrophic"
 assert_block "7c.5 bare dot" "rm -rf ." "catastrophic"
 assert_block "7c.6 bare dot-dot" "rm -rf .." "catastrophic"
+assert_block "7c.7 catastrophic operand on a later line of a multiline command" \
+	$'echo start\nrm -rf /' "catastrophic"
 
 echo "# 7d. Placement-ordering regression guard: existing hard-blocks still fire first"
 assert_block "7d.1 rm -rf ~/.ssh still exit-2-blocks (protected-path check)" "rm -rf ~/.ssh" "BLOCK"
