@@ -349,7 +349,7 @@ if printf '%s' "$RM_GATE_SCAN_STR" | grep -qE "$RM_GATE_RE"; then
 				rm | /bin/rm | /usr/bin/rm | '\rm')
 					RM_SAW_RECURSIVE_FLAG=0
 					RM_ALL_VARS_OK=1
-					declare -A RM_SEEN_VARNAMES=()
+					RM_SEEN_VARNAMES=" "
 					for ((RM_TI = 1; RM_TI < ${#RM_LAST_WORDS[@]}; RM_TI++)); do
 						RM_TOK="${RM_LAST_WORDS[$RM_TI]}"
 						case "$RM_TOK" in
@@ -373,7 +373,11 @@ if printf '%s' "$RM_GATE_SCAN_STR" | grep -qE "$RM_GATE_RE"; then
 						if ((RM_TOK_LEN >= 2)) && [[ "${RM_TOK:0:1}" == '"' && "${RM_TOK: -1}" == '"' ]]; then
 							RM_TOK_INNER="${RM_TOK:1:RM_TOK_LEN-2}"
 							if [[ "$RM_TOK_INNER" =~ ^\$([A-Za-z_][A-Za-z0-9_]*)$ ]] || [[ "$RM_TOK_INNER" =~ ^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$ ]]; then
-								RM_SEEN_VARNAMES["${BASH_REMATCH[1]}"]=1
+								RM_VARNAME="${BASH_REMATCH[1]}"
+								case "$RM_SEEN_VARNAMES" in
+									*" $RM_VARNAME "*) ;;
+									*) RM_SEEN_VARNAMES="$RM_SEEN_VARNAMES$RM_VARNAME " ;;
+								esac
 							else
 								RM_ALL_VARS_OK=0
 								break
@@ -383,18 +387,18 @@ if printf '%s' "$RM_GATE_SCAN_STR" | grep -qE "$RM_GATE_RE"; then
 							break
 						fi
 					done
-					if [ "$RM_SAW_RECURSIVE_FLAG" -eq 1 ] && [ "$RM_ALL_VARS_OK" -eq 1 ] && [ "${#RM_SEEN_VARNAMES[@]}" -ge 1 ]; then
+					if [ "$RM_SAW_RECURSIVE_FLAG" -eq 1 ] && [ "$RM_ALL_VARS_OK" -eq 1 ] && [ "$RM_SEEN_VARNAMES" != " " ]; then
 						RM_PRECEDING_OK=1
 						for ((RM_SI = 0; RM_SI < RM_TRIMMED_COUNT - 1; RM_SI++)); do
 							RM_STMT="${RM_TRIMMED[$RM_SI]}"
 							if [[ "$RM_STMT" =~ $RM_MKTEMP_ASSIGN_RE ]]; then
-								unset "RM_SEEN_VARNAMES[${BASH_REMATCH[1]}]"
+								RM_SEEN_VARNAMES="${RM_SEEN_VARNAMES/ ${BASH_REMATCH[1]} / }"
 							else
 								RM_PRECEDING_OK=0
 								break
 							fi
 						done
-						if [ "$RM_PRECEDING_OK" -eq 1 ] && [ "${#RM_SEEN_VARNAMES[@]}" -eq 0 ]; then
+						if [ "$RM_PRECEDING_OK" -eq 1 ] && [ "$RM_SEEN_VARNAMES" = " " ]; then
 							RM_MKTEMP_ALLOW=1
 						fi
 					fi
