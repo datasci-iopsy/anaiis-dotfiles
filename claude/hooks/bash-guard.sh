@@ -245,19 +245,26 @@ fi
 # into eval/bash -c/sh -c payloads), so this isn't a new gap, just the same
 # accepted one extended to this section.
 #
-# Also known, not fixed (accepted, same class): a heredoc body (<<'EOF'
-# ... EOF) is invisible to the quote-blanking above -- it isn't delimited
-# by paired quote characters at all, so "rm -rf" appearing as literal text
-# inside a heredoc (e.g. a test/log script written via `cat > file <<'EOF'
-# ... EOF`) still activates this section even though the heredoc content
-# itself never runs as a command. This is architecturally the same
-# accepted gap as the bash -c/eval case above (script content this file
-# doesn't parse into), just via a different quoting mechanism; observed
-# live from an agent's own verification heredoc during this session.
+# Heredoc bodies (<<'EOF' ... EOF or <<EOF ... EOF) are also blanked before
+# the gate check, for the same reason as quoted spans above: "rm -rf"
+# appearing as literal text inside a heredoc (e.g. a test/log script written
+# via `cat > file <<'EOF' ... EOF`) is data, not a command, and a heredoc
+# body is never itself a command-name position (unlike a quoted string),
+# so unlike the quote-blanking above, no whitespace check is needed here --
+# the whole body is always safe to blank for gate-detection purposes.
+# Observed live from an agent's own verification heredoc, and again from a
+# PR body written via this same pattern, during this session.
+#
+# Known limitation, same class as the bash -c/eval case above: a heredoc
+# piped directly to a shell (bash <<'EOF' ... EOF) would have its payload
+# blanked too and fall through with no opinion -- this isn't a new gap,
+# just the already-accepted "doesn't parse into shell-executed payloads"
+# blind spot extended to this quoting mechanism.
 RM_GATE_RE='\brm\b[^;&|]*((^|[[:space:]])-[A-Za-z]*[rR][A-Za-z]*\b|--recursive\b)'
 RM_SCAN_STR="$GUARD_STR"
 if command -v perl >/dev/null 2>&1; then
 	RM_SCAN_STR=$(printf '%s' "$GUARD_STR" | perl -0777 -pe '
+		s/<<-?(\x27?)([A-Za-z_][A-Za-z0-9_]*)\1[ \t]*\n.*?\n[ \t]*\2\b//gs;
 		s/\x27([^\x27]*)\x27/$1 =~ m{\s} ? q() : $&/ges;
 		s/"((?:\\.|[^"\\])*)"/$1 =~ m{\s} ? q() : $&/ges;
 	' 2>/dev/null) || RM_SCAN_STR="$GUARD_STR"

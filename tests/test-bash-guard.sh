@@ -404,6 +404,20 @@ assert_decision "7i.5 rm --interactive: no JSON" "rm --interactive somefile" "no
 assert_allow "7i.6 rm --interactive: exit 0" "rm --interactive somefile"
 assert_decision "7i.7 regression guard: rm -rf .venv still engages the section" "rm -rf .venv" "allow"
 
+echo "# 7j. Heredoc immunity: rm -rf appearing only as data inside a heredoc body never engages the section (same accepted class as the bash -c blind spot, extended to heredocs -- heredoc bodies are never a command-name position, so no whitespace gate is needed here unlike the quote-blanking case)"
+assert_decision "7j.1 rm -rf as prose inside a cat <<'EOF' heredoc body, single-quoted delimiter" \
+	$'cat > /tmp/test_loop.sh <<\x27EOF\x27\nrm -rf "$HOME" is dangerous\nEOF' "none"
+assert_allow "7j.1b same command truly exits 0" \
+	$'cat > /tmp/test_loop.sh <<\x27EOF\x27\nrm -rf "$HOME" is dangerous\nEOF'
+assert_decision "7j.2 rm -rf as prose inside an unquoted-delimiter heredoc body" \
+	$'cat > /tmp/test_loop.sh <<EOF\nrm -rf "$HOME" is dangerous\nEOF' "none"
+assert_allow "7j.2b same command truly exits 0" \
+	$'cat > /tmp/test_loop.sh <<EOF\nrm -rf "$HOME" is dangerous\nEOF'
+
+echo "# 7k. Regression guard: a real rm -rf outside a heredoc still engages the gate even when a heredoc is attached to the same command"
+assert_decision "7k.1 real rm -rf before an attached heredoc still triggers the gate (ask, since the heredoc's own embedded newline is a genuine compound signal)" \
+	$'rm -rf .venv <<\x27EOF\x27\nnote\nEOF' "ask"
+
 echo
 echo "──────────────────────────────────────────────"
 echo "test-bash-guard: $PASS passed, $FAIL failed"
