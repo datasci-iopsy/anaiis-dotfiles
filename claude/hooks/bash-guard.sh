@@ -173,4 +173,176 @@ if printf '%s' "$CMD" | grep -qE '\b(python|python3)\b' \
 	exit 2
 fi
 
+# ── uv add/pip install: transparency notice ─────────────────────────────────
+# uv is the sole sanctioned Python dependency tool (rules/python.md); these two
+# subcommands are allowed, never blocked. This notice makes a dependency
+# change visible in the transcript instead of silent, it never gates anything.
+if printf '%s' "$CMD" | grep -qE '\buv\s+add\b'; then
+	echo "[deps] $CMD -- modifies pyproject.toml/uv.lock" >&2
+elif printf '%s' "$CMD" | grep -qE '\buv\s+pip\s+install\b'; then
+	echo "[deps] $CMD -- installs into the active environment (pyproject.toml/uv.lock not updated)" >&2
+fi
+
+# ── Recursive rm: scoped allow/ask instead of a blanket settings.json deny ──
+# settings.json's Bash(rm -r*)/Bash(rm -fr*)/Bash(rm -R*) denies blocked every
+# recursive delete unconditionally, including disposable paths (a session
+# scratchpad dir, .venv, node_modules, build artifacts, tests/fixtures/).
+# This section replaces that blanket deny with a precise safe-list, reusing
+# the traversal-safe technique from the tests/fixtures/ .env carve-out above
+# (a path segment can't start with "." so ".." never matches). Runs LAST,
+# after every other exit-2 check in this file, so an overlapping genuinely
+# dangerous case (rm -rf ~/.ssh) still hits the existing hard block above,
+# never gets downgraded to this section's ask.
+#
+# A hook's permissionDecision covers the WHOLE command, not per-subcommand
+# (unlike settings.json rule matching), so this never emits "allow" for a
+# compound command: rm -rf .venv && rm -rf /etc must not get laundered
+# through an allow keyed off the first-looking operand.
+#
+# Detection is broadened (rm, /bin/rm, /usr/bin/rm, \rm; every recursive
+# flag spelling; a bare word boundary rather than a strict subcommand-start
+# anchor, since rm commonly follows a shell keyword like a for-loop's "do")
+# because gate-evasion only ever degrades to this section's own "no
+# opinion" (falling through to the harness's default ask-prompt), never to
+# a silent allow: broadening can only reduce unnecessary prompts, never
+# weaken safety. Checked against $GUARD_STR (already message-flag-scrubbed)
+# so a commit message merely mentioning "rm" and a flag as prose can't
+# spuriously trigger this section.
+#
+# Known residual risk, accepted (not fixed): the safe-list matches the
+# operand STRING, not the resolved filesystem path. A symlink named like a
+# safe entry (.venv, node_modules, ...) pointing elsewhere would match and
+# silently allow. Requires an attacker to have already planted that symlink,
+# a materially higher bar than a crafted command; closing it fully would
+# need realpath/readlink -f resolution, a class of logic (real filesystem
+# syscalls) this file doesn't otherwise use.
+#
+# Also known: this is word-splitting, not a shell parser, so a quoted-but-
+# otherwise-safe operand (rm -rf ".venv") fails the character allowlist below
+# and asks rather than allows -- same class of limitation as every other
+# regex-based check in this file, documented rather than engineered around.
+#
+# Gate check runs against RM_SCAN_STR, not GUARD_STR: a further pass blanks
+# any complete single- or double-quoted span whose CONTENT contains
+# whitespace, so "rm -rf" appearing only as prose/test-data inside some
+# other command's quoted argument (a log message, a nested bash -c script
+# literal) never activates this section at all -- observed live: writing
+# example commands in ledger rationale text, and a surgeon's own bash -c
+# verification snippet, both tripped this section despite invoking no real
+# rm. The whitespace requirement is deliberate, not incidental: a short,
+# no-whitespace quoted span (like "rm" as a quoted command name, "rm" -rf /)
+# is a real, executable invocation in bash and must stay visible, so it is
+# never blanked -- only multi-word content is prose/data by construction.
+# The tripwire and operand-safety logic below still run against the
+# ORIGINAL $CMD once the section is entered, so a genuine quoted operand
+# (rm -rf "$HOME") is unaffected; only the gate's activation decision
+# ignores quoted spans, never the safety logic itself.
+#
+# Known limitation, same class as elsewhere in this file: this doesn't
+# parse nested shell invocations, so bash -c "rm -rf /" or eval "rm -rf /"
+# would have its whole payload blanked and fall through with no opinion.
+# Every other check in this file has the identical blind spot (none parse
+# into eval/bash -c/sh -c payloads), so this isn't a new gap, just the same
+# accepted one extended to this section.
+#
+# Also known, not fixed (accepted, same class): a heredoc body (<<'EOF'
+# ... EOF) is invisible to the quote-blanking above -- it isn't delimited
+# by paired quote characters at all, so "rm -rf" appearing as literal text
+# inside a heredoc (e.g. a test/log script written via `cat > file <<'EOF'
+# ... EOF`) still activates this section even though the heredoc content
+# itself never runs as a command. This is architecturally the same
+# accepted gap as the bash -c/eval case above (script content this file
+# doesn't parse into), just via a different quoting mechanism; observed
+# live from an agent's own verification heredoc during this session.
+RM_GATE_RE='\brm\b[^;&|]*((^|[[:space:]])-[A-Za-z]*[rR][A-Za-z]*\b|--recursive\b)'
+RM_SCAN_STR="$GUARD_STR"
+if command -v perl >/dev/null 2>&1; then
+	RM_SCAN_STR=$(printf '%s' "$GUARD_STR" | perl -0777 -pe '
+		s/\x27([^\x27]*)\x27/$1 =~ m{\s} ? q() : $&/ges;
+		s/"((?:\\.|[^"\\])*)"/$1 =~ m{\s} ? q() : $&/ges;
+	' 2>/dev/null) || RM_SCAN_STR="$GUARD_STR"
+fi
+RM_GATE_SCAN_STR="${RM_SCAN_STR//$'\n'/ }"
+if printf '%s' "$RM_GATE_SCAN_STR" | grep -qE "$RM_GATE_RE"; then
+	# Tripwire scan runs FIRST, on the whole word list, before the compound-
+	# operator check below and independent of it: a catastrophic operand
+	# (notably $HOME and /* -- both contain a character, $ or *, that the
+	# compound-operator check treats as a shell metacharacter) is exactly as
+	# dangerous whether or not it's chained with other commands, so this
+	# takes priority over everything else in this section, including ask.
+	read -r -a RM_WORDS <<<"$CMD"
+	for RM_I in "${!RM_WORDS[@]}"; do
+		RM_W="${RM_WORDS[$RM_I]}"
+		RM_W_LEN=${#RM_W}
+		if ((RM_W_LEN >= 2)) && { [[ "${RM_W:0:1}" == '"' && "${RM_W: -1}" == '"' ]] || [[ "${RM_W:0:1}" == "'" && "${RM_W: -1}" == "'" ]]; }; then
+			RM_W="${RM_W:1:RM_W_LEN-2}"
+		fi
+		case "$RM_W" in
+			/ | '/*' | '~' | '$HOME' | . | ..)
+				printf 'BLOCK: rm -rf targeting a catastrophic path (%s) is never automatic. Run manually in terminal if genuinely needed.\n' "$RM_W" >&2
+				exit 2
+				;;
+		esac
+	done
+
+	if printf '%s' "$GUARD_STR" | grep -qE '[;&|`$()<>]' || [[ "$GUARD_STR" == *$'\n'* ]]; then
+		jq -n --arg r "recursive rm alongside a shell operator/substitution -- cannot verify each path independently" \
+			'{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask", "permissionDecisionReason": $r}}'
+		exit 0
+	fi
+
+	RM_IDX=-1
+	for RM_I in "${!RM_WORDS[@]}"; do
+		case "${RM_WORDS[$RM_I]}" in
+			rm | */rm | '\rm') RM_IDX=$RM_I ;;
+		esac
+	done
+
+	RM_ASK_REASON=""
+	if [ "$RM_IDX" -lt 0 ]; then
+		RM_ASK_REASON="matched the recursive-rm pattern but could not precisely locate the rm invocation"
+	else
+		# Every remaining operand must be plain path text AND match
+		# the safe-list, or the whole command asks (first failure wins,
+		# named in the reason).
+		RM_SEG='([^./][^/]*/)*[^./][^/]*'
+		RM_ARTIFACTS='\.venv|node_modules|dist|build|\.next|coverage|__pycache__'
+		RM_SAFE_SCRATCH="^(/private)?/tmp/claude-[0-9]+/${RM_SEG}/scratchpad(/${RM_SEG})?/?\$"
+		RM_SAFE_ARTIFACT="^(\\./)?(${RM_SEG}/)?(${RM_ARTIFACTS})(/${RM_SEG})?/?\$"
+		RM_SAFE_FIXTURE="^(\\./)?tests/fixtures/${RM_SEG}/?\$"
+
+		RM_OPERAND_COUNT=0
+		RM_SEEN_DASHDASH=0
+		for ((RM_I = RM_IDX + 1; RM_I < ${#RM_WORDS[@]}; RM_I++)); do
+			RM_W="${RM_WORDS[$RM_I]}"
+			if [ "$RM_W" = "--" ]; then
+				RM_SEEN_DASHDASH=1
+				continue
+			fi
+			if [ "$RM_SEEN_DASHDASH" -eq 0 ]; then
+				case "$RM_W" in -*) continue ;; esac
+			fi
+			RM_OPERAND_COUNT=$((RM_OPERAND_COUNT + 1))
+			if ! printf '%s' "$RM_W" | grep -qE '^[A-Za-z0-9._/-]+$'; then
+				RM_ASK_REASON="operand \"$RM_W\" contains characters that can't be verified safe"
+				break
+			fi
+			if ! printf '%s' "$RM_W" | grep -qE "$RM_SAFE_SCRATCH|$RM_SAFE_ARTIFACT|$RM_SAFE_FIXTURE"; then
+				RM_ASK_REASON="operand \"$RM_W\" is not on the known-safe path list"
+				break
+			fi
+		done
+		[ "$RM_OPERAND_COUNT" -eq 0 ] && RM_ASK_REASON="no path operand found to verify"
+	fi
+
+	if [ -z "$RM_ASK_REASON" ]; then
+		jq -n --arg r "recursive delete of a known-disposable path (scratchpad/.venv/node_modules/build-artifact/tests-fixtures)" \
+			'{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow", "permissionDecisionReason": $r}}'
+	else
+		jq -n --arg r "$RM_ASK_REASON" \
+			'{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask", "permissionDecisionReason": $r}}'
+	fi
+	exit 0
+fi
+
 exit 0

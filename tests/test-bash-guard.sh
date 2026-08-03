@@ -11,7 +11,8 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GUARD="$REPO_DIR/claude/hooks/bash-guard.sh"
 
 TEST_HOME=$(mktemp -d)
-trap 'rm -rf "$TEST_HOME"' EXIT
+STDERR_TMP=$(mktemp)
+trap 'rm -rf "$TEST_HOME" "$STDERR_TMP"' EXIT
 
 PASS=0
 FAIL=0
@@ -44,6 +45,64 @@ assert_allow() {
 		PASS=$((PASS + 1))
 	else
 		printf '  FAIL  %s\n        expected exit 0, got %s (%s)\n' "$name" "$RC" "$STDERR"
+		FAIL=$((FAIL + 1))
+	fi
+}
+
+# Allowed AND a non-blocking informational notice is printed to stderr.
+assert_notice() {
+	local name="$1" cmd="$2" needle="$3"
+	run_guard "$cmd"
+	if [ "$RC" -eq 0 ] && printf '%s' "$STDERR" | grep -qF -- "$needle"; then
+		printf '  PASS  %s\n' "$name"
+		PASS=$((PASS + 1))
+	else
+		printf '  FAIL  %s\n        exit=%s stderr=%s\n' "$name" "$RC" "$STDERR"
+		FAIL=$((FAIL + 1))
+	fi
+}
+
+# Allowed AND no notice text appears (regression guard for unrelated commands).
+assert_no_notice() {
+	local name="$1" cmd="$2" needle="$3"
+	run_guard "$cmd"
+	if [ "$RC" -eq 0 ] && ! printf '%s' "$STDERR" | grep -qF -- "$needle"; then
+		printf '  PASS  %s\n' "$name"
+		PASS=$((PASS + 1))
+	else
+		printf '  FAIL  %s\n        exit=%s stderr=%s\n' "$name" "$RC" "$STDERR"
+		FAIL=$((FAIL + 1))
+	fi
+}
+
+# run_guard_json <command-string>; sets RC and STDOUT (where a hook's
+# permissionDecision JSON lands, unlike the exit-2/stderr block pattern the
+# other assert_* helpers check). STDERR_TMP is truncated and re-read each
+# call rather than a fresh mktemp per call, matching this script's
+# set-up-once-at-top style for TEST_HOME.
+run_guard_json() {
+	local cmd="$1"
+	STDOUT=$(jq -n --arg c "$cmd" '{"session_id":"test","tool_input":{"command":$c}}' \
+		| HOME="$TEST_HOME" bash "$GUARD" 2>"$STDERR_TMP")
+	RC=$?
+	STDERR=$(cat "$STDERR_TMP")
+}
+
+# Asserts the hook's stdout permissionDecision JSON matches $want (one of
+# allow/ask/deny), or "none" if no decision JSON is expected at all (the
+# plain exit-2/stderr-block and plain exit-0/no-output paths both count as
+# "none" here).
+assert_decision() {
+	local name="$1" cmd="$2" want="$3"
+	run_guard_json "$cmd"
+	local got
+	got=$(printf '%s' "$STDOUT" | jq -r '.hookSpecificOutput.permissionDecision // "none"' 2>/dev/null)
+	[ -z "$got" ] && got="none"
+	if [ "$got" = "$want" ]; then
+		printf '  PASS  %s\n' "$name"
+		PASS=$((PASS + 1))
+	else
+		printf '  FAIL  %s\n        want=%s got=%s exit=%s stdout=%s\n' "$name" "$want" "$got" "$RC" "$STDOUT"
 		FAIL=$((FAIL + 1))
 	fi
 }
@@ -200,6 +259,17 @@ assert_allow "3.12 echo PATH" 'echo $PATH'
 assert_allow "3.13 gh auth status" "gh auth status"
 assert_allow "3.14 env-prefixed command" "env FOO=bar make build"
 
+echo "# 3b. uv add/pip install: allowed, non-blocking transparency notice"
+assert_notice "3b.1 uv add prints [deps] notice" "uv add requests" "[deps]"
+assert_notice "3b.2 uv pip install prints [deps] notice" "uv pip install requests" "[deps]"
+assert_no_notice "3b.3 uv sync prints no [deps] notice" "uv sync" "[deps]"
+assert_no_notice "3b.4 uv run prints no [deps] notice" "uv run pytest" "[deps]"
+assert_no_notice "3b.5 uv remove prints no [deps] notice" "uv remove requests" "[deps]"
+
+echo "# 3c. run_guard_json/assert_decision smoke check (no false positive)"
+assert_decision "3c.1 [deps] notice case has no decision JSON" "uv add requests" "none"
+assert_decision "3c.2 plain allow case has no decision JSON" "git status" "none"
+
 echo "# 4. Message-flag prose allowed (commit messages, PR text)"
 assert_allow "4.1 commit -m single-quoted mentioning .env" "git commit -m 'docs: describe .env handling'"
 assert_allow "4.2 commit -m double-quoted, no expansion" 'git commit -m "update the global.env loading docs"'
@@ -258,6 +328,81 @@ BEFORE=$(log_lines)
 run_guard "git status"
 AFTER=$(log_lines)
 assert_log_unchanged "6.3 benign allowed command appends no log line" "$BEFORE" "$AFTER"
+
+echo "# 7. Recursive rm: scoped allow/ask instead of a blanket deny"
+
+echo "# 7a. Safe-list allows (silent, no friction)"
+assert_decision "7a.1 rm -rf .venv" "rm -rf .venv" "allow"
+assert_decision "7a.2 multiple safe operands" "rm -rf node_modules dist build" "allow"
+assert_decision "7a.3 broadened spelling: --recursive" "rm --recursive coverage" "allow"
+assert_decision "7a.4 broadened spelling: -fR" "rm -fR build" "allow"
+assert_decision "7a.5 scratchpad dir (uid + literal scratchpad segment)" \
+	"rm -rf /private/tmp/claude-501/-Users-x-project/9db8ed1c-8fd2-4bc5-960b-69b62d39b45c/scratchpad/out" "allow"
+assert_decision "7a.6 nested safe subpath" "rm -rf tests/fixtures/dotenv/leftover" "allow"
+assert_decision "7a.7 /bin/rm broadened invocation form" "/bin/rm -rf node_modules" "allow"
+assert_decision "7a.8 backslash-escaped rm broadened invocation form" '\rm -rf .venv' "allow"
+echo "# 7b. Non-safe-list falls to ask, never a silent allow or silent deny"
+assert_decision "7b.0 rm after a shell keyword (for-loop do) engages the section, not silently ignored -- for-loop ; is compound syntax the laundering guard correctly can't distinguish from chained commands" \
+	'for f in *.jsonl; do rm -rf .venv; done' "ask"
+assert_decision "7b.1 traversal escaping tests/fixtures/" "rm -rf tests/fixtures/../../src" "ask"
+assert_decision "7b.2 one safe operand, one unsafe: whole command asks" \
+	"rm -rf node_modules dist ../src" "ask"
+assert_decision "7b.3 compound command: laundering guard" "rm -rf .venv && rm -rf /etcX" "ask"
+assert_decision "7b.4 unverifiable operand (shell expansion characters)" 'rm -rf "$HOME/x"' "ask"
+assert_decision "7b.5 not on the safe-list at all" "rm -rf /Users/someone/project/notes" "ask"
+assert_decision "7b.6 bare tests/fixtures with no subpath asks" "rm -rf tests/fixtures" "ask"
+assert_decision "7b.7 zero operands" "rm -rf" "ask"
+assert_decision "7b.8 absolute path to an otherwise-safe-named dir" "rm -rf /Users/x/project/node_modules" "ask"
+assert_decision "7b.9 scratchpad-looking prefix missing the scratchpad segment" \
+	"rm -rf /tmp/claude-branch-hygiene-x" "ask"
+
+echo "# 7c. Catastrophic tripwire: hard-deny, on top of (not instead of) ask"
+assert_block "7c.1 bare root" "rm -rf /" "catastrophic"
+assert_block "7c.2 root glob" "rm -rf /*" "catastrophic"
+assert_block "7c.3 bare tilde" "rm -rf ~" "catastrophic"
+assert_block "7c.4 literal \$HOME" 'rm -rf $HOME' "catastrophic"
+assert_block "7c.5 bare dot" "rm -rf ." "catastrophic"
+assert_block "7c.6 bare dot-dot" "rm -rf .." "catastrophic"
+
+echo "# 7d. Placement-ordering regression guard: existing hard-blocks still fire first"
+assert_block "7d.1 rm -rf ~/.ssh still exit-2-blocks (protected-path check)" "rm -rf ~/.ssh" "BLOCK"
+
+echo "# 7e. Non-recursive / unrelated rm: section never engages, no decision JSON"
+assert_decision "7e.1 non-recursive rm: no JSON" "rm -f single.txt" "none"
+assert_allow "7e.2 non-recursive rm: exit 0" "rm -f single.txt"
+assert_decision "7e.3 unrelated -R doesn't leak across an operator" "ls -R && rm foo" "none"
+
+echo "# 7f. Message-flag prose immunity (GUARD_STR-based, not raw CMD)"
+assert_decision "7f.1 commit message mentioning rm and -rf as prose" \
+	'git commit -m "explain the rm -rf recovery flag behavior"' "none"
+
+echo "# 7g. Quoted-prose immunity: rm -rf appearing only as data inside an unrelated command's quoted argument never engages the section (generalizes 7f beyond message-flags). Paired with assert_allow: a plain 'no decision JSON' check alone can't distinguish a correct skip (exit 0) from a worse false-positive hard-block (exit 2) -- this prose deliberately contains a standalone '/' word, which the tripwire's own word-split would catch if the gate wrongly activates."
+assert_decision "7g.1 rm -rf mentioned in a log-style function's quoted argument, real compound operator present" \
+	'echo "step one" && myfunc "confirmed rm -rf / is dangerous"' "none"
+assert_allow "7g.1b same command truly exits 0, not hard-blocked by the tripwire misreading prose" \
+	'echo "step one" && myfunc "confirmed rm -rf / is dangerous"'
+assert_decision "7g.2 rm -rf embedded as inert test data inside a nested bash -c script, multi-line" \
+	$'bash -c \'CMD="rm -rf /"\necho done\'' "none"
+assert_allow "7g.2b same command truly exits 0" \
+	$'bash -c \'CMD="rm -rf /"\necho done\''
+assert_decision "7g.3 rm -rf inside a single-quoted echo argument, no compound operator at all" \
+	"echo 'note: rm -rf is dangerous, never run it unattended'" "none"
+assert_allow "7g.3b same command truly exits 0" \
+	"echo 'note: rm -rf is dangerous, never run it unattended'"
+
+echo "# 7h. Regression guard: a quoted single-token command name is still a real invocation, not prose -- quoted-prose immunity must never create a new evasion vector"
+assert_block "7h.1 quoted bare rm command name still executes for real, tripwire must still fire" '"rm" -rf /' "catastrophic"
+assert_decision "7h.2 quoted bare rm command name, non-catastrophic operand, must still ask (never silently allow or silently skip)" \
+	'"rm" -rf /Users/someone/project/notes' "ask"
+
+echo "# 7i. Long-flag false-positive guard: an 'r' inside a long GNU-style option name is not a recursive short flag"
+assert_decision "7i.1 rm --force: no JSON" "rm --force somefile" "none"
+assert_allow "7i.2 rm --force: exit 0" "rm --force somefile"
+assert_decision "7i.3 rm --verbose: no JSON" "rm --verbose somefile" "none"
+assert_allow "7i.4 rm --verbose: exit 0" "rm --verbose somefile"
+assert_decision "7i.5 rm --interactive: no JSON" "rm --interactive somefile" "none"
+assert_allow "7i.6 rm --interactive: exit 0" "rm --interactive somefile"
+assert_decision "7i.7 regression guard: rm -rf .venv still engages the section" "rm -rf .venv" "allow"
 
 echo
 echo "──────────────────────────────────────────────"
