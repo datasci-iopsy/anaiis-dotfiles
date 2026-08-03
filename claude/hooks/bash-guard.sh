@@ -292,6 +292,123 @@ if printf '%s' "$RM_GATE_SCAN_STR" | grep -qE "$RM_GATE_RE"; then
 		esac
 	done
 
+	# Narrow, provably-safe carve-out: silently allow when the ENTIRE
+	# command consists of nothing but mktemp-assignment statement(s)
+	# followed by exactly one final recursive-rm cleanup on those exact
+	# variables -- e.g. `TMP=$(mktemp -d); ...; rm -rf "$TMP"`. This does
+	# NOT loosen the compound-operator ask below in general: an "allow"
+	# decision covers the WHOLE submitted command, so this only fires when
+	# every statement matches this exact recognized shape, leaving nothing
+	# else present that could be laundered alongside the rm. A command
+	# with any other statement (real work, a pipe, a second command) fails
+	# to match and falls straight through to the unchanged ask logic
+	# below. A later reassignment of the same variable to something other
+	# than a fresh mktemp call also fails to match, since every statement
+	# before the final rm must itself be a clean mktemp assignment.
+	# Statements are split on ';' and real newlines only, not && / || / &
+	# -- those carry conditional/background semantics this check doesn't
+	# reason about, so their presence simply fails to match.
+	# mktemp's own argument text (captured group 2) is a POSITIVE denylist
+	# excluding every shell metacharacter capable of nested execution,
+	# expansion, or redirection (backtick, $, |, &, <, >, (, ;, #, {, },
+	# ~, both quote characters, backslash) -- not just the closing paren.
+	# Stored in a variable, not written inline into [[ =~ ]], since this
+	# file already had one instance this session where inline regex
+	# escaping silently didn't behave as assumed; a variable can be
+	# tested standalone. Without this exclusion, a payload hidden inside
+	# mktemp's own arguments (e.g. a backtick-quoted nested command, which
+	# contains no ')' character) would still match this "clean mktemp
+	# assignment" shape and execute for real when the statement runs,
+	# laundered through the one carve-out in this file designed
+	# specifically to prevent exactly this. Caught by adversarial review
+	# before this shipped; confirmed via a live PoC that a nested
+	# backtick command actually ran. A second adversarial pass after the
+	# fix found two low-severity, non-exploitable gaps closed by adding
+	# #/{/}/~ here: a bare '#' produces a false "allow" on a command real
+	# bash actually refuses to run (a mid-statement '#' with no following
+	# newline comments out to true EOF, a parse-time syntax error, so
+	# nothing executes -- confirmed empirically), and brace/tilde
+	# expansion carry no code-execution capability here but are expansion
+	# mechanisms this denylist's own stated goal should cover regardless.
+	RM_MKTEMP_ASSIGN_RE='^([A-Za-z_][A-Za-z0-9_]*)=\$\([[:space:]]*mktemp([[:space:]][^)`$|&<>(;#{}~'"'"'"\\]*)?\)$'
+	RM_MKTEMP_ALLOW=0
+	RM_STATEMENTS_STR="${CMD//$'\n'/;}"
+	IFS=';' read -r -a RM_STATEMENTS <<<"$RM_STATEMENTS_STR"
+	RM_TRIMMED=()
+	for RM_STMT in "${RM_STATEMENTS[@]}"; do
+		RM_STMT="${RM_STMT#"${RM_STMT%%[![:space:]]*}"}"
+		RM_STMT="${RM_STMT%"${RM_STMT##*[![:space:]]}"}"
+		[ -n "$RM_STMT" ] && RM_TRIMMED+=("$RM_STMT")
+	done
+	RM_TRIMMED_COUNT=${#RM_TRIMMED[@]}
+	if [ "$RM_TRIMMED_COUNT" -ge 1 ]; then
+		RM_LAST_STMT="${RM_TRIMMED[$((RM_TRIMMED_COUNT - 1))]}"
+		read -r -a RM_LAST_WORDS <<<"$RM_LAST_STMT"
+		if [ "${#RM_LAST_WORDS[@]}" -ge 2 ]; then
+			case "${RM_LAST_WORDS[0]}" in
+				rm | /bin/rm | /usr/bin/rm | '\rm')
+					RM_SAW_RECURSIVE_FLAG=0
+					RM_ALL_VARS_OK=1
+					declare -A RM_SEEN_VARNAMES=()
+					for ((RM_TI = 1; RM_TI < ${#RM_LAST_WORDS[@]}; RM_TI++)); do
+						RM_TOK="${RM_LAST_WORDS[$RM_TI]}"
+						case "$RM_TOK" in
+							--recursive)
+								RM_SAW_RECURSIVE_FLAG=1
+								continue
+								;;
+							-[A-Za-z]*)
+								[[ "$RM_TOK" =~ ^-[A-Za-z]*[rR][A-Za-z]*$ ]] && RM_SAW_RECURSIVE_FLAG=1
+								continue
+								;;
+						esac
+						# The operand must be QUOTED (starts and ends with a
+						# literal '"'), not bare $VAR/${VAR}: an unquoted
+						# reference is subject to the real shell's word-
+						# splitting/globbing at execution time, so mktemp
+						# output containing a space (e.g. --suffix=" x")
+						# could silently expand into more than one operand
+						# this check never independently validated.
+						RM_TOK_LEN=${#RM_TOK}
+						if ((RM_TOK_LEN >= 2)) && [[ "${RM_TOK:0:1}" == '"' && "${RM_TOK: -1}" == '"' ]]; then
+							RM_TOK_INNER="${RM_TOK:1:RM_TOK_LEN-2}"
+							if [[ "$RM_TOK_INNER" =~ ^\$([A-Za-z_][A-Za-z0-9_]*)$ ]] || [[ "$RM_TOK_INNER" =~ ^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$ ]]; then
+								RM_SEEN_VARNAMES["${BASH_REMATCH[1]}"]=1
+							else
+								RM_ALL_VARS_OK=0
+								break
+							fi
+						else
+							RM_ALL_VARS_OK=0
+							break
+						fi
+					done
+					if [ "$RM_SAW_RECURSIVE_FLAG" -eq 1 ] && [ "$RM_ALL_VARS_OK" -eq 1 ] && [ "${#RM_SEEN_VARNAMES[@]}" -ge 1 ]; then
+						RM_PRECEDING_OK=1
+						for ((RM_SI = 0; RM_SI < RM_TRIMMED_COUNT - 1; RM_SI++)); do
+							RM_STMT="${RM_TRIMMED[$RM_SI]}"
+							if [[ "$RM_STMT" =~ $RM_MKTEMP_ASSIGN_RE ]]; then
+								unset "RM_SEEN_VARNAMES[${BASH_REMATCH[1]}]"
+							else
+								RM_PRECEDING_OK=0
+								break
+							fi
+						done
+						if [ "$RM_PRECEDING_OK" -eq 1 ] && [ "${#RM_SEEN_VARNAMES[@]}" -eq 0 ]; then
+							RM_MKTEMP_ALLOW=1
+						fi
+					fi
+					;;
+			esac
+		fi
+	fi
+
+	if [ "$RM_MKTEMP_ALLOW" -eq 1 ]; then
+		jq -n --arg r "recursive delete of variable(s) assigned via mktemp earlier in this same command, with no other statement present to verify" \
+			'{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow", "permissionDecisionReason": $r}}'
+		exit 0
+	fi
+
 	if printf '%s' "$GUARD_STR" | grep -qE '[;&|`$()<>]' || [[ "$GUARD_STR" == *$'\n'* ]]; then
 		jq -n --arg r "recursive rm alongside a shell operator/substitution -- cannot verify each path independently" \
 			'{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask", "permissionDecisionReason": $r}}'
