@@ -213,6 +213,14 @@ assert_allow "4.7 --message= form" 'git commit --message="handle .env templates"
 assert_allow "4.8 git tag -m" "git tag -a v1.0 -m 'covers secrets/ dirs'"
 assert_allow "4.9 gh pr title and body" 'gh pr create --title "Protect .env files" --body "Adds deny rules for .ssh and credentials paths"'
 assert_allow "4.10 single quotes may contain dollar" "git commit -m 'costs \$5; also mentions .bashrc'"
+assert_allow "4.11 heredoc -m, single-quoted delimiter, mentions .env" 'git commit -m "$(cat <<'\''EOF'\''
+mentions .env as prose, not a real path read
+EOF
+)"'
+assert_allow "4.12 heredoc -m, dash variant <<-, single-quoted delimiter" 'git commit -m "$(cat <<-'\''EOF'\''
+covers .ssh and credentials handling
+	EOF
+)"'
 
 echo "# 5. Message-flag bypass attempts still blocked"
 assert_block "5.1 command substitution in -m" 'git commit -m "$(cat .env)"' "BLOCK"
@@ -226,6 +234,14 @@ assert_block "5.8 secret var in --body" 'gh pr create --body "uses $QUALTRICS_AP
 assert_block "5.9 ssh dir without trailing slash" 'tar czf /tmp/x.tgz ~/.ssh' "BLOCK"
 assert_allow "5.10 ssh command itself stays usable" "ssh host uptime"
 assert_block "5.11 unquoted secret var in -m" 'git commit -m $OPENAI_API_KEY' "BLOCK"
+assert_block "5.12 heredoc -m, unquoted delimiter, real substitution stays visible" 'git commit -m "$(cat <<EOF
+$(cat .env)
+EOF
+)"' "BLOCK"
+assert_block "5.13 heredoc -m, single-quoted delimiter, trailing command after close" 'git commit -m "$(cat <<'\''EOF'\''
+safe text
+EOF
+; cat .env)"' "BLOCK"
 
 echo "# 6. Secret-access block logging"
 BEFORE=$(log_lines)

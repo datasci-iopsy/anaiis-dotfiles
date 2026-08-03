@@ -90,6 +90,13 @@ fi
 # name a file like .env without a block. Strip them before path matching,
 # but only when they provably cannot execute or expand anything:
 #   - single-quoted: always inert, always stripped
+#   - "$(cat <<'DELIM' ... DELIM)" (single-quoted heredoc delimiter, the
+#     project's own commit-message convention): also always inert -- a
+#     single-quoted delimiter guarantees bash performs zero expansion on the
+#     heredoc body, so it's as safe as a bare single-quoted string. Requires
+#     the closing DELIM (optionally tab-indented, for <<-) to be immediately
+#     followed by the closing )" with nothing else in between, so a real
+#     command chained after the heredoc (; cat .env) is never swallowed.
 #   - double-quoted: stripped only if free of $ and backtick (no expansion,
 #     no command substitution); "$(cat .env)" therefore stays visible
 # A message flag interpolating a secret-named variable is blocked outright:
@@ -104,6 +111,7 @@ if command -v perl >/dev/null 2>&1; then
 	GUARD_STR=$(printf '%s' "$CMD" | perl -0777 -pe '
 		my $f = qr/(?:-m|--message|--title|--body|--notes|--description)/;
 		s/((?:^|\s)$f(?:=|\s+))\x27[^\x27]*\x27/${1}\x27\x27/gs;
+		s/((?:^|\s)$f(?:=|\s+))"\$\(\s*cat\s+<<-?\x27([A-Za-z_][A-Za-z0-9_]*)\x27\s*\n.*?\n[ \t]*\2\s*\)"/${1}""/gs;
 		s/((?:^|\s)$f(?:=|\s+))"[^"`\$]*"/${1}""/gs;
 	' 2>/dev/null) || GUARD_STR="$CMD"
 	[ -n "$GUARD_STR" ] || GUARD_STR="$CMD"
