@@ -97,9 +97,31 @@ echo
 echo "--- 3. Code-surgeon with CR-NNN description passes"
 
 SID_CR="cost-test-cr-$$-$(date +%s)"
+STAMP_CR="/tmp/claude-session-${SID_CR}.gp-count"
 
-assert_exit "3.1 Fix CR-123 surgeon passes" 0 \
-	"$(make_agent_input 'general-purpose' 'Fix CR-123: typo in handler' "$SID_CR")"
+# Exit 0 alone doesn't prove exemption -- a counted-but-under-cap call also
+# exits 0. The stamp file only gets written on the counted (non-exempt) path,
+# so its absence after the call is the real signal.
+assert_exempt() {
+	local label="$1" desc="$2"
+	rm -f "$STAMP_CR"
+	local exit_code
+	exit_code=$(
+		printf '%s' "$(make_agent_input 'general-purpose' "$desc" "$SID_CR")" | bash "$HOOK" 2>/dev/null
+		echo $?
+	)
+	if [ "$exit_code" = "0" ] && [ ! -f "$STAMP_CR" ]; then
+		pass "$label"
+	else
+		fail "$label (exit=$exit_code, stamp $([ -f "$STAMP_CR" ] && echo present || echo absent))"
+	fi
+}
+
+assert_exempt "3.1 Fix CR-123 surgeon exempt from GP count" "Fix CR-123: typo in handler"
+assert_exempt "3.2 Fix CR-PR-11-3699782339 (PR-mode id) surgeon exempt from GP count" "Fix CR-PR-11-3699782339: typo in handler"
+assert_exempt "3.3 Fix CR-PR-11-123,PR-11-456 (batched PR-mode ids) surgeon exempt from GP count" "Fix CR-PR-11-123,PR-11-456: shared file"
+
+rm -f "$STAMP_CR"
 
 # ── 4. General-purpose agents below cap are counted and allowed ───────────────
 

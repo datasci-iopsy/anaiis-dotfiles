@@ -45,8 +45,11 @@ case "$TOOL" in
 				exit 0
 				;;
 			*)
-				# CodeRabbit surgeon spawns: bounded, Sonnet, surgical edits only, pass through
-				if echo "$DESC" | grep -qE '^Fix CR-[0-9]+'; then
+				# CodeRabbit surgeon spawns: bounded, Sonnet, surgical edits only, pass through.
+				# Matches local-mode ids (CR-<n>) and PR-mode ids (CR-PR-<n>-<comment_id>),
+				# including the batched form (CR-<id1>,<id2>,...) -- only the first id needs
+				# to match since the description always starts with it.
+				if echo "$DESC" | grep -qE '^Fix CR-([0-9]+|PR-[0-9]+-[0-9]+)'; then
 					echo "[cost] code-surgeon (~2k-8k tokens, Sonnet), $DESC" >&2
 					exit 0
 				fi
