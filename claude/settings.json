@@ -58,9 +58,6 @@
             "Bash(gcloud * describe *)"
         ],
         "deny": [
-            "Bash(rm -r*)",
-            "Bash(rm -fr*)",
-            "Bash(rm -R*)",
             "Bash(git clean -f*)",
             "Bash(gh repo delete*)",
             "Bash(gh auth logout*)",
@@ -71,8 +68,6 @@
             "Bash(pip uninstall*)",
             "Bash(pip3 install*)",
             "Bash(pip3 uninstall*)",
-            "Bash(uv pip install*)",
-            "Bash(uv add*)",
             "Bash(docker rm*)",
             "Bash(docker rmi*)",
             "Bash(docker system prune*)",
