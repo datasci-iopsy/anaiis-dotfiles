@@ -288,5 +288,6 @@
         }
     },
     "skipDangerousModePermissionPrompt": true,
-    "autoCompactEnabled": true
+    "autoCompactEnabled": true,
+    "tui": "fullscreen"
 }
