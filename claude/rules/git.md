@@ -1,6 +1,6 @@
 ---
 name: git
-description: Branch naming and decision rules, commit discipline, staging by name, push is user-initiated, PR conventions, worktrees for parallel work only
+description: Branch naming and decision rules, commit discipline, staging by name, push is user-initiated, rebase ours/theirs semantics, PR conventions, worktrees for parallel work only
 ---
 
 # Git Workflow
@@ -37,6 +37,11 @@ Before creating any new `claude-*` branch, run `git branch --list 'claude-*'`. I
 
 ## Push
 - Push is always user-initiated. Never push without explicit instruction, regardless of pending commits.
+
+## Rebase conflict resolution (ours/theirs)
+- `git rebase` inverts the merge convention: during a rebase, `ours` is the branch being rebased onto (the base, plus already-replayed commits), and `theirs` is the commit currently being replayed. This is the opposite of `git merge`, where `ours` is the current checked-out branch. Using `--ours`/`--theirs` on the merge-conflict assumption during a rebase silently keeps the wrong side.
+- **Why:** during a manual rebase, a docs-regeneration commit's conflict was resolved with `--ours`, which discarded that commit's entire own diff. The commit became empty and `git rebase` silently dropped it, no error, no warning. Caught only by counting commits before and after.
+- **How to apply:** before running `git checkout --ours <file>` or `--theirs <file>` mid-rebase, confirm which side actually holds the content worth keeping (read the conflict markers, or the commit's own diff) rather than defaulting to merge-conflict habits. After any rebase, verify the commit count matches expectations (`git log --oneline <base>..<branch> | wc -l`) rather than assuming nothing was lost.
 
 ## Stop hook responses
 `stop-hook-git-check.sh` runs on every Stop event and reports git state as one or more `[git] ...` lines; each line carries its own "reply only: Ok" directive inline, so the instruction holds even if this rule file wasn't loaded that session. Any `[git] ...` line, regardless of which condition triggered it (uncommitted changes, untracked files, unpushed commits, deferred CodeRabbit findings), is a status report, never user input:
