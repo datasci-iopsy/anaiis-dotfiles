@@ -6,17 +6,14 @@ metadata:
 ---
 
 The user runs multiple Claude Code sessions concurrently against the same repo/branch. An
-uncommitted diff sitting in the working tree when `stop-hook-git-check.sh` fires is not
-necessarily "pending work from my logical unit" per [[git-workflow]] (`rules/git.md`); it can
-belong to a different, live session doing unrelated deliberate work.
+uncommitted diff when `stop-hook-git-check.sh` fires is not necessarily this session's own
+pending work per [[git-workflow]] (`rules/git.md`); it can belong to a different, live
+session doing unrelated work.
 
-Confirmed once in `mattermoreai/dbt` (2026-08-18): a coherent, well-formed pending diff got
-committed under the assumption it was this session's own work, when it actually belonged to a
-concurrent session, on a branch whose name didn't even match the diff's topic.
-
-**Why:** committing another session's mid-flight work under the umbrella of "the stop hook
-said uncommitted changes" can interleave two unrelated logical concerns into one commit
-history entry, and risks committing something the other session isn't done editing yet.
+**Why:** confirmed once in `mattermoreai/dbt` (2026-08-18): a well-formed diff got
+committed as this session's own when it actually belonged to a concurrent session, on a
+branch whose name didn't even match the diff's topic. Interleaves unrelated concerns into
+one commit and risks committing something not yet finished.
 
 **How to apply:** when `stop-hook-git-check.sh` reports `[git] uncommitted changes`, before
 committing: (1) run `git branch --show-current` fresh, never trust a stale `gitStatus`

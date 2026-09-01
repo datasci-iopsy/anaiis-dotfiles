@@ -16,9 +16,8 @@ literal default; the user moved it to `spec/SPEC.md` and asked this become the s
 default.
 
 **How to apply:** `Glob`/`ls` the project root for `spec/`/`specs/` right before every spec
-`Write`, don't rely on an earlier check from the same session (this lapsed once despite an
-earlier confirmed check the same session). Same check applies to `tasks/`.
+`Write`, don't rely on an earlier same-session check (this lapsed once despite one). Same
+check applies to `tasks/`.
 
 **Gitignore check:** before treating "commit the spec" as automatic, check `.gitignore`. An
-already-gitignored `spec/` is a deliberate convention (local scratch, not shipped), not a bug;
-respect it silently and just note the spec exists locally.
+already-gitignored `spec/` is deliberate (local scratch, not shipped); respect it silently.
