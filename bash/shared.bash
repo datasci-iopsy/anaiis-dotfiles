@@ -106,10 +106,10 @@ export CLAUDE_CODE_MAX_OUTPUT_TOKENS="32000"
 export COST_GUARD_GP_LIMIT="75"
 
 # Privacy-focused, minimal-traffic configuration:
-export DISABLE_TELEMETRY="1"
-export DISABLE_ERROR_REPORTING="1"
-export DISABLE_FEEDBACK_COMMAND="1"
-export DISABLE_AUTOUPDATER="1"
+# export DISABLE_TELEMETRY="1"
+# export DISABLE_ERROR_REPORTING="1"
+# export DISABLE_FEEDBACK_COMMAND="1"
+# export DISABLE_AUTOUPDATER="1"
 
 # Bash and API timeouts. Research workflows can hit long-running R or DuckDB
 # commands; raise BASH_MAX_TIMEOUT_MS in ~/.bashrc.local if needed.
