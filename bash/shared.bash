@@ -89,7 +89,7 @@ fi
 # one-off changes; this is the baseline. Pins each class to a specific snapshot
 # so /model picks resolve deterministically across machines.
 export ANTHROPIC_MODEL="opusplan"
-export ANTHROPIC_DEFAULT_FABLE_MODEL="claude-fable-5"
+export ANTHROPIC_DEFAULT_FABLE_MODEL="claude-fable-5-1"
 export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-5"
 export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-5"
 export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku-4-5"
@@ -198,11 +198,11 @@ alias claude-fast='claude --model opusplan --permission-mode bypassPermissions'
 # Turbo: opusplan, high effort
 alias claude-turbo='CLAUDE_CODE_EFFORT_LEVEL=xhigh claude --model opusplan --permission-mode bypassPermissions'
 
-# Fable: Fable 5, high effort
-alias claude-fable='CLAUDE_CODE_EFFORT_LEVEL=high claude --model claude-fable-5 --permission-mode bypassPermissions'
+# Fable: Fable 5.1, high effort
+alias claude-fable='CLAUDE_CODE_EFFORT_LEVEL=high claude --model claude-fable-5-1 --permission-mode bypassPermissions'
 
-# Fable max: Fable 5, max effort
-alias claude-fable-max='CLAUDE_CODE_EFFORT_LEVEL=max claude --model claude-fable-5 --permission-mode bypassPermissions'
+# Fable max: Fable 5.1, max effort
+alias claude-fable-max='CLAUDE_CODE_EFFORT_LEVEL=max claude --model claude-fable-5-1 --permission-mode bypassPermissions'
 
 # ── CodeRabbit ────────────────────────────────────────────────────────────────
 alias cr='coderabbit'
