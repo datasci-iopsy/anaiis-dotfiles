@@ -45,12 +45,14 @@ case "$TOOL" in
 				exit 0
 				;;
 			*)
-				# CodeRabbit surgeon spawns: bounded, Sonnet, surgical edits only, pass through.
-				# Matches local-mode ids (CR-<n>) and PR-mode ids (CR-PR-<n>-<comment_id>),
-				# including the batched form (CR-<id1>,<id2>,...) -- only the first id needs
-				# to match since the description always starts with it.
-				if echo "$DESC" | grep -qE '^Fix CR-([0-9]+|PR-[0-9]+-[0-9]+)'; then
-					echo "[cost] code-surgeon (~2k-8k tokens, Sonnet), $DESC" >&2
+				# rabbit-sweep agent spawns: bounded, surgical or judgment-only, pass through.
+				# Descriptions start with "Fix CR-" (code-surgeon, Sonnet), "Triage CR-"
+				# (coderabbit-triage, Haiku) or "Verify intent CR-" (intent-verifier, Sonnet);
+				# see review/skills/rabbit-sweep/references/toolbox.md. Matches local-mode ids
+				# (CR-<n>) and PR-mode ids (CR-PR-<n>-<comment_id>), including the batched
+				# form (CR-<id1>,<id2>,...) -- only the first id needs to match.
+				if echo "$DESC" | grep -qE '^(Fix|Triage|Verify intent) CR-([0-9]+|PR-[0-9]+-[0-9]+)'; then
+					echo "[cost] rabbit-sweep agent (~2k-8k tokens), $DESC" >&2
 					exit 0
 				fi
 				# General-purpose agents are unbounded, count and gate above cap
