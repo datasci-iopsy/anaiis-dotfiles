@@ -120,6 +120,8 @@ assert_exempt() {
 assert_exempt "3.1 Fix CR-123 surgeon exempt from GP count" "Fix CR-123: typo in handler"
 assert_exempt "3.2 Fix CR-PR-11-3699782339 (PR-mode id) surgeon exempt from GP count" "Fix CR-PR-11-3699782339: typo in handler"
 assert_exempt "3.3 Fix CR-PR-11-123,PR-11-456 (batched PR-mode ids) surgeon exempt from GP count" "Fix CR-PR-11-123,PR-11-456: shared file"
+assert_exempt "3.4 Triage CR-PR-21-3940715835 (coderabbit-triage) exempt from GP count" "Triage CR-PR-21-3940715835: require a live node"
+assert_exempt "3.5 Verify intent CR-PR-21-3940715835 (intent-verifier) exempt from GP count" "Verify intent CR-PR-21-3940715835: require a live node"
 
 rm -f "$STAMP_CR"
 
