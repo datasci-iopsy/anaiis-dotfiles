@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# block-em-dash.sh, deny Edit/Write/MultiEdit/NotebookEdit payloads
-# containing U+2014 (em dash). Enforces the rule in
-# ~/.claude/rules/code-style.md across every Claude-initiated write.
+# block-em-dash.sh, deny Edit/Write/MultiEdit/NotebookEdit/ExitPlanMode
+# payloads containing U+2014 (em dash). Enforces the rule in
+# ~/.claude/rules/code-style.md across every Claude-initiated write, plans
+# included.
 #
 # Input:  PreToolUse JSON on stdin.
 # Output: stderr message + exit 2 to deny on em dash; exit 0 otherwise.
@@ -31,6 +32,9 @@ case "$TOOL" in
 	NotebookEdit)
 		PAYLOAD=$(printf '%s' "$INPUT" | jq -r '.tool_input.new_source // ""')
 		;;
+	ExitPlanMode)
+		PAYLOAD=$(printf '%s' "$INPUT" | jq -r '.tool_input.plan // ""')
+		;;
 	*)
 		exit 0
 		;;
@@ -39,7 +43,7 @@ esac
 # U+2014 in UTF-8 is the byte sequence E2 80 94.
 EM_DASH=$'\xe2\x80\x94'
 if printf '%s' "$PAYLOAD" | grep -qF -- "$EM_DASH"; then
-	FILE=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .tool_input.notebook_path // "(unknown)"')
+	FILE=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .tool_input.notebook_path // (if .tool_name == "ExitPlanMode" then "(plan)" else "(unknown)" end)')
 	{
 		printf '[em-dash-guard] BLOCKED: %s payload for %s contains an em dash (U+2014).\n' "$TOOL" "$FILE"
 		printf 'Per ~/.claude/rules/code-style.md, em dashes are forbidden in code, docs, and prose.\n'

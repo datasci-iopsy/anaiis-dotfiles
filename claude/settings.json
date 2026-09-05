@@ -209,6 +209,15 @@
                 ]
             },
             {
+                "matcher": "ExitPlanMode",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash $HOME/.claude/hooks/block-em-dash.sh"
+                    }
+                ]
+            },
+            {
                 "matcher": "Write|Edit",
                 "hooks": [
                     {
