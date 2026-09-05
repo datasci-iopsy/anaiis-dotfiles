@@ -1,5 +1,5 @@
 {
-    "skillListingBudgetFraction": 0.05,
+    "skillListingBudgetFraction": 0.075,
     "env": {
         "GIT_AUTHOR_NAME": "datasci-iopsy",
         "GIT_AUTHOR_EMAIL": "14611107+datasci-iopsy@users.noreply.github.com",
