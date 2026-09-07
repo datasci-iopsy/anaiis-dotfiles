@@ -118,14 +118,16 @@ if command -v perl >/dev/null 2>&1; then
 		# quoted token immediately after the command name and its flags is
 		# stripped, never a later argument, so a real FILE operand is
 		# untouched and still scanned below.
-		# A file-valued flag (-f/--file/--from-file and similar) or a
-		# path-selecting flag (--include/--exclude/--glob/--iglob and rg\x27s
-		# short -g) has its own operand consumed and preserved as part of
-		# the flag run; the next quoted token afterward is still scrubbed as the pattern.
-		my $pf = qr/(?:file|from-file|rawfile|slurpfile|argfile|include|exclude|exclude-dir|include-dir|glob|iglob|ignore-file|exclude-from|pre)/;
+		# A pattern-file flag (-f/--file/--from-file) ends the flag run: its
+		# operand is a file and the positional after it is the input file, so
+		# neither is scrubbed. A path-selecting flag (--include/--exclude/
+		# --glob/--iglob and rg\x27s short -g) has its own operand consumed and
+		# preserved; the next quoted token afterward is still scrubbed as the pattern.
+		my $pfstop = qr/(?:file|from-file|rawfile|slurpfile|argfile)/;
+		my $pfskip = qr/(?:include|exclude|exclude-dir|include-dir|glob|iglob|ignore-file|exclude-from|pre)/;
 		my $gtok = qr/(?:\x27[^\x27]*\x27|"[^"`\$]*"|\S+)/;
-		my $gelem1 = qr/-(?![A-Za-z]*[fg]\b)[A-Za-z]+|--(?!$pf\b)[A-Za-z][A-Za-z-]*(?:=\S*|\s+(?![\x27"])\S+)?/;
-		my $gelem2 = qr/(?:-[A-Za-z]*[fg]\b|--$pf\b)(?:=$gtok|\s+$gtok)/;
+		my $gelem1 = qr/-(?![A-Za-z]*[fg]\b)[A-Za-z]+|--(?!(?:$pfstop|$pfskip)\b)[A-Za-z][A-Za-z-]*(?:=\S*|\s+(?![\x27"])\S+)?/;
+		my $gelem2 = qr/(?:-[A-Za-z]*g\b|--$pfskip\b)(?:=$gtok|\s+$gtok)/;
 		my $g = qr/(?:grep|egrep|rg)/;
 		s/((?:^|[;&|]\s*)$g\b(?:\s+(?:$gelem2|$gelem1))*\s+)\x27[^\x27]*\x27/${1}\x27\x27/gs;
 		s/((?:^|[;&|]\s*)$g\b(?:\s+(?:$gelem2|$gelem1))*\s+)"[^"`\$]*"/${1}""/gs;

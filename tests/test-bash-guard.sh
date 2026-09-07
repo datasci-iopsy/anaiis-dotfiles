@@ -298,6 +298,10 @@ assert_allow "2k.19 rg --heading is boolean, not file-valued despite ending in g
 assert_allow "2k.20 rg --debug is boolean, not file-valued despite ending in g" "rg --debug '.env' src"
 assert_block "2k.21 grep --include=.env attached form keeps the glob operand visible" "grep -r --include='.env' foo src" "BLOCK"
 assert_block "2k.22 rg -g glob operand still leaves a later file operand visible" "rg -g '*.md' foo .env" "BLOCK"
+assert_block "2k.23 grep -f pattern file: the quoted positional after it is the input file, not a pattern" "grep -f 'patterns' '.env'" "BLOCK"
+assert_block "2k.24 rg -f pattern file: the quoted positional after it is the input file, not a pattern" "rg -f 'patterns' '.env'" "BLOCK"
+assert_block "2k.25 grep --file long form: the quoted positional after it is the input file" "grep --file 'patterns' '.env'" "BLOCK"
+assert_allow "2k.26 grep -f with a benign input file is not over-blocked" "grep -f 'patterns' notes.md"
 
 echo "# 2l. jq program text is not a path reference"
 assert_allow "2l.1 jq program mentions .env deep inside a longer filter" "jq 'select(.path == \".env.local\") | .path' data.json"
