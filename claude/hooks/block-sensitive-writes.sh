@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# block-sensitive-writes.sh: deny Write/Edit to credentials, secrets, and key files.
-# Allows writes to *.env.example and *.env.template (non-secret scaffolding).
+# block-sensitive-writes.sh: deny Read/Write/Edit of credentials, secrets, and
+# key files. Allows Read/Write/Edit of *.env.example and *.env.template
+# (non-secret scaffolding). Sole enforcement point for the .env family across
+# all three tools -- settings.json's own Read/Edit globs can't express an
+# exception for the template files (no negation, deny always wins), so that
+# carve-out lives here instead.
 #
 # Input:  PreToolUse JSON on stdin.
 # Output: stderr message + exit 2 to deny; exit 0 otherwise.
@@ -13,6 +17,7 @@ INPUT=$(cat)
 
 command -v jq >/dev/null 2>&1 || exit 0
 
+TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty')
 FILE=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty')
 SESSION_ID=$(printf '%s' "$INPUT" | jq -r '.session_id // empty')
 
@@ -35,11 +40,30 @@ case "$FILE" in
 	*.env.example | *.env.template)
 		exit 0
 		;;
-	*.lock | *.env | *.env.* | *credentials* | *secret* | *.pem | *.key)
-		log_secret_block "write-guard:sensitive-file" "$FILE"
-		printf 'BLOCK: Refusing write to sensitive file: %s\n' "$FILE" >&2
-		exit 2
-		;;
 esac
+
+if [ "$TOOL" = "Read" ]; then
+	# Narrower than Write/Edit below: .lock and a bare *secret* substring in
+	# the path (package-lock.json, uv.lock, secrets-architecture.md) are
+	# ordinary, frequently-read source files, not secrets. Read never had
+	# this hook's protection before (Write|Edit was the only matcher), so
+	# only the .env family -- the thing settings.json's Read glob got wrong --
+	# is added here, not the full Write/Edit set.
+	case "$FILE" in
+		*.env | *.env.*)
+			log_secret_block "read-guard:sensitive-file" "$FILE"
+			printf 'BLOCK: Refusing read of sensitive file: %s\n' "$FILE" >&2
+			exit 2
+			;;
+	esac
+else
+	case "$FILE" in
+		*.lock | *.env | *.env.* | *credentials* | *secret* | *.pem | *.key)
+			log_secret_block "write-guard:sensitive-file" "$FILE"
+			printf 'BLOCK: Refusing write to sensitive file: %s\n' "$FILE" >&2
+			exit 2
+			;;
+	esac
+fi
 
 exit 0

@@ -46,6 +46,10 @@ make_write_input() {
 	printf '{"tool_name":"Write","tool_input":{"file_path":"%s","content":"x"}}' "$1"
 }
 
+make_read_input() {
+	printf '{"tool_name":"Read","tool_input":{"file_path":"%s"}}' "$1"
+}
+
 # ── 1. Hook file present and executable ───────────────────────────────────────
 
 echo
@@ -133,6 +137,38 @@ if [ "$AFTER" -eq "$BEFORE" ]; then
 else
 	fail "6.2 allowed write should not log (before=$BEFORE after=$AFTER)"
 fi
+
+# ── 7. Read tool: centralized .env protection ─────────────────────────────────
+# settings.json's Read(**/.env*) / Edit(**/.env*) globs matched .env.example
+# and .env.template too, contradicting this hook's own carve-out (which only
+# ran for Write/Edit until now). Protection for the .env family is
+# centralized here so the same carve-out applies to Read as well.
+
+echo
+echo "--- 7. Read tool: .env family"
+
+assert_exit "7.1 Read .env denied" 2 "$(make_read_input '/project/.env')"
+assert_exit "7.2 Read .env.production denied" 2 "$(make_read_input '/project/.env.production')"
+assert_exit "7.3 Read .env.example allowed" 0 "$(make_read_input '/project/.env.example')"
+assert_exit "7.4 Read .env.template allowed" 0 "$(make_read_input '/project/.env.template')"
+
+echo
+echo "--- 8. Read tool: narrower pattern set than Write/Edit"
+# .lock and bare *secret*-substring stay in the Write/Edit set (unchanged,
+# see section 3/4) but must NOT extend to Read -- package-lock.json and a
+# file merely named secrets-architecture.md are ordinary, frequently-read
+# source files, not secrets.
+
+assert_exit "8.1 Read package-lock.json allowed" 0 "$(make_read_input '/project/package-lock.json')"
+assert_exit "8.2 Read uv.lock allowed" 0 "$(make_read_input '/project/uv.lock')"
+assert_exit "8.3 Read secrets-architecture.md allowed" 0 "$(make_read_input '/project/docs/secrets-architecture.md')"
+
+echo
+echo "--- 9. Write/Edit behavior unchanged (regression)"
+
+assert_exit "9.1 Write .lock still denied" 2 "$(make_write_input '/project/some.lock')"
+assert_exit "9.2 Write secret-named file still denied" 2 "$(make_write_input '/project/api_secret.txt')"
+assert_exit "9.3 Write .env.example still allowed" 0 "$(make_write_input '/project/.env.example')"
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 
