@@ -7,7 +7,7 @@
 #     the parallel-work alternative)
 #   - block-edit-on-main.sh still exempts ~/.claude/plans/ paths
 #   - list-merged-claude-branches.sh outputs advisory when merged branches
-#     exist (claude-<category>/* current convention, claude/* legacy)
+#     exist (claude-<type>/* current convention, claude/* legacy)
 #   - list-merged-claude-branches.sh is silent when nothing is merged
 #   - rules/git.md exists with required section headings
 #   - settings.json registers list-merged-claude-branches.sh
@@ -167,7 +167,7 @@ assert_exit "2.3 allows edit on claude-* branch (exit 0)" "0" "$RC"
 echo "# 3. block message suggests branching first"
 run_block_hook "main" >/dev/null 2>/tmp/block-hook.stderr || true
 STDERR=$(cat /tmp/block-hook.stderr)
-assert_contains "3.1 message suggests branch first" "git checkout -b claude-<category>/<short-description>" "$STDERR"
+assert_contains "3.1 message suggests branch first" "git checkout -b claude-<type>/<ticket>-<short-description>" "$STDERR"
 assert_contains "3.2 message offers worktree for parallel work only" "parallel work only" "$STDERR"
 assert_contains "3.3 message mentions git worktree add" "git worktree add" "$STDERR"
 

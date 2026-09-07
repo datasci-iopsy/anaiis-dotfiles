@@ -2,7 +2,7 @@
 # PreToolUse hook: block Edit/Write on main or master.
 # Exempt: paths under $HOME/.claude/plans/, $HOME/.claude/projects/, and
 # $HOME/.claude/memory/ -- plan files and memory may be written from main;
-# implementation must run on a claude-<category>/<short-description> branch
+# implementation must run on a claude-<type>/<ticket>-<short-description> branch
 # (see rules/git.md).
 # Registered in claude/settings.json under PreToolUse matcher "Write|Edit|MultiEdit|NotebookEdit".
 
@@ -34,8 +34,8 @@ if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
 	fi
 
 	echo "[block-edit-on-main] BLOCKED: refusing to edit '${FILE}' on branch '${BRANCH}'." >&2
-	echo "Branch first: git checkout -b claude-<category>/<short-description>" >&2
-	echo "Worktree (explicit parallel work only): git worktree add ../<repo>.worktrees/<topic> -b claude-<category>/<topic>" >&2
+	echo "Branch first: git checkout -b claude-<type>/<ticket>-<short-description>" >&2
+	echo "Worktree (explicit parallel work only): git worktree add ../<repo>.worktrees/<topic> -b claude-<type>/<ticket>-<topic>" >&2
 	exit 2
 fi
 

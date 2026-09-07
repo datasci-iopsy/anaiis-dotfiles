@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # UserPromptSubmit hook: advisory listing merged Claude branches
-# (claude-<category>/* current convention, claude/* legacy).
+# (claude-<type>/* current convention, claude/* legacy).
 # Runs at most once per calendar day (flag file in /tmp).
 # Never deletes branches. Output is advisory only.
 

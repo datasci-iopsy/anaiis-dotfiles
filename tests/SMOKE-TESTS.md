@@ -17,7 +17,7 @@ machine setup. Not part of the automated suite.
 2. Observe the PreToolUse hook fires before the edit executes.
 
 **Expected:** Hook output contains `BLOCKED`. Claude creates a
-`claude-<category>/<short-description>` branch before proceeding.
+`claude-<type>/<ticket>-<short-description>` branch before proceeding.
 
 **Fail condition:** Edit executes directly on `main` with no hook message.
 
@@ -35,7 +35,7 @@ changed with <= 5 lines delta, no new symbols.
 **Expected:** Claude commits directly to the feature branch without creating a
 `claude-*` sub-branch.
 
-**Fail condition:** Claude creates a `claude-<category>/<topic>` branch for a
+**Fail condition:** Claude creates a `claude-<type>/<ticket>-<topic>` branch for a
 single trivial line change.
 
 ---
