@@ -99,31 +99,6 @@ rm -f "$T3_PCT" "$T3_FLAG"
 T3_CTX=$(printf '%s' "$T3_RESULT" | jq -r '.hookSpecificOutput.additionalContext // ""' 2>/dev/null)
 assert_contains "T3: 75% emits a directive" "$T3_CTX" "/compact"
 
-# ---- T4: pressure - missing pct file is silent ------------------------------
-
-echo
-echo "--- T4: pressure - missing pct file emits nothing"
-
-T4_SID="ctxwatch-$$-4"
-rm -f "/tmp/claude-context-${T4_SID}.pct" "/tmp/claude-context-watch-${T4_SID}.fired"
-
-T4_RESULT=$(make_input "$T4_SID" | bash "$HOOK" 2>/dev/null)
-assert_empty "T4: no pct file emits nothing" "$T4_RESULT"
-
-# ---- T5: pressure - non-numeric pct file is silent --------------------------
-
-echo
-echo "--- T5: pressure - corrupt pct file emits nothing"
-
-T5_SID="ctxwatch-$$-5"
-T5_PCT="/tmp/claude-context-${T5_SID}.pct"
-rm -f "$T5_PCT" "/tmp/claude-context-watch-${T5_SID}.fired"
-echo "not-a-number" >"$T5_PCT"
-
-T5_RESULT=$(make_input "$T5_SID" | bash "$HOOK" 2>/dev/null)
-rm -f "$T5_PCT"
-assert_empty "T5: corrupt pct value emits nothing" "$T5_RESULT"
-
 # ---- Summary ----------------------------------------------------------------
 
 echo

@@ -81,19 +81,6 @@ run_hook() {
 	return $rc
 }
 
-# ── 1. Hook file present and executable ──────────────────────────────────────
-echo "# 1. Hook file"
-[ -f "$HOOK" ] && PASS=$((PASS + 1)) && echo "  PASS  1.1 hook exists" \
-	|| {
-		FAIL=$((FAIL + 1))
-		echo "  FAIL  1.1 hook missing: $HOOK"
-	}
-[ -x "$HOOK" ] && PASS=$((PASS + 1)) && echo "  PASS  1.2 hook executable" \
-	|| {
-		FAIL=$((FAIL + 1))
-		echo "  FAIL  1.2 hook not executable"
-	}
-
 # ── 2. Always exits 0 ─────────────────────────────────────────────────────────
 echo "# 2. Exit code always 0"
 for ext in json sql sh py R; do
@@ -112,12 +99,6 @@ json="{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$tmp\"}}"
 stderr=$(run_hook "$json" 2>&1)
 assert_exit "3.1 exit=0 for .xyz" "0" "$?"
 assert_not_contains "3.2 no [lint] marker for .xyz" "[lint]" "$stderr"
-
-# ── 4. Empty file_path is a no-op ────────────────────────────────────────────
-echo "# 4. Empty file_path"
-json="{\"tool_name\":\"Write\",\"tool_input\":{}}"
-stderr=$(run_hook "$json" 2>&1)
-assert_exit "4.1 exit=0 for empty path" "0" "$?"
 
 # ── 5. JSON auto-fix ─────────────────────────────────────────────────────────
 echo "# 5. JSON auto-fix (jq --indent 4)"

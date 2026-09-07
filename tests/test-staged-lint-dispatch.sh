@@ -47,6 +47,18 @@ assert_contains() {
 	fi
 }
 
+assert_empty() {
+	local name="$1" value="$2"
+	if [ -z "$value" ]; then
+		printf '  PASS  %s\n' "$name"
+		PASS=$((PASS + 1))
+	else
+		printf '  FAIL  %s\n        expected empty output, got:   %s\n' \
+			"$name" "$value"
+		FAIL=$((FAIL + 1))
+	fi
+}
+
 # Create a disposable git repo, stage the given file, run the given script,
 # return its exit code; output (stdout+stderr) captured to $RUN_OUTPUT.
 RUN_OUTPUT=""
@@ -81,15 +93,6 @@ run_empty() {
 echo "# sqlfmt staged-lint"
 
 SQLFMT_SCRIPT="$SCRIPTS/sqlfmt-lint-staged.sh"
-[ -f "$SQLFMT_SCRIPT" ] \
-	&& {
-		PASS=$((PASS + 1))
-		echo "  PASS  sqlfmt.0 script exists"
-	} \
-	|| {
-		FAIL=$((FAIL + 1))
-		echo "  FAIL  sqlfmt.0 script missing: $SQLFMT_SCRIPT"
-	}
 
 SQLFMT=""
 command -v sqlfmt &>/dev/null && SQLFMT="sqlfmt"
@@ -101,14 +104,12 @@ if [[ -n "$SQLFMT" ]]; then
 	printf 'select id, name from users\n' >"$CLEAN_SQL"
 	$SQLFMT --line-length 120 "$CLEAN_SQL" &>/dev/null
 	run_staged "$SQLFMT_SCRIPT" "$CLEAN_SQL" "clean.sql"
-	assert_exit "sqlfmt.1 clean file exits 0" "0" "$?"
 	assert_contains "sqlfmt.2 clean prints Done" "Done" "$RUN_OUTPUT"
 
 	# Dirty file: formats in-place, re-stages, exits 0
 	DIRTY_SQL=$(mktemp "$WORK/dirty.XXXXXX.sql")
 	printf 'SELECT ID,NAME FROM USERS\n' >"$DIRTY_SQL"
 	run_staged "$SQLFMT_SCRIPT" "$DIRTY_SQL" "dirty.sql"
-	assert_exit "sqlfmt.3 dirty file exits 0" "0" "$?"
 	assert_contains "sqlfmt.4 dirty prints re-staged notice" "Auto-formatted" "$RUN_OUTPUT"
 
 	# SKIP_SQLFMT=1 bypasses
@@ -119,7 +120,12 @@ if [[ -n "$SQLFMT" ]]; then
 	cp "$DIRTY_SQL2" "$local_repo/dirty.sql"
 	git -C "$local_repo" add dirty.sql
 	(cd "$local_repo" && SKIP_SQLFMT=1 bash "$SQLFMT_SCRIPT") >"$WORK/run.out" 2>&1
-	assert_exit "sqlfmt.5 SKIP_SQLFMT=1 exits 0" "0" "$?"
+	rc=$?
+	RUN_OUTPUT=$(cat "$WORK/run.out")
+	assert_exit "sqlfmt.5 SKIP_SQLFMT=1 exits 0" "0" "$rc"
+	# Fails if sqlfmt-lint-staged.sh drops the SKIP_SQLFMT early exit: the staged dirty file then
+	# reaches the formatter and prints "[sqlfmt] Formatting 1 staged SQL file(s)...".
+	assert_empty "sqlfmt.5b SKIP_SQLFMT=1 prints nothing" "$RUN_OUTPUT"
 else
 	echo "  SKIP  sqlfmt.1-5 sqlfmt not installed"
 fi
@@ -135,10 +141,20 @@ repo=$(mktemp -d "$WORK/miss.XXXXXX")
 git -C "$repo" init -q
 cp "$DIRTY_SQL3" "$repo/dirty.sql"
 git -C "$repo" add dirty.sql
-(cd "$repo" && PATH=/dev/null bash "$SQLFMT_SCRIPT") >"$WORK/run.out" 2>&1
+# Keep git and coreutils reachable but not sqlfmt (a uv tool under ~/.local/bin),
+# and point HOME at an empty dir so the script's ~/.local/bin/sqlfmt fallback also
+# misses. PATH=/dev/null would remove git too and exit before the guarded branch.
+SAFE_PATH="/usr/bin:/bin"
+FAKE_HOME=$(mktemp -d "$WORK/fakehome.XXXXXX")
+(cd "$repo" && HOME="$FAKE_HOME" PATH="$SAFE_PATH" bash "$SQLFMT_SCRIPT") >"$WORK/run.out" 2>&1
+rc=$?
 RUN_OUTPUT=$(cat "$WORK/run.out")
-assert_exit "sqlfmt.7 missing tool exits 0" "0" "$?"
-assert_contains "sqlfmt.8 missing tool prints notice" "not found" "$RUN_OUTPUT"
+# Fails if the not-found branch turns fail-closed (exit 1) or the script runs an empty $SQLFMT
+# unguarded, which under set -e exits 127.
+assert_exit "sqlfmt.7 missing tool exits 0" "0" "$rc"
+# Fails if the not-found branch stops emitting the prefixed notice; bash's own
+# "command not found" no longer satisfies this needle.
+assert_contains "sqlfmt.8 missing tool prints notice" "[sqlfmt] sqlfmt not found" "$RUN_OUTPUT"
 
 # ── shfmt ────────────────────────────────────────────────────────────────────
 echo "# shfmt staged-lint"

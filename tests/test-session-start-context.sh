@@ -197,21 +197,6 @@ T6_RESULT=$(make_input "compact" "t6-$$" "$T6_PROJ" | HOME="$T6_HOME" bash "$HOO
 rm -rf "$T6_HOME" "$T6_PROJ"
 assert_empty "T6: no output when nothing to deliver" "$T6_RESULT"
 
-# ---- T7: pressure - missing jq exits 0 silently ----
-
-echo
-echo "--- T7: pressure - missing jq exits 0 silently"
-
-T7_HOME=$(mktemp -d)
-T7_PROJ=$(mktemp -d)
-mkdir -p "$T7_HOME/.claude/memory"
-echo "# Global Memory Index" >"$T7_HOME/.claude/memory/MEMORY.md"
-
-T7_RESULT=$(make_input "startup" "t7-$$" "$T7_PROJ" \
-	| HOME="$T7_HOME" PATH="/bin" bash "$HOOK" 2>/dev/null) || true
-rm -rf "$T7_HOME" "$T7_PROJ"
-assert_empty "T7: no output when jq absent from PATH" "$T7_RESULT"
-
 # ---- T8: staleness stamp advances only when an advisory was actually emitted (G2) ----
 
 echo

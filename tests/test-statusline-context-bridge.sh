@@ -99,10 +99,16 @@ fi
 echo
 echo "--- T4: pressure - path-unsafe session_id writes nothing"
 
-T4_UNSAFE_FILE="/tmp/claude-context-../evil.pct"
+# The id must be one whose target path is writable, so the guard is the only
+# reason the file is missing (a "../evil" id fails on its own: the parent dir
+# "claude-context-.." does not exist).
+T4_UNSAFE_FILE="/tmp/claude-context-foo bar.pct"
 rm -f "$T4_UNSAFE_FILE"
-make_input 70 "../evil" | bash "$SCRIPT" >/dev/null 2>&1 || true
+make_input 70 "foo bar" | bash "$SCRIPT" >/dev/null 2>&1 || true
+# Fails if the sid_j character-class guard (^[a-zA-Z0-9._-]+$) is removed
+# from statusline-command.sh: /tmp exists, so the write then succeeds.
 assert_file_absent "T4: no pct file written for unsafe session_id" "$T4_UNSAFE_FILE"
+rm -f "$T4_UNSAFE_FILE"
 
 # ---- T5: missing session_id is a graceful no-op for the pct file -----------
 

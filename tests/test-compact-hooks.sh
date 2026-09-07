@@ -12,7 +12,10 @@
 
 set -euo pipefail
 
-HOOK_DIR="$HOME/.claude/hooks"
+# Resolve hooks through the repo, not ~/.claude/hooks: the symlink layer is
+# absent on a clean CI runner and the suite must not depend on it.
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+HOOK_DIR="$REPO_DIR/claude/hooks"
 PASS=0
 FAIL=0
 
@@ -45,6 +48,12 @@ assert_contains() {
 assert_not_contains() {
 	local label="$1" file="$2" pattern="$3"
 	! grep -q "$pattern" "$file" 2>/dev/null && pass "$label" || fail "$label, unexpected pattern found: '$pattern'"
+}
+
+# Fixed-string variant: the needle may hold regex metacharacters (paths, `**`).
+assert_contains_fixed() {
+	local label="$1" file="$2" needle="$3"
+	grep -qF -- "$needle" "$file" 2>/dev/null && pass "$label" || fail "$label, text not found: '$needle'"
 }
 
 # ── Test environment setup ────────────────────────────────────────────────────
@@ -110,9 +119,14 @@ test_pre_compact_creates_handoff() {
 	expected_file=$(ls "$TEST_MEMORY_DIR/handoffs"/handoff_*.md 2>/dev/null | head -1 || echo "")
 	assert_file_exists "handoff file created" "$expected_file"
 	assert_contains "trigger field present" "$expected_file" "Trigger.*manual"
-	assert_contains "branch field present" "$expected_file" "Branch:"
-	assert_contains "session id present" "$expected_file" "Session:"
-	assert_contains "project cwd present" "$expected_file" "Project:"
+	local branch
+	branch=$(git -C "$TEST_CWD" branch --show-current)
+	# Fails if pre-compact.sh stops resolving the branch via git (e.g. always writes the "(not a git repo)" fallback).
+	assert_contains_fixed "branch field present" "$expected_file" "**Branch:** $branch"
+	# Fails if pre-compact.sh writes SESSION_SHORT or an empty value after the Session label instead of the full id.
+	assert_contains_fixed "session id present" "$expected_file" "**Session:** $TEST_SESSION_ID"
+	# Fails if pre-compact.sh writes PROJECT_KEY (tr-encoded) or an empty value after the Project label instead of CWD.
+	assert_contains_fixed "project cwd present" "$expected_file" "**Project:** $TEST_CWD"
 	teardown_test_env
 }
 
@@ -133,14 +147,9 @@ test_pre_compact_no_memory_md_side_effect() {
 	echo
 	echo "── test_pre_compact_no_memory_md_side_effect"
 	# Hook writes to handoffs/ only; MEMORY.md is never mutated.
-	# Multiple runs within the same minute share a filename (minute-precision ISO
-	# timestamp), so we only assert >= 1 file, not an exact count.
 	setup_test_env
 	run_pre_compact "manual"
 	run_pre_compact "auto"
-	local count
-	count=$(find "$TEST_MEMORY_DIR/handoffs" -maxdepth 1 -name 'handoff_*.md' -type f 2>/dev/null | wc -l | tr -d ' ')
-	[ "${count:-0}" -ge 1 ] && pass "at least one handoff file written" || fail "no handoff files found"
 	assert_file_missing "MEMORY.md not touched by hook" "$TEST_MEMORY_DIR/MEMORY.md"
 	teardown_test_env
 }
@@ -242,9 +251,13 @@ test_pre_compact_empty_cwd() {
 	echo
 	echo "── test_pre_compact_empty_cwd"
 	local input='{"trigger":"manual","session_id":"abc123","cwd":"","hook_event_name":"PreCompact"}'
-	local exit_code=0
-	echo "$input" | bash "$HOOK_DIR/pre-compact.sh" 2>/dev/null || exit_code=$?
-	[ "$exit_code" -eq 0 ] && pass "exits 0 with empty cwd" || fail "non-zero exit with empty cwd"
+	local empty_home
+	empty_home=$(mktemp -d)
+	echo "$input" | HOME="$empty_home" bash "$HOOK_DIR/pre-compact.sh" 2>/dev/null || true
+	# Fails if pre-compact.sh drops the `[ -z "$CWD" ] && exit 0` guard: an empty CWD yields an empty
+	# PROJECT_KEY and mkdir -p creates $HOME/.claude/projects//memory/handoffs before the write.
+	[ ! -e "$empty_home/.claude/projects" ] && pass "nothing written under HOME with empty cwd" || fail "empty cwd wrote under $empty_home/.claude/projects"
+	rm -rf "$empty_home"
 }
 
 # ── Run all automated tests ───────────────────────────────────────────────────

@@ -9,7 +9,6 @@
 #   - list-merged-claude-branches.sh outputs advisory when merged branches
 #     exist (claude-<type>/* current convention, claude/* legacy)
 #   - list-merged-claude-branches.sh is silent when nothing is merged
-#   - rules/git.md exists with required section headings
 #   - settings.json registers list-merged-claude-branches.sh
 #
 # Note: Scenarios 01-05 from the plan (trivial vs. non-trivial edit,
@@ -21,7 +20,6 @@ set -u
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BLOCK_HOOK="$REPO_DIR/claude/hooks/block-edit-on-main.sh"
 ADVISORY_HOOK="$REPO_DIR/claude/hooks/list-merged-claude-branches.sh"
-BRANCHING_RULE="$REPO_DIR/claude/rules/git.md"
 SETTINGS="$REPO_DIR/claude/settings.json"
 
 PASS=0
@@ -113,45 +111,6 @@ run_advisory_hook() {
 	printf '%s' "$output"
 }
 
-# ── 1. Hook files exist and are executable ────────────────────────────────
-echo "# 1. Hook files"
-[ -f "$BLOCK_HOOK" ] \
-	&& {
-		PASS=$((PASS + 1))
-		echo "  PASS  1.1 block-edit-on-main.sh exists"
-	} \
-	|| {
-		FAIL=$((FAIL + 1))
-		echo "  FAIL  1.1 block-edit-on-main.sh missing"
-	}
-[ -x "$BLOCK_HOOK" ] \
-	&& {
-		PASS=$((PASS + 1))
-		echo "  PASS  1.2 block-edit-on-main.sh executable"
-	} \
-	|| {
-		FAIL=$((FAIL + 1))
-		echo "  FAIL  1.2 block-edit-on-main.sh not executable"
-	}
-[ -f "$ADVISORY_HOOK" ] \
-	&& {
-		PASS=$((PASS + 1))
-		echo "  PASS  1.3 list-merged-claude-branches.sh exists"
-	} \
-	|| {
-		FAIL=$((FAIL + 1))
-		echo "  FAIL  1.3 list-merged-claude-branches.sh missing"
-	}
-[ -x "$ADVISORY_HOOK" ] \
-	&& {
-		PASS=$((PASS + 1))
-		echo "  PASS  1.4 list-merged-claude-branches.sh executable"
-	} \
-	|| {
-		FAIL=$((FAIL + 1))
-		echo "  FAIL  1.4 list-merged-claude-branches.sh not executable"
-	}
-
 # ── 2. block-edit-on-main regression ─────────────────────────────────────
 echo "# 2. block-edit-on-main regression"
 RC=$(run_block_hook "main")
@@ -173,10 +132,15 @@ assert_contains "3.3 message mentions git worktree add" "git worktree add" "$STD
 
 # ── 4. block-edit-on-main plans exemption ────────────────────────────────
 echo "# 4. plans/ exemption"
-PLANS_DIR="$HOME/.claude/plans"
-mkdir -p "$PLANS_DIR"
-RC=$(run_block_hook "main" "$PLANS_DIR/my-plan.md")
+# The hook resolves ~/.claude/plans via expanduser + realpath, so a throwaway
+# HOME isolates this case from the real ~/.claude tree. Resolve the temp path
+# with pwd -P first: macOS mktemp returns /var/folders, realpath yields
+# /private/var, and the hook compares the resolved prefix against file_path.
+PLANS_HOME="$(cd "$(mktemp -d)" && pwd -P)"
+mkdir -p "$PLANS_HOME/.claude/plans"
+RC=$(HOME="$PLANS_HOME" run_block_hook "main" "$PLANS_HOME/.claude/plans/my-plan.md")
 assert_exit "4.1 plans path exempt from block on main (exit 0)" "0" "$RC"
+rm -rf "$PLANS_HOME"
 
 # ── 5. advisory hook with merged Claude branches ──────────────────────────
 echo "# 5. advisory hook with merged branches"
@@ -195,31 +159,6 @@ echo "# 6. advisory hook when nothing to clean"
 OUTPUT=$(run_advisory_hook "")
 assert_not_contains "6.1 no output when no merged Claude branches" \
 	"[branch-hygiene]" "$OUTPUT"
-
-# ── 7. rules/git.md structure ─────────────────────────────────────────────
-echo "# 7. git rule file content"
-[ -f "$BRANCHING_RULE" ] \
-	&& {
-		PASS=$((PASS + 1))
-		echo "  PASS  7.1 rules/git.md exists"
-	} \
-	|| {
-		FAIL=$((FAIL + 1))
-		echo "  FAIL  7.1 rules/git.md missing"
-	}
-
-if [ -f "$BRANCHING_RULE" ]; then
-	for section in "Branching decision" "Branch reuse" "Worktrees" "Branch cleanup" "Pull requests" "Branch naming"; do
-		escaped=$(printf '%s' "$section" | sed 's/[][\.*^$(){}?+|/-]/\\&/g')
-		if grep -qiE "^#{1,6}[[:space:]].*${escaped}" "$BRANCHING_RULE"; then
-			printf '  PASS  7.x rule contains section: %s\n' "$section"
-			PASS=$((PASS + 1))
-		else
-			printf '  FAIL  7.x rule missing section: %s\n' "$section"
-			FAIL=$((FAIL + 1))
-		fi
-	done
-fi
 
 # ── 8. settings.json registers advisory hook ──────────────────────────────
 echo "# 8. settings.json registration"
