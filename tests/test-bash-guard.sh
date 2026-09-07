@@ -310,6 +310,12 @@ echo "# 2m. echo/printf string literal is not a path reference"
 assert_allow "2m.1 echo writes ledger prose mentioning .env" "echo 'blocked read of .env' >> ledger.md"
 assert_block "2m.2 echo writing to a real .env file still blocks" "echo x > .env" "BLOCK"
 assert_block "2m.3 unrelated real .env read still blocks" "cat .env | wc -l" "BLOCK"
+assert_allow "2m.4 printf format plus a second quoted operand mentioning .env" "printf '%s\n' 'note on .env' >> ledger.md"
+assert_allow "2m.5 echo second quoted operand mentioning .env is also scrubbed" "echo 'a' 'second mentions .env'"
+assert_allow "2m.6 echo double-quoted second operand mentioning .env is also scrubbed" 'echo "a" "b .env" > log.txt'
+assert_block "2m.7 echo redirect target past a scrubbed operand still blocks" "echo 'a' > .env" "BLOCK"
+assert_block "2m.8 chained command past scrubbed echo operands still blocks" "echo 'a' 'b' && cat .env" "BLOCK"
+assert_block "2m.9 piped command past scrubbed echo operands still blocks" "echo 'a' 'b' | tee .env" "BLOCK"
 
 echo "# 2n. test-fixture .env paths are not real secrets"
 assert_allow "2n.1 .env under tests/fixtures/ is scaffolding" "touch tests/fixtures/dotenv/.env"

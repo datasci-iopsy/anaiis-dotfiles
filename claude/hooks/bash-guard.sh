@@ -137,14 +137,17 @@ if command -v perl >/dev/null 2>&1; then
 		# after, so a real path elsewhere in the same command is untouched.
 		s/(\bjq\b(?:\s+-(?!-?(?:f\b|[A-Za-z]*f\b|-file\b|-from-file\b|-rawfile\b|-slurpfile\b|-argfile\b))-?[A-Za-z][A-Za-z-]*)*\s+)\x27[^\x27]*\x27/${1}\x27\x27/gs;
 		s/(\bjq\b(?:\s+-(?!-?(?:f\b|[A-Za-z]*f\b|-file\b|-from-file\b|-rawfile\b|-slurpfile\b|-argfile\b))-?[A-Za-z][A-Za-z-]*)*\s+)"[^"`\$]*"/${1}""/gs;
-		# echo/printf\x27s quoted argument is text being printed (to stdout, a
-		# log line, a ledger file), not a file path read. Only the first
-		# quoted token right after echo/printf (and its flags) is blanked; a
+		# echo/printf\x27s quoted arguments are text being printed (to stdout, a
+		# log line, a ledger file), not a file path read. Every static quoted
+		# token right after echo/printf (and its flags) is blanked in turn; a
 		# redirect target after it (echo "..." > .env) is never touched and
 		# still scanned below.
 		my $e = qr/(?:echo|printf)/;
-		s/(\b$e\b(?:\s+-{1,2}[A-Za-z][A-Za-z-]*)*\s+)\x27[^\x27]*\x27/${1}\x27\x27/gs;
-		s/(\b$e\b(?:\s+-{1,2}[A-Za-z][A-Za-z-]*)*\s+)"[^"`\$]*"/${1}""/gs;
+		my $eflag = qr/-{1,2}[A-Za-z][A-Za-z-]*/;
+		my $eblank = qr/(?:\x27\x27|"")/;
+		my $ebare = qr/[^\s\x27"<>|;&()`\$]+/;
+		1 while s/(\b$e\b(?:\s+(?:$eflag|$eblank|$ebare))*\s+)\x27[^\x27]+\x27/${1}\x27\x27/s;
+		1 while s/(\b$e\b(?:\s+(?:$eflag|$eblank|$ebare))*\s+)"[^"`\$]+"/${1}""/s;
 	' 2>/dev/null) || GUARD_STR="$CMD"
 	[ -n "$GUARD_STR" ] || GUARD_STR="$CMD"
 fi
