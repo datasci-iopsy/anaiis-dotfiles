@@ -77,6 +77,7 @@ _install() {
 		echo "  created  $hook"
 
 	elif grep -qF "$marker" "$hook"; then
+		chmod +x "$hook"
 		echo "  ok       $hook (dispatcher already present)"
 
 	elif [ "$name" = "pre-commit" ] && grep -qF "$STALE_MARKER" "$hook"; then
@@ -87,6 +88,7 @@ _install() {
 	else
 		printf '\n# Dotfiles %s hooks (managed by ~/anaiis-dotfiles -- never edit this line)\n%s\n' \
 			"$label" "$line" >>"$hook"
+		chmod +x "$hook"
 		echo "  updated  $hook (appended dispatcher)"
 	fi
 }
