@@ -1,0 +1,55 @@
+# Runs the repo's shell test suite on every pull request and on pushes to
+# main. macOS runner on purpose: the hooks under test use BSD-only forms
+# (date -j, stat -f) and only ever run on macOS. Public repo, so runner
+# minutes are free on GitHub-hosted standard runners, macOS included.
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    permissions:
+      contents: read
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # jq, python3, git, and realpath ship with the image. shfmt and
+      # shellcheck may not; the lint-dispatch suites skip their cases when a
+      # tool is absent, which would silently drop coverage, so install only
+      # what is missing. Homebrew bash is a documented prerequisite
+      # (Brewfile): /bin/bash is 3.2 on macOS and statusline-command.sh uses
+      # namerefs (Bash 4.3+), so a runner whose PATH bash is 3.2 renders
+      # nothing there. Prepending the brew prefix makes later steps, and the
+      # `bash <script>` calls inside the suites, pick up the newer bash.
+      - name: Install tools missing from the runner image
+        run: |
+          for tool in shfmt shellcheck; do
+            command -v "$tool" >/dev/null 2>&1 || brew install "$tool"
+          done
+          bash_major="$(bash -c 'printf "%s" "${BASH_VERSINFO[0]}"')"
+          bash_minor="$(bash -c 'printf "%s" "${BASH_VERSINFO[1]}"')"
+          if [ "$bash_major" -lt 4 ] ||
+             { [ "$bash_major" -eq 4 ] && [ "$bash_minor" -lt 3 ]; }; then
+            brew install bash
+          fi
+          echo "$(brew --prefix)/bin" >>"$GITHUB_PATH"
+          "$(brew --prefix)/bin/bash" --version | head -1
+
+      # Several hooks and the memory doctor resolve ~/.claude/* at runtime;
+      # the installer's CI mode builds only that symlink tree.
+      - name: Build the ~/.claude tree
+        run: bash install.sh --symlinks-only
+
+      - name: Run the test suite
+        run: bash tests/run-all.sh

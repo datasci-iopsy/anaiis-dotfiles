@@ -13,7 +13,7 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-HOOK="$HOME/.claude/hooks/session-start-context.sh"
+HOOK="$REPO_DIR/claude/hooks/session-start-context.sh"
 
 WRITE_REPORT=0
 [ "${1:-}" = "--report" ] && WRITE_REPORT=1

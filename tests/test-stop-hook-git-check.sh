@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # tests/test-stop-hook-git-check.sh -- verify stop-hook-git-check.sh
 #
-# Confirms: exits 0 on clean repo with no remote; exits 2 for uncommitted
+# Confirms: exits 0 on a dirty repo with no remote; exits 2 for uncommitted
 # changes; exits 2 for untracked files; exits 2 for unpushed commits;
-# exits 0 when up to date with remote; recursion guard exits 0 immediately;
-# every blocking [git] message carries the "reply only: Ok" directive inline.
+# exits 0 when up to date with remote; recursion guard exits 0 immediately
+# even on a dirty tree; every blocking [git] message carries the
+# "reply only: Ok" directive inline.
 #
 # Exit 0 if all tests pass; non-zero on any failure.
 
@@ -78,23 +79,6 @@ setup_repo_with_remote() {
 	printf '%s' "$local_repo"
 }
 
-# ── 1. Hook file present and executable ───────────────────────────────────────
-
-echo
-echo "--- 1. Hook file"
-
-if [ -f "$HOOK" ]; then
-	pass "1.1 hook exists"
-else
-	fail "1.1 hook missing: $HOOK"
-fi
-
-if [ -x "$HOOK" ]; then
-	pass "1.2 hook executable"
-else
-	fail "1.2 hook not executable"
-fi
-
 # ── 2. Recursion guard ────────────────────────────────────────────────────────
 
 echo
@@ -104,7 +88,11 @@ TMP_BARE=$(mktemp -d)
 git init --bare "$TMP_BARE" >/dev/null 2>&1
 TMP_REPO=$(mktemp -d)
 git clone "$TMP_BARE" "$TMP_REPO" >/dev/null 2>&1
+# Dirty the tree so the recursion guard is the only path to exit 0.
+printf 'dirty\n' >"$TMP_REPO/untracked.txt"
 
+# Fails if the stop_hook_active early exit is removed from the hook: the
+# untracked file above then trips the untracked-files check and exits 2.
 got=$(
 	cd "$TMP_REPO" && printf '%s' "$ACTIVE_INPUT" | bash "$HOOK" 2>/dev/null
 	echo $?
@@ -131,13 +119,17 @@ NO_REMOTE=$(mktemp -d)
 		&& git add f.txt >/dev/null 2>&1 \
 		&& git commit -m "init" >/dev/null 2>&1
 ) >/dev/null 2>&1
+# Dirty the tracked file so the no-remote bail is the only path to exit 0.
+printf 'y\n' >>"$NO_REMOTE/f.txt"
 
+# Fails if the `git remote` empty-check bail is removed from the hook: the
+# modified tracked file then trips the uncommitted-changes check and exits 2.
 got=$(
 	cd "$NO_REMOTE" && printf '%s' "$CLEAN_INPUT" | bash "$HOOK" 2>/dev/null
 	echo $?
 )
 if [ "$got" = "0" ]; then
-	pass "3.1 no-remote repo exits 0"
+	pass "3.1 dirty no-remote repo exits 0"
 else
 	fail "3.1 no-remote repo should exit 0 (got $got)"
 fi

@@ -24,8 +24,14 @@ INPUT=$(cat)
 
 command -v jq >/dev/null 2>&1 || exit 0
 
-CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')
-SESSION_ID=$(printf '%s' "$INPUT" | jq -r '.session_id // empty')
+# Scans below feed strings to grep/sed via here-strings rather than
+# `printf | ...` pipelines: the pipeline forks a subshell for the builtin
+# printf on top of the exec, and this hook runs on every Bash call, so one
+# fork per scan is the dominant cost. Semantics are unchanged for grep -q
+# (per-line matching, same anchors); the here-string's trailing newline is
+# stripped by $(...) where output is captured.
+CMD=$(jq -r '.tool_input.command // empty' <<<"$INPUT")
+SESSION_ID=$(jq -r '.session_id // empty' <<<"$INPUT")
 
 [ -z "$CMD" ] && exit 0
 
@@ -43,17 +49,17 @@ log_secret_block() {
 }
 
 # ── Destructive commands ────────────────────────────────────────────────────
-if printf '%s' "$CMD" | grep -qE '^bq\s+rm\b'; then
+if grep -qE '^bq\s+rm\b' <<<"$CMD"; then
 	printf 'BLOCK: bq rm is destructive. Run this manually in terminal.\n' >&2
 	exit 2
 fi
 
-if printf '%s' "$CMD" | grep -qE '^gcloud\s.*(delete|destroy|remove-iam-policy|set-iam-policy|disable|reset-windows-password)'; then
+if grep -qE '^gcloud\s.*(delete|destroy|remove-iam-policy|set-iam-policy|disable|reset-windows-password)' <<<"$CMD"; then
 	printf 'BLOCK: Destructive gcloud command detected. Run this manually in terminal.\n' >&2
 	exit 2
 fi
 
-if printf '%s' "$CMD" | grep -qE '^uv\s+(cache\s+(clean|prune)|publish|tool\s+uninstall|pip\s+uninstall)'; then
+if grep -qE '^uv\s+(cache\s+(clean|prune)|publish|tool\s+uninstall|pip\s+uninstall)' <<<"$CMD"; then
 	printf 'BLOCK: Destructive uv command detected. Run this manually in terminal.\n' >&2
 	exit 2
 fi
@@ -66,8 +72,8 @@ fi
 # --force-with-lease always also matches a git push --force* deny), so this
 # hook is the real enforcement point for the --force/--force-with-lease split,
 # not settings.json.
-if printf '%s' "$CMD" | grep -qE '(^|[;&|]\s*)git\s+push\b' \
-	&& printf '%s' "$CMD" | grep -qE '(^|[[:space:]])(-f|--force)([[:space:]=]|$)'; then
+if grep -qE '(^|[;&|]\s*)git\s+push\b' <<<"$CMD" \
+	&& grep -qE '(^|[[:space:]])(-f|--force)([[:space:]=]|$)' <<<"$CMD"; then
 	printf 'BLOCK: bare --force/-f push is unsafe (no remote-side check). Use --force-with-lease instead.\n' >&2
 	exit 2
 fi
@@ -75,10 +81,7 @@ fi
 # ── Secrets: token-minting commands ─────────────────────────────────────────
 # These commands take no file path (so the protected-path check below never
 # sees them) but their sole output is a live, usable credential.
-if printf '%s' "$CMD" | grep -qE '(^|[;&|]\s*)gcloud\s+auth\s+print-(access|identity)-token\b' \
-	|| printf '%s' "$CMD" | grep -qE '(^|[;&|]\s*)aws\s+sts\s+get-(session|federation)-token\b' \
-	|| printf '%s' "$CMD" | grep -qE '(^|[;&|]\s*)heroku\s+auth:token\b' \
-	|| printf '%s' "$CMD" | grep -qE '(^|[;&|]\s*)doctl\s+auth\s+token\b'; then
+if grep -qE '(^|[;&|]\s*)gcloud\s+auth\s+print-(access|identity)-token\b|(^|[;&|]\s*)aws\s+sts\s+get-(session|federation)-token\b|(^|[;&|]\s*)heroku\s+auth:token\b|(^|[;&|]\s*)doctl\s+auth\s+token\b' <<<"$CMD"; then
 	log_secret_block "bash-guard:token-mint" "$CMD"
 	printf 'BLOCK: command mints a live credential/token. Run this manually in terminal if genuinely needed.\n' >&2
 	exit 2
@@ -101,7 +104,7 @@ fi
 #     no command substitution); "$(cat .env)" therefore stays visible
 # A message flag interpolating a secret-named variable is blocked outright:
 # the shell would expand the real value into the message.
-if printf '%s' "$CMD" | grep -qE '(^|[[:space:]])(-m|--message|--title|--body|--notes|--description)(=|[[:space:]]+)("[^"]*\$\{?[A-Za-z0-9_]*(TOKEN|SECRET|API_?KEY|PASSWORD)|\$\{?[A-Za-z_][A-Za-z0-9_]*(TOKEN|SECRET|API_?KEY|PASSWORD))'; then
+if grep -qE '(^|[[:space:]])(-m|--message|--title|--body|--notes|--description)(=|[[:space:]]+)("[^"]*\$\{?[A-Za-z0-9_]*(TOKEN|SECRET|API_?KEY|PASSWORD)|\$\{?[A-Za-z_][A-Za-z0-9_]*(TOKEN|SECRET|API_?KEY|PASSWORD))' <<<"$CMD"; then
 	printf 'BLOCK: message flag interpolates a secret-named variable; the expanded value would land in the message text.\n' >&2
 	exit 2
 fi
@@ -173,13 +176,13 @@ fi
 # makes the quoted token a real path, not a filter key, so this fallback
 # .env-key stripper must not fire when one is present.
 JQ_DOTENV_SED="s/(jq([[:space:]]+--?[A-Za-z][A-Za-z-]*)*[[:space:]]+)(['\"])\.env([^A-Za-z0-9_]|\$)/\1\3\4/g"
-if printf '%s' "$GUARD_STR" | grep -qE '\bjq\b[^|;&]*[[:space:]]-(-?f\b|[A-Za-z]*f\b|-file\b|-from-file\b|-rawfile\b|-slurpfile\b|-argfile\b)'; then
+if grep -qE '\bjq\b[^|;&]*[[:space:]]-(-?f\b|[A-Za-z]*f\b|-file\b|-from-file\b|-rawfile\b|-slurpfile\b|-argfile\b)' <<<"$GUARD_STR"; then
 	JQ_DOTENV_SED='s/&/&/'
 fi
-SCRUBBED=$(printf '%s' "$GUARD_STR" | sed -E 's/\.env\.(example|template)//g' \
-	| sed -E "$JQ_DOTENV_SED" \
-	| sed -E 's#tests/fixtures/([^./[:space:]][^/[:space:]]*/)*\.env(\.[A-Za-z0-9_]+)*#tests/fixtures/FIXTURE#g')
-if printf '%s' "$SCRUBBED" | grep -qE '(\.env\b|\.ssh\b|\.bashrc(\.local)?|\.bash_profile|\.zshrc(\.local)?|\.profile\b|secrets/|\.pem\b|(^|[/[:space:]])\.?\w*\.key\b|credentials|\.aws\b|\.config/(gcloud|secrets|gh)\b|\.netrc\b|\.gnupg\b|\.docker/config|\.kube/config|\.npmrc\b|\.pypirc\b)'; then
+SCRUBBED=$(sed -E -e 's/\.env\.(example|template)//g' \
+	-e "$JQ_DOTENV_SED" \
+	-e 's#tests/fixtures/([^./[:space:]][^/[:space:]]*/)*\.env(\.[A-Za-z0-9_]+)*#tests/fixtures/FIXTURE#g' <<<"$GUARD_STR")
+if grep -qE '(\.env\b|\.ssh\b|\.bashrc(\.local)?|\.bash_profile|\.zshrc(\.local)?|\.profile\b|secrets/|\.pem\b|(^|[/[:space:]])\.?\w*\.key\b|credentials|\.aws\b|\.config/(gcloud|secrets|gh)\b|\.netrc\b|\.gnupg\b|\.docker/config|\.kube/config|\.npmrc\b|\.pypirc\b)' <<<"$SCRUBBED"; then
 	log_secret_block "bash-guard:protected-path" "$CMD"
 	printf 'BLOCK: command references a protected secrets path. If a value is needed, ask the user to provide or load it.\n' >&2
 	exit 2
@@ -200,18 +203,18 @@ fi
 # cannot select, invert, or emit more than the matched line is accepted.
 # Calibrated against real usage, see tests/fixtures/env-dump/usage-evidence.md.
 ENV_DUMP=false
-if printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*$'; then
+if grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*$' <<<"$CMD"; then
 	ENV_DUMP=true
-elif printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|'; then
-	if printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|[[:space:]]*(grep|egrep|rg)\b'; then
-		if printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|[[:space:]]*(grep|egrep|rg)([[:space:]]+-[inwxFEGPsaHhbco]+)*[[:space:]]+('"'"'\^?[A-Za-z_][A-Za-z0-9_]*='"'"'|"\^?[A-Za-z_][A-Za-z0-9_]*="|\^?[A-Za-z_][A-Za-z0-9_]*=)[[:space:]]*$' \
-			&& ! printf '%s' "$CMD" | grep -qiE '(^|[[:space:]])(-[A-Za-z]*v[A-Za-z]*|--invert-match)([[:space:]]|$)' \
-			&& ! printf '%s' "$CMD" | grep -qiE '(TOKEN|SECRET|API_?KEY|PASSWORD)'; then
+elif grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|' <<<"$CMD"; then
+	if grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|[[:space:]]*(grep|egrep|rg)\b' <<<"$CMD"; then
+		if grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|[[:space:]]*(grep|egrep|rg)([[:space:]]+-[inwxFEGPsaHhbco]+)*[[:space:]]+('"'"'\^?[A-Za-z_][A-Za-z0-9_]*='"'"'|"\^?[A-Za-z_][A-Za-z0-9_]*="|\^?[A-Za-z_][A-Za-z0-9_]*=)[[:space:]]*$' <<<"$CMD" \
+			&& ! grep -qiE '(^|[[:space:]])(-[A-Za-z]*v[A-Za-z]*|--invert-match)([[:space:]]|$)' <<<"$CMD" \
+			&& ! grep -qiE '(TOKEN|SECRET|API_?KEY|PASSWORD)' <<<"$CMD"; then
 			ENV_DUMP=false
 		else
 			ENV_DUMP=true
 		fi
-	elif printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|[[:space:]]*wc\b'; then
+	elif grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|[[:space:]]*wc\b' <<<"$CMD"; then
 		ENV_DUMP=false
 	else
 		ENV_DUMP=true
@@ -219,8 +222,8 @@ elif printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|'; 
 fi
 
 if $ENV_DUMP \
-	|| printf '%s' "$GUARD_STR" | grep -qE 'printenv[[:space:]]+.*(TOKEN|SECRET|API_?KEY|PASSWORD)' \
-	|| printf '%s' "$GUARD_STR" | grep -qE '\b(echo|printf)\b[^|;&]*\$\{?[A-Za-z0-9_]*(TOKEN|SECRET|API_?KEY|PASSWORD)'; then
+	|| grep -qE 'printenv[[:space:]]+.*(TOKEN|SECRET|API_?KEY|PASSWORD)' <<<"$GUARD_STR" \
+	|| grep -qE '\b(echo|printf)\b[^|;&]*\$\{?[A-Za-z0-9_]*(TOKEN|SECRET|API_?KEY|PASSWORD)' <<<"$GUARD_STR"; then
 	log_secret_block "bash-guard:env-dump" "$CMD"
 	printf 'BLOCK: command would print environment secrets. If a value is needed, ask the user to provide it.\n' >&2
 	exit 2
@@ -233,11 +236,9 @@ fi
 # targeted getenv/index access when it co-occurs with a secret-shaped name
 # (TOKEN/SECRET/API_?KEY/PASSWORD). Ordinary os.getenv('CONFIG_VAR', default)
 # calls with no secret-shaped name pass through.
-if printf '%s' "$CMD" | grep -qE '(os\.environ|process\.env)\)' \
-	|| printf '%s' "$CMD" | grep -qE 'os\.environ\.(items|keys|values)\(\)' \
-	|| printf '%s' "$CMD" | grep -qE '\bENV\.(to_h|inspect)\b' \
-	|| { printf '%s' "$CMD" | grep -qE '(os\.getenv|os\.environ\[|process\.env\.|ENV\[)' \
-		&& printf '%s' "$CMD" | grep -qiE '(TOKEN|SECRET|API_?KEY|PASSWORD)'; }; then
+if grep -qE '(os\.environ|process\.env)\)|os\.environ\.(items|keys|values)\(\)|\bENV\.(to_h|inspect)\b' <<<"$CMD" \
+	|| { grep -qE '(os\.getenv|os\.environ\[|process\.env\.|ENV\[)' <<<"$CMD" \
+		&& grep -qiE '(TOKEN|SECRET|API_?KEY|PASSWORD)' <<<"$CMD"; }; then
 	log_secret_block "bash-guard:env-dump-lang" "$CMD"
 	printf 'BLOCK: command would print language-level environment secrets (python/node/ruby). If a value is needed, ask the user to provide it.\n' >&2
 	exit 2
@@ -247,10 +248,10 @@ fi
 # Only python/python3 commands whose sole import is json are blocked. A comma
 # after json (import json, pandas) or any other import statement means the
 # script does more than parsing; allow it.
-if printf '%s' "$GUARD_STR" | grep -qE '\b(python|python3)\b' \
-	&& printf '%s' "$GUARD_STR" | grep -qE '\bimport\s+json\b' \
-	&& ! printf '%s' "$GUARD_STR" | grep -qE '\bimport\s+json\s*,' \
-	&& ! printf '%s' "$GUARD_STR" | sed 's/import[[:space:]]*json//g' | grep -qE '\bimport\s+\w'; then
+if grep -qE '\b(python|python3)\b' <<<"$GUARD_STR" \
+	&& grep -qE '\bimport\s+json\b' <<<"$GUARD_STR" \
+	&& ! grep -qE '\bimport\s+json\s*,' <<<"$GUARD_STR" \
+	&& ! sed 's/import[[:space:]]*json//g' <<<"$GUARD_STR" | grep -qE '\bimport\s+\w'; then
 	echo "Prefer jq over Python for JSON parsing -- import json is the only import, this is a pure parsing task. jq is pre-approved, streaming, and faster." >&2
 	exit 2
 fi
@@ -259,9 +260,9 @@ fi
 # uv is the sole sanctioned Python dependency tool (rules/python.md); these two
 # subcommands are allowed, never blocked. This notice makes a dependency
 # change visible in the transcript instead of silent, it never gates anything.
-if printf '%s' "$CMD" | grep -qE '\buv\s+add\b'; then
+if grep -qE '\buv\s+add\b' <<<"$CMD"; then
 	echo "[deps] $CMD -- modifies pyproject.toml/uv.lock" >&2
-elif printf '%s' "$CMD" | grep -qE '\buv\s+pip\s+install\b'; then
+elif grep -qE '\buv\s+pip\s+install\b' <<<"$CMD"; then
 	echo "[deps] $CMD -- installs into the active environment (pyproject.toml/uv.lock not updated)" >&2
 fi
 
@@ -352,7 +353,7 @@ if command -v perl >/dev/null 2>&1; then
 	' 2>/dev/null) || RM_SCAN_STR="$GUARD_STR"
 fi
 RM_GATE_SCAN_STR="${RM_SCAN_STR//$'\n'/ }"
-if printf '%s' "$RM_GATE_SCAN_STR" | grep -qE "$RM_GATE_RE"; then
+if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 	# Tripwire scan runs FIRST, on the whole word list, before the compound-
 	# operator check below and independent of it: a catastrophic operand
 	# (notably $HOME and /* -- both contain a character, $ or *, that the
@@ -495,7 +496,7 @@ if printf '%s' "$RM_GATE_SCAN_STR" | grep -qE "$RM_GATE_RE"; then
 		exit 0
 	fi
 
-	if printf '%s' "$GUARD_STR" | grep -qE '[;&|`$()<>]' || [[ "$GUARD_STR" == *$'\n'* ]]; then
+	if grep -qE '[;&|`$()<>]' <<<"$GUARD_STR" || [[ "$GUARD_STR" == *$'\n'* ]]; then
 		jq -n --arg r "recursive rm alongside a shell operator/substitution -- cannot verify each path independently" \
 			'{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask", "permissionDecisionReason": $r}}'
 		exit 0
@@ -533,11 +534,11 @@ if printf '%s' "$RM_GATE_SCAN_STR" | grep -qE "$RM_GATE_RE"; then
 				case "$RM_W" in -*) continue ;; esac
 			fi
 			RM_OPERAND_COUNT=$((RM_OPERAND_COUNT + 1))
-			if ! printf '%s' "$RM_W" | grep -qE '^[A-Za-z0-9._/-]+$'; then
+			if ! grep -qE '^[A-Za-z0-9._/-]+$' <<<"$RM_W"; then
 				RM_ASK_REASON="operand \"$RM_W\" contains characters that can't be verified safe"
 				break
 			fi
-			if ! printf '%s' "$RM_W" | grep -qE "$RM_SAFE_SCRATCH|$RM_SAFE_ARTIFACT|$RM_SAFE_FIXTURE"; then
+			if ! grep -qE "$RM_SAFE_SCRATCH|$RM_SAFE_ARTIFACT|$RM_SAFE_FIXTURE" <<<"$RM_W"; then
 				RM_ASK_REASON="operand \"$RM_W\" is not on the known-safe path list"
 				break
 			fi

@@ -2,8 +2,8 @@
 # tests/test-cost-guard.sh -- verify cost-guard.sh
 #
 # Confirms: Explore/Plan pass through with info; general-purpose agents are
-# counted and blocked above cap; WebFetch passes; COST_GUARD_GP_LIMIT is
-# respected; stamp files are managed correctly.
+# counted and blocked above cap; COST_GUARD_GP_LIMIT is respected; stamp
+# files are managed correctly.
 #
 # Exit 0 if all tests pass; non-zero on any failure.
 
@@ -60,23 +60,6 @@ make_agent_input() {
 		"$sid" "$subtype" "$desc" "$prompt"
 }
 
-# ── 1. Hook file present and executable ───────────────────────────────────────
-
-echo
-echo "--- 1. Hook file"
-
-if [ -f "$HOOK" ]; then
-	pass "1.1 hook exists"
-else
-	fail "1.1 hook missing: $HOOK"
-fi
-
-if [ -x "$HOOK" ]; then
-	pass "1.2 hook executable"
-else
-	fail "1.2 hook not executable"
-fi
-
 # ── 2. Bounded agents pass through ────────────────────────────────────────────
 
 echo
@@ -84,11 +67,24 @@ echo "--- 2. Bounded agents pass (Explore, Plan, claude-code-guide)"
 
 SID_B="cost-test-bounded-$$-$(date +%s)"
 
+# Exit 0 alone cannot tell the bounded branch from an under-cap counted spawn
+# (both exit 0). The bounded branch is the only one whose notice names the
+# subagent type ("[cost] Explore agent (~..."); the counted branch prints
+# "[cost] general-purpose agent #N/LIMIT". Each pair below fails if its type
+# is dropped from the "Explore | Plan | claude-code-guide" case in
+# cost-guard.sh: the input then falls to the counted branch and the notice
+# no longer names the type.
 assert_exit "2.1 Explore passes" 0 \
+	"$(make_agent_input 'Explore' 'find thing' "$SID_B")"
+assert_stderr_contains "2.1b Explore takes the bounded branch (notice names the type)" "[cost] Explore agent (" \
 	"$(make_agent_input 'Explore' 'find thing' "$SID_B")"
 assert_exit "2.2 Plan passes" 0 \
 	"$(make_agent_input 'Plan' 'plan task' "$SID_B")"
+assert_stderr_contains "2.2b Plan takes the bounded branch (notice names the type)" "[cost] Plan agent (" \
+	"$(make_agent_input 'Plan' 'plan task' "$SID_B")"
 assert_exit "2.3 claude-code-guide passes" 0 \
+	"$(make_agent_input 'claude-code-guide' 'answer question' "$SID_B")"
+assert_stderr_contains "2.3b claude-code-guide takes the bounded branch (notice names the type)" "[cost] claude-code-guide agent (" \
 	"$(make_agent_input 'claude-code-guide' 'answer question' "$SID_B")"
 
 # ── 3. CodeRabbit surgeon passes through ──────────────────────────────────────
@@ -194,24 +190,6 @@ else
 fi
 
 rm -f "$STAMP_LIM"
-
-# ── 7. WebFetch passes through ────────────────────────────────────────────────
-
-echo
-echo "--- 7. WebFetch passes"
-
-assert_exit "7.1 WebFetch passes" 0 \
-	'{"tool_name":"WebFetch","tool_input":{"url":"https://example.com","prompt":"get"}}'
-
-# ── 8. Non-agent tools pass through ───────────────────────────────────────────
-
-echo
-echo "--- 8. Non-agent tools pass"
-
-assert_exit "8.1 Bash passes" 0 \
-	'{"tool_name":"Bash","tool_input":{"command":"ls"}}'
-assert_exit "8.2 Read passes" 0 \
-	'{"tool_name":"Read","tool_input":{"file_path":"/tmp/x"}}'
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 

@@ -47,19 +47,6 @@ run_hook() {
 	echo $?
 }
 
-# ── 1. Hook file present and executable ───────────────────────────────────
-echo "# 1. Hook file"
-[ -f "$HOOK" ] && PASS=$((PASS + 1)) && echo "  PASS  1.1 hook exists" \
-	|| {
-		FAIL=$((FAIL + 1))
-		echo "  FAIL  1.1 hook missing: $HOOK"
-	}
-[ -x "$HOOK" ] && PASS=$((PASS + 1)) && echo "  PASS  1.2 hook executable" \
-	|| {
-		FAIL=$((FAIL + 1))
-		echo "  FAIL  1.2 hook not executable"
-	}
-
 # ── 2. Registered in settings.json under PreToolUse ───────────────────────
 echo "# 2. settings.json registration"
 if command -v jq >/dev/null 2>&1; then

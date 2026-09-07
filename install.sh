@@ -8,6 +8,23 @@
 
 set -euo pipefail
 
+# Usage:
+#   bash install.sh                   full install
+#   bash install.sh --symlinks-only   steps 1 and 2 only; stops before ~/.bashrc,
+#                                     graphify, CLI tools, R style, and Homebrew
+#                                     (what CI runs to build the ~/.claude tree)
+#   bash install.sh --bashrc-only     step 3 only: wire $HOME/.bashrc and exit
+#                                     (what tests/test-install-bashrc.sh runs
+#                                     against a throwaway HOME)
+MODE="${1:-}"
+case "$MODE" in
+	--symlinks-only | --bashrc-only | "") ;;
+	*)
+		echo "usage: bash install.sh [--symlinks-only|--bashrc-only]" >&2
+		exit 2
+		;;
+esac
+
 DOTFILES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Always resolve to the main worktree — never let a linked worktree become canonical
 if git -C "$DOTFILES" rev-parse --git-dir >/dev/null 2>&1; then
@@ -31,6 +48,49 @@ symlink() {
 		echo "  link $dst -> $src"
 	fi
 }
+
+# Step 3: wire PATH and the shared.bash source line into $HOME/.bashrc.
+# A function so --bashrc-only can run exactly this phase against a throwaway
+# HOME; the body is what the full install has always run.
+wire_bashrc() {
+	echo ""
+	echo "=== Shell config (~/.bashrc) ==="
+	local BASHRC="$HOME/.bashrc"
+	local tmp_bashrc
+	tmp_bashrc="$(mktemp "${TMPDIR:-/tmp}/bashrc_path_fix.XXXXXX")" || return 1
+	# Strip any prior form (bare export, indented export inside an if-guard, or
+	# duplicates), then append the single canonical line. Idempotent by design.
+	awk '
+	/if.*anaiis-dotfiles\/bin/  { in_guard=1; next }
+	in_guard && /^[[:space:]]*fi[[:space:]]*$/ { in_guard=0; next }
+	/anaiis-dotfiles\/bin/      { next }
+	{ print }
+' "$BASHRC" >"$tmp_bashrc" \
+		&& mv "$tmp_bashrc" "$BASHRC" \
+		|| {
+			rm -f "$tmp_bashrc"
+			return 1
+		}
+	printf '\nexport PATH="$HOME/anaiis-dotfiles/bin:$PATH"\n' >>"$BASHRC"
+	echo "  ok   PATH line (canonical)"
+	if grep -qF 'anaiis-dotfiles/bash/shared.bash' "$BASHRC" 2>/dev/null; then
+		echo "  ok   shared.bash source line"
+	else
+		if grep -qF '.bashrc.local' "$BASHRC" 2>/dev/null; then
+			sed -i '' '/\.bashrc\.local/i\
+source "$HOME/anaiis-dotfiles/bash/shared.bash"
+' "$BASHRC"
+		else
+			printf '\nsource "$HOME/anaiis-dotfiles/bash/shared.bash"\n' >>"$BASHRC"
+		fi
+		echo "  add  source shared.bash -> $BASHRC"
+	fi
+}
+
+if [ "$MODE" = "--bashrc-only" ]; then
+	wire_bashrc
+	exit 0
+fi
 
 echo "=== Canonical path ==="
 if [ "$DOTFILES" != "$CANONICAL" ]; then
@@ -62,32 +122,13 @@ symlink "$CANONICAL/claude/hooks" "$HOME/.claude/hooks"
 symlink "$CANONICAL/claude/scripts" "$HOME/.claude/scripts"
 symlink "$CANONICAL/claude/memory" "$HOME/.claude/memory"
 
-echo ""
-echo "=== Shell config (~/.bashrc) ==="
-BASHRC="$HOME/.bashrc"
-# Strip any prior form (bare export, indented export inside an if-guard, or
-# duplicates), then append the single canonical line. Idempotent by design.
-awk '
-	/if.*anaiis-dotfiles\/bin/  { in_guard=1; next }
-	in_guard && /^[[:space:]]*fi[[:space:]]*$/ { in_guard=0; next }
-	/anaiis-dotfiles\/bin/      { next }
-	{ print }
-' "$BASHRC" >"/tmp/bashrc_path_fix" \
-	&& mv "/tmp/bashrc_path_fix" "$BASHRC"
-printf '\nexport PATH="$HOME/anaiis-dotfiles/bin:$PATH"\n' >>"$BASHRC"
-echo "  ok   PATH line (canonical)"
-if grep -qF 'anaiis-dotfiles/bash/shared.bash' "$BASHRC" 2>/dev/null; then
-	echo "  ok   shared.bash source line"
-else
-	if grep -qF '.bashrc.local' "$BASHRC" 2>/dev/null; then
-		sed -i '' '/\.bashrc\.local/i\
-source "$HOME/anaiis-dotfiles/bash/shared.bash"
-' "$BASHRC"
-	else
-		printf '\nsource "$HOME/anaiis-dotfiles/bash/shared.bash"\n' >>"$BASHRC"
-	fi
-	echo "  add  source shared.bash -> $BASHRC"
+if [ "$MODE" = "--symlinks-only" ]; then
+	echo ""
+	echo "Done (--symlinks-only: skipped shell config, graphify, CLI tools, R style, Homebrew)."
+	exit 0
 fi
+
+wire_bashrc
 
 echo ""
 echo "=== Claude Code: graphify (vendored) ==="
