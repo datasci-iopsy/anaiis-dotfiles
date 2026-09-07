@@ -118,14 +118,17 @@ if command -v perl >/dev/null 2>&1; then
 		# quoted token immediately after the command name and its flags is
 		# stripped, never a later argument, so a real FILE operand is
 		# untouched and still scanned below.
-		# A file-valued flag (-f/--file/--from-file and combined forms like
-		# -nf) is not consumed by the flag run, so its own operand keeps
-		# the quoted token visible instead of erasing it as a pattern.
-		# A path-selecting flag (--include/--exclude/--glob and similar,
-		# plus rg\x27s short -g) is excluded the same way, keeping its operand visible.
+		# A file-valued flag (-f/--file/--from-file and similar) or a
+		# path-selecting flag (--include/--exclude/--glob/--iglob and rg\x27s
+		# short -g) has its own operand consumed and preserved as part of
+		# the flag run; the next quoted token afterward is still scrubbed as the pattern.
+		my $pf = qr/(?:file|from-file|rawfile|slurpfile|argfile|include|exclude|exclude-dir|include-dir|glob|iglob|ignore-file|exclude-from|pre)/;
+		my $gtok = qr/(?:\x27[^\x27]*\x27|"[^"`\$]*"|\S+)/;
+		my $gelem1 = qr/-(?![A-Za-z]*[fg]\b)[A-Za-z]+|--(?!$pf\b)[A-Za-z][A-Za-z-]*(?:=\S*|\s+(?![\x27"])\S+)?/;
+		my $gelem2 = qr/(?:-[A-Za-z]*[fg]\b|--$pf\b)(?:=$gtok|\s+$gtok)/;
 		my $g = qr/(?:grep|egrep|rg)/;
-		s/((?:^|[;&|]\s*)$g\b(?:\s+-(?!-?(?:f\b|g\b|[A-Za-z]*f\b|[A-Za-z]*g\b|-file\b|-from-file\b|-rawfile\b|-slurpfile\b|-argfile\b|-include\b|-exclude\b|-exclude-dir\b|-include-dir\b|-glob\b|-iglob\b|-ignore-file\b|-exclude-from\b|-pre\b))-?[A-Za-z][A-Za-z-]*)*\s+)\x27[^\x27]*\x27/${1}\x27\x27/gs;
-		s/((?:^|[;&|]\s*)$g\b(?:\s+-(?!-?(?:f\b|g\b|[A-Za-z]*f\b|[A-Za-z]*g\b|-file\b|-from-file\b|-rawfile\b|-slurpfile\b|-argfile\b|-include\b|-exclude\b|-exclude-dir\b|-include-dir\b|-glob\b|-iglob\b|-ignore-file\b|-exclude-from\b|-pre\b))-?[A-Za-z][A-Za-z-]*)*\s+)"[^"`\$]*"/${1}""/gs;
+		s/((?:^|[;&|]\s*)$g\b(?:\s+(?:$gelem2|$gelem1))*\s+)\x27[^\x27]*\x27/${1}\x27\x27/gs;
+		s/((?:^|[;&|]\s*)$g\b(?:\s+(?:$gelem2|$gelem1))*\s+)"[^"`\$]*"/${1}""/gs;
 		# The jq program is a filter expression, not a file path, and commonly
 		# appears after a shell keyword (a for-loop body\x27s "do") that the
 		# grep/rg separator anchor above would miss, so this one anchors on

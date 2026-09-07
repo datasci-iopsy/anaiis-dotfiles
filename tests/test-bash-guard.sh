@@ -288,6 +288,13 @@ assert_block "2k.12 rg --glob keeps the glob operand visible, not a pattern" "rg
 assert_block "2k.13 rg -g keeps the glob operand visible, not a pattern" "rg -g '.env' foo ." "BLOCK"
 assert_block "2k.14 rg --iglob keeps the glob operand visible, not a pattern" "rg --iglob '.env' foo ." "BLOCK"
 assert_allow "2k.15 grep --color is boolean, the quoted token is still a pattern" "grep -rn --color 'needle .env' src"
+assert_allow "2k.16 grep --include with a quoted glob still scrubs the pattern" "grep --include '*.txt' '.env' src"
+assert_allow "2k.17 grep --include=glob attached form still scrubs the pattern" "grep -r --include=*.txt '.env' src"
+assert_allow "2k.18 rg --encoding takes a detached value, not file-valued" "rg --encoding utf-8 '.env' src"
+assert_allow "2k.19 rg --heading is boolean, not file-valued despite ending in g" "rg --heading '.env' src"
+assert_allow "2k.20 rg --debug is boolean, not file-valued despite ending in g" "rg --debug '.env' src"
+assert_block "2k.21 grep --include=.env attached form keeps the glob operand visible" "grep -r --include='.env' foo src" "BLOCK"
+assert_block "2k.22 rg -g glob operand still leaves a later file operand visible" "rg -g '*.md' foo .env" "BLOCK"
 
 echo "# 2l. jq program text is not a path reference"
 assert_allow "2l.1 jq program mentions .env deep inside a longer filter" "jq 'select(.path == \".env.local\") | .path' data.json"
