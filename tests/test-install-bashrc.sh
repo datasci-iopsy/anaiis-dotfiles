@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
-# tests/test-install-bashrc.sh -- verify install.sh PATH wiring is idempotent
+# tests/test-install-bashrc.sh -- verify install.sh's ~/.bashrc wiring and
+# its CI mode, by running the real installer against a throwaway HOME.
 #
 # Tests:
-#   - install.sh adds PATH line when absent
-#   - install.sh normalises a bare duplicate (two export PATH lines)
-#   - install.sh handles an if-guard form without leaving stray fi or duplicates
-#   - install.sh is idempotent: running twice produces exactly one PATH line
-#   - result always passes bash -n (syntax check)
+#   - install.sh --bashrc-only adds the PATH line when absent
+#   - install.sh --bashrc-only normalises a bare duplicate (two export PATH lines)
+#   - install.sh --bashrc-only handles an if-guard form without leaving a
+#     stray fi or duplicates (the exact failure mode that caused the bug)
+#   - install.sh --bashrc-only is idempotent: two runs leave exactly one PATH line
+#   - the resulting .bashrc always passes bash -n (syntax check)
+#   - install.sh --symlinks-only creates the ~/.claude links and stops before
+#     the shell-config phase (used by CI)
+#
+# Earlier versions of this file re-implemented the installer's awk block
+# inside the test and asserted on that copy, so a regression in install.sh
+# could not fail them (tasks/trim-candidates.md, 2026-09-07). The
+# --bashrc-only mode exists so the installer itself is what runs here.
 
 set -u
 
@@ -44,19 +53,11 @@ assert_syntax_ok() {
 	fi
 }
 
-# Apply the PATH-wiring logic from install.sh to a mock BASHRC file.
-# Mirrors the exact commands in install.sh's PATH section so any regression
-# in that section will cause these tests to fail.
-run_path_block() {
-	local BASHRC="$1"
-	awk '
-		/if.*anaiis-dotfiles\/bin/  { in_guard=1; next }
-		in_guard && /^[[:space:]]*fi[[:space:]]*$/ { in_guard=0; next }
-		/anaiis-dotfiles\/bin/      { next }
-		{ print }
-	' "$BASHRC" >"/tmp/bashrc_path_fix_$$" \
-		&& mv "/tmp/bashrc_path_fix_$$" "$BASHRC"
-	printf '\nexport PATH="$HOME/anaiis-dotfiles/bin:$PATH"\n' >>"$BASHRC"
+# Run the installer's shell-config phase with HOME pointed at the directory
+# that holds the mock .bashrc. The installer reads and rewrites $HOME/.bashrc.
+run_bashrc_phase() {
+	local mock="$1"
+	HOME="$(dirname "$mock")" bash "$INSTALL" --bashrc-only >/dev/null 2>&1
 }
 
 TMPDIR_TEST="$(mktemp -d)"
@@ -64,28 +65,36 @@ trap 'rm -rf "$TMPDIR_TEST"' EXIT
 
 # ---------------------------------------------------------------------------
 # Test 1: PATH line absent -- should be added
+# Fails if install.sh stops appending the canonical export line.
 # ---------------------------------------------------------------------------
-MOCK="$TMPDIR_TEST/bashrc_absent"
+mkdir -p "$TMPDIR_TEST/absent"
+MOCK="$TMPDIR_TEST/absent/.bashrc"
 printf '# minimal bashrc\n[ -f ~/.bashrc.local ] && source ~/.bashrc.local\n' >"$MOCK"
-run_path_block "$MOCK"
+run_bashrc_phase "$MOCK"
 count=$(grep -c 'anaiis-dotfiles/bin' "$MOCK" || true)
 assert_eq "adds PATH when absent" "1" "$count"
 assert_syntax_ok "syntax ok after adding PATH" "$MOCK"
 
 # ---------------------------------------------------------------------------
 # Test 2: Bare duplicate (two identical export PATH lines)
+# Fails if install.sh's awk block stops stripping prior PATH lines before
+# appending.
 # ---------------------------------------------------------------------------
-MOCK="$TMPDIR_TEST/bashrc_duplicate"
+mkdir -p "$TMPDIR_TEST/duplicate"
+MOCK="$TMPDIR_TEST/duplicate/.bashrc"
 printf '# minimal bashrc\nexport PATH="$HOME/anaiis-dotfiles/bin:$PATH"\nexport PATH="$HOME/anaiis-dotfiles/bin:$PATH"\n[ -f ~/.bashrc.local ] && source ~/.bashrc.local\n' >"$MOCK"
-run_path_block "$MOCK"
+run_bashrc_phase "$MOCK"
 count=$(grep -c 'anaiis-dotfiles/bin' "$MOCK" || true)
 assert_eq "deduplicates bare duplicate" "1" "$count"
 assert_syntax_ok "syntax ok after dedup" "$MOCK"
 
 # ---------------------------------------------------------------------------
 # Test 3: if-guard form (the exact failure mode that caused the bug)
+# Fails if install.sh's awk block drops the in_guard handling: the guarded
+# export would survive (two PATH lines) or the closing fi would be orphaned.
 # ---------------------------------------------------------------------------
-MOCK="$TMPDIR_TEST/bashrc_ifguard"
+mkdir -p "$TMPDIR_TEST/ifguard"
+MOCK="$TMPDIR_TEST/ifguard/.bashrc"
 cat >"$MOCK" <<'EOF'
 # minimal bashrc
 if [[ ":$PATH:" != *":$HOME/anaiis-dotfiles/bin:"* ]]; then
@@ -93,7 +102,7 @@ if [[ ":$PATH:" != *":$HOME/anaiis-dotfiles/bin:"* ]]; then
 fi
 [ -f ~/.bashrc.local ] && source ~/.bashrc.local
 EOF
-run_path_block "$MOCK"
+run_bashrc_phase "$MOCK"
 count=$(grep -c 'anaiis-dotfiles/bin' "$MOCK" || true)
 assert_eq "if-guard: exactly one PATH line after normalise" "1" "$count"
 stray_fi=$(grep -c '^fi$' "$MOCK" || true)
@@ -102,14 +111,38 @@ assert_syntax_ok "syntax ok after if-guard normalise" "$MOCK"
 
 # ---------------------------------------------------------------------------
 # Test 4: Idempotency -- running twice gives same result as once
+# Fails if install.sh appends without first stripping the line it added on
+# the previous run.
 # ---------------------------------------------------------------------------
-MOCK="$TMPDIR_TEST/bashrc_idempotent"
+mkdir -p "$TMPDIR_TEST/idempotent"
+MOCK="$TMPDIR_TEST/idempotent/.bashrc"
 printf '# minimal bashrc\n[ -f ~/.bashrc.local ] && source ~/.bashrc.local\n' >"$MOCK"
-run_path_block "$MOCK"
-run_path_block "$MOCK"
+run_bashrc_phase "$MOCK"
+run_bashrc_phase "$MOCK"
 count=$(grep -c 'anaiis-dotfiles/bin' "$MOCK" || true)
 assert_eq "idempotent: two runs produce exactly one PATH line" "1" "$count"
 assert_syntax_ok "syntax ok after two runs" "$MOCK"
+
+# ---------------------------------------------------------------------------
+# Test 5: --symlinks-only links ~/.claude and stops before shell config
+#
+# Fail-to-fail: the .bashrc assertion fails if the flag is ignored or if the
+# early exit is placed after the ~/.bashrc block (a PATH line would appear);
+# the memory-link assertion fails if the exit is placed before the Directories
+# section; the .lintr assertion fails if the exit is placed after R Style.
+# ---------------------------------------------------------------------------
+FAKE_HOME="$TMPDIR_TEST/home_symlinks_only"
+mkdir -p "$FAKE_HOME"
+printf '# untouched\n' >"$FAKE_HOME/.bashrc"
+HOME="$FAKE_HOME" bash "$INSTALL" --symlinks-only >/dev/null 2>&1
+rc=$?
+assert_eq "--symlinks-only: exits 0" "0" "$rc"
+assert_eq "--symlinks-only: .bashrc untouched" "# untouched" "$(cat "$FAKE_HOME/.bashrc")"
+linked=$(cd "$FAKE_HOME/.claude/memory" 2>/dev/null && pwd -P)
+assert_eq "--symlinks-only: ~/.claude/memory resolves into the repo" \
+	"$(cd "$REPO_DIR/claude/memory" && pwd -P)" "$linked"
+lintr_present=$([ -e "$FAKE_HOME/.lintr" ] && echo 1 || echo 0)
+assert_eq "--symlinks-only: .lintr not linked" "0" "$lintr_present"
 
 # ---------------------------------------------------------------------------
 # Summary
