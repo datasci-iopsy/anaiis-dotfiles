@@ -229,7 +229,7 @@ See `claude/skills/README.md` for trigger conditions.
 | File | Covers |
 |---|---|
 | `rules/behavioral.md` | The 9 imperatives: surface tradeoffs, minimum code, surgical changes, verify, model judgment scope, surface conflicts, fail loud, plan and checkpoint, hook output is not user input |
-| `rules/environment.md` | macOS, Bash, direnv, uv, worktree safety |
+| `rules/environment.md` | macOS, Bash, direnv, uv, worktree safety, rm -rf splitting |
 | `rules/tools.md` | gh, jq, gcloud, make, structured CLI output flags |
 | `rules/code-style.md` | Writing style, shell formatting, no emojis, convention conformance |
 | `rules/git.md` | Typed branches (`claude-<type>/<ticket>-<desc>`), trivial-edit criteria, Conventional Commit subjects, PR title format, push, worktrees for parallel work only |
