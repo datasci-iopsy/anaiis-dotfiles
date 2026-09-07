@@ -199,7 +199,7 @@ if printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*$'; the
 	ENV_DUMP=true
 elif printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|'; then
 	if printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|[[:space:]]*(grep|egrep|rg)\b'; then
-		if printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|[[:space:]]*(grep|egrep|rg)([[:space:]]+-[inwxFEGPsaHhbceo]+)*[[:space:]]+('"'"'\^?[A-Za-z_][A-Za-z0-9_]*='"'"'|"\^?[A-Za-z_][A-Za-z0-9_]*="|\^?[A-Za-z_][A-Za-z0-9_]*=)[[:space:]]*$' \
+		if printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|[[:space:]]*(grep|egrep|rg)([[:space:]]+-[inwxFEGPsaHhbco]+)*[[:space:]]+('"'"'\^?[A-Za-z_][A-Za-z0-9_]*='"'"'|"\^?[A-Za-z_][A-Za-z0-9_]*="|\^?[A-Za-z_][A-Za-z0-9_]*=)[[:space:]]*$' \
 			&& ! printf '%s' "$CMD" | grep -qiE '(^|[[:space:]])(-[A-Za-z]*v[A-Za-z]*|--invert-match)([[:space:]]|$)' \
 			&& ! printf '%s' "$CMD" | grep -qiE '(TOKEN|SECRET|API_?KEY|PASSWORD)'; then
 			ENV_DUMP=false
