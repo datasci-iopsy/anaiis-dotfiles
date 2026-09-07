@@ -188,14 +188,15 @@ fi
 # it); anything looser (a viewer like cat/less/head/tail/sort/tee, an extra
 # stage after the pattern, or a grep/egrep/rg whose selector is secret-shaped
 # or not a complete variable name followed by "=") is still effectively a
-# dump and stays blocked.
+# dump and stays blocked. Only a fixed whitelist of grep short options that
+# cannot select, invert, or emit more than the matched line is accepted.
 # Calibrated against real usage, see tests/fixtures/env-dump/usage-evidence.md.
 ENV_DUMP=false
 if printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*$'; then
 	ENV_DUMP=true
 elif printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|'; then
 	if printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|[[:space:]]*(grep|egrep|rg)\b'; then
-		if printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|[[:space:]]*(grep|egrep|rg)([[:space:]]+-[A-Za-z]+)*[[:space:]]+('"'"'\^?[A-Za-z_][A-Za-z0-9_]*='"'"'|"\^?[A-Za-z_][A-Za-z0-9_]*="|\^?[A-Za-z_][A-Za-z0-9_]*=)[[:space:]]*$' \
+		if printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|[[:space:]]*(grep|egrep|rg)([[:space:]]+-[inwxFEGPsaHhbceo]+)*[[:space:]]+('"'"'\^?[A-Za-z_][A-Za-z0-9_]*='"'"'|"\^?[A-Za-z_][A-Za-z0-9_]*="|\^?[A-Za-z_][A-Za-z0-9_]*=)[[:space:]]*$' \
 			&& ! printf '%s' "$CMD" | grep -qiE '(^|[[:space:]])(-[A-Za-z]*v[A-Za-z]*|--invert-match)([[:space:]]|$)' \
 			&& ! printf '%s' "$CMD" | grep -qiE '(TOKEN|SECRET|API_?KEY|PASSWORD)'; then
 			ENV_DUMP=false

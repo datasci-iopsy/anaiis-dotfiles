@@ -236,6 +236,12 @@ assert_block "2j.15 env grep bare name is a substring of GITHUB_TOKEN" "env | gr
 assert_block "2j.16 env grep unanchored bare name still blocks" "env | grep HOME" "BLOCK"
 assert_block "2j.17 env grep anchored prefix without = still blocks" "env | grep '^HOME'" "BLOCK"
 assert_block "2j.18 printenv grep prefix selector reaches suffixed variants" "printenv | grep -i 'claude_plugin_root_'" "BLOCK"
+assert_block "2j.19 env grep -z null-data record turns the whole dump into one match" "env | grep -z 'HOME='" "BLOCK"
+assert_block "2j.20 env grep --null-data long form still blocks" "env | grep --null-data 'HOME='" "BLOCK"
+assert_block "2j.21 printenv grep -l prints matching filenames beyond the value" "printenv | grep -l 'HOME='" "BLOCK"
+assert_block "2j.22 env grep -A context lines emit beyond the matched variable" "env | grep -A 3 '^HOME='" "BLOCK"
+assert_allow "2j.23 env grep -in whitelisted flags still allow a targeted lookup" "env | grep -in '^HOME='"
+assert_allow "2j.24 env grep -F whitelisted flag still allows a targeted lookup" "env | grep -F 'HOME='"
 
 echo "# 2f. Language-level environment dumps blocked (data-calibrated, see tests/fixtures/env-dump/)"
 assert_block "2f.1 python os.environ bare print" 'python3 -c "import os; print(os.environ)"' "BLOCK"
