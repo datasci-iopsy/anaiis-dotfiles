@@ -1,6 +1,6 @@
 ---
 name: git
-description: Branch naming and decision rules, commit discipline, staging by name, push is user-initiated, rebase ours/theirs semantics, PR conventions, worktrees for parallel work only
+description: Typed claude branches, trivial-edit criteria, Conventional Commit subjects, PR titles, staging by name, user-initiated push, rebase ours/theirs, worktrees
 ---
 
 # Git Workflow
@@ -11,29 +11,52 @@ description: Branch naming and decision rules, commit discipline, staging by nam
 - Verify branch merge state with `git branch --merged main` or `git log --oneline -5` before reporting it. Never infer from session context.
 
 ## Branch naming
-- Only the user creates and owns feature branches (never create them): `<type>/<linear-id>-<short-title>` or `<type>/<short-title>` (e.g., `feat/ana-758-engagement-survey`, `hotfix/auth-fix`).
-- Claude branches follow `claude-<category>/<short-description>`: `<category>` is a standard software engineering type (`feat`, `fix`, `refactor`, `docs`, `test`, `chore`); `<short-description>` is kebab-case, 5 words or fewer (e.g., `claude-refactor/dotfiles-perf-optimization`).
+- Only the user creates and owns feature branches (never create them): `<type>/<ticket-id>-<short-title>` or `<type>/<short-title>` (e.g., `feat/ana-758-engagement-survey`, `hotfix/auth-fix`).
+- Claude branches: `claude-<type>/<ticket-id>-<short-kebab-description>`. `<type>` is mandatory, one of the eight below. `<ticket-id>` is the tracker key lowercased (`dsio-86`), from the parent branch name, else the user's message, else ask once; with no ticket drop the segment, never a placeholder. `<short-kebab-description>`: lowercase, hyphens, 5 words or fewer. Examples: `claude-fix/dsio-86-scrub-flags`, `claude-docs/git-conventions`.
+
+| Type | Use for |
+|---|---|
+| `feat` | New capability or user-visible change |
+| `fix` | Correct wrong behavior |
+| `refactor` | Restructure, no behavior change |
+| `chore` | Deps, tooling, CI, config, maintenance |
+| `docs` | Docs only |
+| `test` | Tests only |
+| `hotfix` | Urgent production fix |
+| `wip` | Investigation or prototype, not merge-ready; branches only |
 
 ## Branching decision
 Binary rules, checked in order:
 
-1. **On `main` or `master`:** create `claude-<category>/<short-description>` with `git checkout -b` before the first edit. The `block-edit-on-main.sh` hook rejects edits on main; branching first is the resolution. Plan files at `~/.claude/plans/` are exempt and may be written from main; implementation is not.
+1. **On `main` or `master`:** create `claude-<type>/<ticket>-<desc>` with `git checkout -b` before the first edit. The `block-edit-on-main.sh` hook rejects edits on main; branching first is the resolution. Plan files at `~/.claude/plans/` are exempt and may be written from main; implementation is not.
 2. **On a user feature branch, trivial edit:** commit directly to that branch. Trivial means ALL five hold:
    1. `git branch --show-current` returns neither `main`, `master`, nor a name starting with `claude-`.
    2. Exactly one file changed: `git diff --name-only` lists one path.
    3. Total lines changed (insertions + deletions) is 5 or fewer per `git diff --shortstat`.
    4. No new file created and no new named symbol (function, class, method, import, or dependency) introduced.
    5. The changed file is not under `tests/`, `claude/hooks/`, or `claude/skills/`, and does not end in `.json`, `.yaml`, `.toml`, or `.envrc`.
-3. **Any other edit:** create a `claude-<category>/<topic>` branch from the current user feature branch.
+3. **Any other edit:** create a `claude-<type>/<ticket>-<desc>` branch from the current user feature branch, inheriting `<ticket>` from that branch name when present.
 
 ## Branch reuse
 Before creating any new `claude-*` branch, run `git branch --list 'claude-*'`. If an unmerged branch whose name contains the topic slug exists, ask: "Continue on `<existing>`? (y/n)." Never silently create a duplicate of an unmerged branch.
 
 ## Staging and commits
 - Stage files by name, never `git add -A` or `git add .`.
-- One logical concern per commit. Messages: imperative mood, concise, no trailing period.
-- Commit autonomously at the end of each logical work unit; do not surface the commit or wait for instruction.
+- One logical concern per commit; commit autonomously at the end of each work unit without surfacing it or waiting for instruction.
+- Subject: `<type>(<scope>): <description>`. `<type>` from the table above, never `wip` (a `wip` branch still commits with a real type). `<scope>` optional: one lowercase token for the component, tool, or directory touched (`bash-guard`, `dbt`, `deps`). `<description>`: lowercase imperative, no trailing period, under 72 chars, completes "If accepted, this commit will ...".
+- Body only when the diff cannot explain why: problem and rationale in 1 to 3 sentences after a blank line. Ticket only in an optional `Refs: <id>` footer, never the subject.
+- Never `WIP`, `fix`, `changes`, `address review comments`, or a subject that restates the diff without intent.
+- Rebase groups follow the same subject rule.
 - Never amend unless explicitly asked. Never force-push. Never skip hooks (`--no-verify`).
+
+```
+fix(audit-log): normalize tracker timestamps
+feat(attrition): add manager-tenure feature
+refactor(dbt): extract employee-status macro
+docs(runbook): document survey backfill process
+test(ingestion): cover duplicate-event handling
+chore(deps): upgrade dbt-utils
+```
 
 ## Push
 - Push is always user-initiated. Never push without explicit instruction, regardless of pending commits.
@@ -54,6 +77,9 @@ Before creating any new `claude-*` branch, run `git branch --list 'claude-*'`. I
 ## Pull requests
 - Claude never opens a PR on its own initiative: not as a "helpful" follow-on after committing, not auto-chained after another skill, not because the diff looks PR-ready. Opening a PR is visible to others and triggers CI, so it always needs the user's explicit trigger for that specific PR.
 - Invoking a skill whose documented job is to open a PR (e.g. `/anaiis-git-ops:pr`) is that explicit trigger. Claude runs the skill's `gh pr create` step as written, without asking a second time within that run; the invocation itself is the authorization. This does not extend past the invocation: it does not license opening additional PRs, reopening a closed one, or opening one from a different, unrelated task.
+- Title: `<type>(<scope>): <description> [<TICKET-ID>]`, the commit subject rule plus the ticket in brackets, uppercase as tracked; mandatory whenever the branch or work has one, omitted only when none exists. Example: `fix(audit-log): normalize tracker timestamps [PA-217]`.
+- Body, in order: Summary (what and why), Ticket (`Closes <ID>` or link), Changes, Validation (what was run). Add Data impact when a model, table, metric, or backfill changes; the PR skill holds the template.
+- One ticket or cohesive change per PR.
 - Before drafting a PR description, review the structure of the repo's recent merged PRs (`gh pr list --state merged --limit 5`).
 - Never include session links (`https://claude.ai/code/session_*`) in PR titles, bodies, or descriptions.
 - CodeRabbit triage runs via `/anaiis-coderabbit` from a `claude-*` branch, never from `main`.
