@@ -35,7 +35,11 @@
 set -u
 
 SCRIPT_REAL="$(realpath "${BASH_SOURCE[0]}")"
-REPO_DIR="$(cd "$(dirname "$SCRIPT_REAL")/../.." && pwd)"
+# MEMORY_DOCTOR_REPO_DIR is a test-only override (like
+# MEMORY_DOCTOR_TRANSCRIPTS_DIR below): tests point the doctor at a throwaway
+# copy of claude/memory and claude/hooks so checks J-L can mutate the global
+# tier without touching the real git-tracked directory. Unset in normal use.
+REPO_DIR="${MEMORY_DOCTOR_REPO_DIR:-$(cd "$(dirname "$SCRIPT_REAL")/../.." && pwd)}"
 PROJECTS_DIR="$HOME/.claude/projects"
 GLOBAL_DIR="$HOME/.claude/memory"
 INDEX="$GLOBAL_DIR/MEMORY.md"

@@ -1,11 +1,21 @@
 #!/usr/bin/env bash
 # tests/test-claude-md-rules.sh, verification harness for the rules system
-# (CLAUDE.md index ↔ rules/*.md ↔ settings.json ↔ rules-doctor.sh).
+# (CLAUDE.md index <-> rules/*.md <-> settings.json <-> rules-doctor.sh).
 #
-# This harness is self-testing: it runs the doctor on the green tree,
-# then mutates each input in turn to confirm the doctor catches drift,
-# then restores. Each mutation targets one doctor check, so a doctor
-# check that can never fail is surfaced here. Exits 0 on full pass.
+# Self-testing: run the doctor on a green tree, then apply every drift
+# mutation at once and confirm the doctor names each targeted check. One
+# multi-fault run rather than one run per fault: the doctor runs every check
+# and never exits early, so each name assertion pins its own check (deleting
+# check X removes the "X" line from the output), and a single exit-code
+# assertion covers the shared FAIL plumbing. The per-fault exit-code
+# assertions this replaced could not fail independently of the name
+# assertions (tasks/trim-candidates.md, 2026-09-07).
+#
+# Hermetic: the doctor runs against a throwaway copy of claude/ via
+# RULES_DOCTOR_REPO_DIR. The real claude/CLAUDE.md, claude/rules/, and
+# claude/settings.json (live through the ~/.claude symlink) are never
+# touched, so a concurrent Claude Code session cannot observe a mutated
+# settings file mid-test.
 #
 # Usage: bash tests/test-claude-md-rules.sh
 
@@ -13,9 +23,6 @@ set -u
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOCTOR="$REPO_DIR/claude/scripts/rules-doctor.sh"
-CLAUDE_MD="$REPO_DIR/claude/CLAUDE.md"
-SETTINGS="$REPO_DIR/claude/settings.json"
-BEHAV_MD="$REPO_DIR/claude/rules/behavioral.md"
 
 PASS=0
 FAIL=0
@@ -43,88 +50,56 @@ assert_contains() {
 	fi
 }
 
-# Backup files we will mutate, restore on EXIT (even on early failure).
-BACKUP_CLAUDE_MD=$(mktemp)
-BACKUP_SETTINGS=$(mktemp)
-BACKUP_BEHAV=$(mktemp)
-cp "$CLAUDE_MD" "$BACKUP_CLAUDE_MD"
-cp "$SETTINGS" "$BACKUP_SETTINGS"
-cp "$BEHAV_MD" "$BACKUP_BEHAV"
-trap 'cp "$BACKUP_CLAUDE_MD" "$CLAUDE_MD"; cp "$BACKUP_SETTINGS" "$SETTINGS"; cp "$BACKUP_BEHAV" "$BEHAV_MD"; rm -f "$BACKUP_CLAUDE_MD" "$BACKUP_SETTINGS" "$BACKUP_BEHAV"' EXIT
+# ── Fixture: throwaway copy of claude/ ────────────────────────────────────
+# -P keeps claude/skills' symlinks as symlinks instead of copying targets.
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+TMP_REPO="$WORK/repo"
+mkdir -p "$TMP_REPO"
+cp -RP "$REPO_DIR/claude" "$TMP_REPO/claude"
+CLAUDE_MD="$TMP_REPO/claude/CLAUDE.md"
+SETTINGS="$TMP_REPO/claude/settings.json"
+BEHAV_MD="$TMP_REPO/claude/rules/behavioral.md"
+
+run_doctor() {
+	RULES_DOCTOR_REPO_DIR="$TMP_REPO" bash "$DOCTOR" >"$1" 2>&1
+}
 
 # ── 1. Doctor passes on green tree ────────────────────────────────────────
 echo "# 1. Doctor on green tree"
-bash "$DOCTOR" >/tmp/test-rules.green.out 2>&1
+run_doctor "$WORK/green.out"
 assert "1.1 doctor exits 0 on green tree" "0" "$?"
-assert_contains "1.2 green output reports 0 failures" "0 failed" "$(cat /tmp/test-rules.green.out)"
 
-# ── 2. Doctor catches a dangling index reference (check A.2) ──────────────
-echo "# 2. Dangling reference in CLAUDE.md"
+# ── 2. Every drift mutation at once ───────────────────────────────────────
+echo "# 2. Every drift mutation applied at once"
+# A.2: index row pointing at a rules file that does not exist
 printf '\n| `rules/nonexistent-rule.md` | bogus row for drift test |\n' >>"$CLAUDE_MD"
-bash "$DOCTOR" >/tmp/test-rules.dangling.out 2>&1
-assert "2.1 doctor exits non-zero on dangling reference" "1" "$?"
-assert_contains "2.2 doctor names the missing file" "nonexistent-rule.md" "$(cat /tmp/test-rules.dangling.out)"
-cp "$BACKUP_CLAUDE_MD" "$CLAUDE_MD"
-
-# ── 3. Doctor catches behavioral.md losing its imperatives (check C.3) ────
-echo "# 3. behavioral.md drift"
+# C.3: behavioral.md loses its numbered H2 imperatives
 sed '/^## [0-9]*\. /d' "$BEHAV_MD" >"${BEHAV_MD}.tmp" && mv "${BEHAV_MD}.tmp" "$BEHAV_MD"
-bash "$DOCTOR" >/tmp/test-rules.mangled.out 2>&1
-assert "3.1 doctor exits non-zero when imperatives removed" "1" "$?"
-assert_contains "3.2 doctor reports C.3 imperative count" "C.3 H2 imperatives" "$(cat /tmp/test-rules.mangled.out)"
-cp "$BACKUP_BEHAV" "$BEHAV_MD"
-
-# ── 4. Doctor catches a re-injection hook (check D.1) ─────────────────────
-echo "# 4. Re-injection registered in settings.json"
+HAVE_JQ=0
 if command -v jq >/dev/null 2>&1; then
-	jq '.hooks.UserPromptSubmit += [{"hooks":[{"type":"command","command":"bash $HOME/.claude/hooks/surface-behavioral-rules.sh"}]}]' \
-		"$SETTINGS" >/tmp/test-rules.settings.json \
-		&& mv /tmp/test-rules.settings.json "$SETTINGS"
-	bash "$DOCTOR" >/tmp/test-rules.reinject.out 2>&1
-	assert "4.1 doctor exits non-zero on re-injection hook" "1" "$?"
-	assert_contains "4.2 doctor reports D.1 re-injection" "D.1 re-injection" "$(cat /tmp/test-rules.reinject.out)"
-	cp "$BACKUP_SETTINGS" "$SETTINGS"
-else
-	echo "  SKIP  jq not available"
+	HAVE_JQ=1
+	# D.1: a re-injection hook registered on UserPromptSubmit
+	# E.1: a registered hook whose file does not exist
+	# H.1: a secrets deny rule dropped from permissions.deny
+	jq '.hooks.UserPromptSubmit += [{"hooks":[{"type":"command","command":"bash $HOME/.claude/hooks/surface-behavioral-rules.sh"}]}]
+		| .hooks.Stop += [{"hooks":[{"type":"command","command":"bash $HOME/.claude/hooks/no-such-hook.sh"}]}]
+		| .permissions.deny -= ["Read(**/.ssh/**)"]' \
+		"$SETTINGS" >"$WORK/settings.json" && mv "$WORK/settings.json" "$SETTINGS"
 fi
-
-# ── 5. Doctor catches a registered-but-missing hook (check E.1) ───────────
-echo "# 5. Stale hook registration"
-if command -v jq >/dev/null 2>&1; then
-	jq '.hooks.Stop += [{"hooks":[{"type":"command","command":"bash $HOME/.claude/hooks/no-such-hook.sh"}]}]' \
-		"$SETTINGS" >/tmp/test-rules.settings.json \
-		&& mv /tmp/test-rules.settings.json "$SETTINGS"
-	bash "$DOCTOR" >/tmp/test-rules.stale.out 2>&1
-	assert "5.1 doctor exits non-zero on missing hook file" "1" "$?"
-	assert_contains "5.2 doctor names the missing hook" "no-such-hook.sh" "$(cat /tmp/test-rules.stale.out)"
-	cp "$BACKUP_SETTINGS" "$SETTINGS"
+run_doctor "$WORK/faults.out"
+RC=$?
+OUT=$(cat "$WORK/faults.out")
+assert "2.1 doctor exits non-zero with every fault present" "1" "$RC"
+assert_contains "2.2 doctor names the missing rules file (A.2)" "nonexistent-rule.md" "$OUT"
+assert_contains "2.3 doctor reports the imperative count (C.3)" "C.3 H2 imperatives" "$OUT"
+if [ "$HAVE_JQ" -eq 1 ]; then
+	assert_contains "2.4 doctor reports re-injection (D.1)" "D.1 re-injection" "$OUT"
+	assert_contains "2.5 doctor names the missing hook (E.1)" "no-such-hook.sh" "$OUT"
+	assert_contains "2.6 doctor names the dropped deny rule (H.1)" "Read(**/.ssh/**)" "$OUT"
 else
-	echo "  SKIP  jq not available"
+	echo "  SKIP  2.4-2.6 jq not available"
 fi
-
-# ── 5b. Doctor catches a removed secrets deny rule (check H.1) ────────────
-echo "# 5b. Missing secrets deny rule"
-if command -v jq >/dev/null 2>&1; then
-	jq '.permissions.deny -= ["Read(**/.ssh/**)"]' "$SETTINGS" >/tmp/test-rules.settings.json \
-		&& mv /tmp/test-rules.settings.json "$SETTINGS"
-	bash "$DOCTOR" >/tmp/test-rules.denydrop.out 2>&1
-	assert "5b.1 doctor exits non-zero on dropped deny rule" "1" "$?"
-	assert_contains "5b.2 doctor names the missing rule" "Read(**/.ssh/**)" "$(cat /tmp/test-rules.denydrop.out)"
-	cp "$BACKUP_SETTINGS" "$SETTINGS"
-else
-	echo "  SKIP  jq not available"
-fi
-
-# ── 6. Doctor passes again after all restores ─────────────────────────────
-echo "# 6. Restore"
-bash "$DOCTOR" >/dev/null 2>&1
-assert "6.1 doctor exits 0 after restore" "0" "$?"
-
-# ── Cleanup tmp files ─────────────────────────────────────────────────────
-rm -f /tmp/test-rules.green.out /tmp/test-rules.dangling.out \
-	/tmp/test-rules.mangled.out /tmp/test-rules.reinject.out \
-	/tmp/test-rules.stale.out /tmp/test-rules.denydrop.out \
-	/tmp/test-rules.localdrift.out
 
 # ── Summary ───────────────────────────────────────────────────────────────
 echo

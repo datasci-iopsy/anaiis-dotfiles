@@ -29,7 +29,11 @@
 set -u
 
 SCRIPT_REAL="$(realpath "${BASH_SOURCE[0]}")"
-REPO_DIR="$(cd "$(dirname "$SCRIPT_REAL")/../.." && pwd)"
+# RULES_DOCTOR_REPO_DIR is a test-only override (same precedent as
+# MEMORY_DOCTOR_REPO_DIR): tests point the doctor at a throwaway copy of
+# claude/ so drift fixtures never touch the real CLAUDE.md, rules/, or the
+# live settings.json behind ~/.claude/settings.json. Unset in normal use.
+REPO_DIR="${RULES_DOCTOR_REPO_DIR:-$(cd "$(dirname "$SCRIPT_REAL")/../.." && pwd)}"
 CLAUDE_MD="$REPO_DIR/claude/CLAUDE.md"
 RULES_DIR="$REPO_DIR/claude/rules"
 BEHAV_MD="$RULES_DIR/behavioral.md"
