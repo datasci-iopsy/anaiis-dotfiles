@@ -124,9 +124,9 @@ bash ~/.claude/scripts/seed-memory.sh
 
 Then edit `~/.claude/projects/<encoded-path>/memory/project_current_phase.md`.
 
-### 5. Repo pre-commit hooks
+### 5. Repo hooks: pre-commit lint, pre-push tests
 
-When working in Claude Code, hooks install automatically on the first prompt in any repo via `ensure-repo-hooks.sh`. For repos you commit to outside Claude (direct CLI commits, CI), run once from the project root:
+Two dispatcher hooks go into every repo. `pre-commit` runs the staged-file linters (R, Python, Shell, JSON, SQL) so commits stay fast. `pre-push` runs the repo's `tests/run-all.sh`, if it has one, so the full suite gates code leaving the machine rather than every commit (`SKIP_TESTS=1 git push` to bypass). When working in Claude Code, both install automatically on the first prompt in any repo via `ensure-repo-hooks.sh`, which also adds `pre-push` to repos that only have `pre-commit`. For repos you commit to outside Claude (direct CLI commits, CI), run once from the project root:
 
 ```bash
 bash ~/.claude/scripts/install-repo-hooks.sh
@@ -220,7 +220,7 @@ See `claude/skills/README.md` for trigger conditions.
 | Command | What it does |
 |---|---|
 | `/seed-project` | Init per-project memory files from templates |
-| `/install-hooks` | Install pre-commit lint dispatcher (R, Python, Shell, JSON) in a repo |
+| `/install-hooks` | Install the pre-commit lint and pre-push test dispatchers in a repo |
 
 ### Rules
 
@@ -254,7 +254,7 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 | Event | Matcher | Script | Behavior |
 |---|---|---|---|
 | `UserPromptSubmit` |, | `maintenance-check.sh` | Weekly plan-file check; monthly session-storage check; weekly repo-hooks audit |
-| `UserPromptSubmit` |, | `ensure-repo-hooks.sh` | Silently installs pre-commit dispatcher in current repo if missing |
+| `UserPromptSubmit` |, | `ensure-repo-hooks.sh` | Silently installs the pre-commit and pre-push dispatchers in the current repo if either is missing |
 | `UserPromptSubmit` |, | `list-merged-claude-branches.sh` | Advisory: lists merged `claude/*` branches and shows the delete command |
 | `SessionStart` | `startup\|resume\|clear\|compact` | `session-start-context.sh` | Delivers the global memory tier via `additionalContext` (startup/clear/compact); restores the newest pre-compact handoff (compact); advises `/seed-project` when the current project has no memory dir; delivery-gated monthly staleness advisory |
 | `PostToolUse` | `Edit\|Write` | `post-edit-lint.sh` | `.py` ruff; `.sh` shfmt (auto-fix) + shellcheck; `.sql` sqlfmt; `.R` lintr; `.json` jq --indent 4 |
@@ -267,7 +267,8 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 | `Stop` |, | `stop-hook-git-check.sh` | Exits 2 (continues agent loop) on uncommitted changes, untracked files, or unpushed commits; exits 0 when clean |
 | `PreCompact` | `*` | `pre-compact.sh` | Writes a structured handoff to project memory |
 | `StatusLine` | n/a | `statusline-command.sh` (in `scripts/`) | Custom status line display; also bridges the exact context percentage to `context-watch.sh` via a per-session `/tmp` file |
-| (in project repos) | n/a | `repo-pre-commit.sh` | Pre-commit dispatcher (R, Python, Shell, JSON) installed into repos by `install-repo-hooks.sh`; not a Claude Code hook |
+| (in project repos) | n/a | `repo-pre-commit.sh` | Pre-commit dispatcher: staged-file linters only (R, Python, Shell, JSON, SQL); installed into repos by `install-repo-hooks.sh`; not a Claude Code hook |
+| (in project repos) | n/a | `repo-pre-push.sh` | Pre-push dispatcher: runs the repo's `tests/run-all.sh` when present (`SKIP_TESTS=1 git push` to bypass); installed alongside pre-commit; not a Claude Code hook |
 
 Hook latency on this machine (measured 2026-07-15, 3-hook chain after the memory-delivery hooks moved to SessionStart): aggregate UserPromptSubmit chain median = **81 ms** (under 100 ms target). Re-measure with `bash tests/measure-userpromptsubmit.sh` if the chain grows.
 
