@@ -103,6 +103,8 @@ bash ~/anaiis-dotfiles/install.sh
 
 Each line prints `ok` (already linked), `link` (newly created), or `SKIP` (real file present, back up and remove first).
 
+`bash install.sh --symlinks-only` creates only the `~/anaiis-dotfiles` and `~/.claude` symlinks and stops before the shell-config, graphify, CLI-tool, R-style, and Homebrew phases. CI uses this mode to build the `~/.claude` tree the test suite expects.
+
 ### 3. Add bin/ to PATH (required for web-verify)
 
 The installer prints this line; copy it into your shell config (one of `~/.bashrc`, `~/.zshrc`, `~/.config/fish/config.fish`, whichever your shell reads):
@@ -284,6 +286,19 @@ Hook latency on this machine (measured 2026-07-15, 3-hook chain after the memory
 | **JSON** | `post-edit-lint.sh` enforces `jq --indent 4` | `json-lint-staged.sh` checks indent | n/a |
 
 `~/.lintr` is symlinked from this repo (`.lintr`). Per-project `.lintr` overrides are honored, lintr walks up from the project root.
+
+---
+
+## Tests and CI
+
+`tests/run-all.sh` runs every `tests/test-*.sh` suite, prints per-suite wall time, and exits non-zero if any suite fails. The suites are hermetic: they resolve hooks and scripts through the repo, build any home tree they need under `mktemp -d`, and never read or write the real `~/.claude`, so results match between a loaded dev machine and a clean runner.
+
+The `tests` GitHub Actions check (`.github/workflows/tests.yml`) runs the same command on `macos-latest` for every pull request and for pushes to `main`. The runner installs Homebrew `bash`, `shfmt`, and `shellcheck` only if the image lacks them, then runs `install.sh --symlinks-only` to build the `~/.claude` symlink tree the hooks expect. macOS on purpose: the hooks use BSD-only forms (`date -j`, `stat -f`) and only ever run on macOS.
+
+```bash
+bash tests/run-all.sh                       # full suite, the same command CI runs
+bash tests/test-bash-guard.sh               # one suite while iterating
+```
 
 ---
 
