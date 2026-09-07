@@ -121,6 +121,23 @@ assert_eq "4.1 ensure-repo-hooks installs pre-push when only pre-commit exists" 
 ENSURE_OUT=$(cd "$R4" && HOME="$TMP_HOME" bash "$ENSURE" 2>&1)
 assert_eq "4.2 ensure-repo-hooks is silent once both hooks exist" "" "$ENSURE_OUT"
 
+# ── 5. Pre-existing hooks without the execute bit become executable ───────
+# git silently skips a hook file that is not executable, so an installer
+# that reports "ok" or "updated" on such a file leaves a hook that never
+# runs. Fail-to-fail: 5.1 fails if the "dispatcher already present" branch
+# omits chmod +x; 5.2 fails if the "appended dispatcher" branch omits it.
+echo "# 5. Non-executable pre-existing hooks"
+R5="$WORK/r5"
+make_repo "$R5"
+printf '#!/usr/bin/env bash\nbash "$HOME/.claude/hooks/repo-pre-commit.sh"\n' >"$R5/.git/hooks/pre-commit"
+printf '#!/usr/bin/env bash\necho custom-push-guard\n' >"$R5/.git/hooks/pre-push"
+chmod -x "$R5/.git/hooks/pre-commit" "$R5/.git/hooks/pre-push"
+(cd "$R5" && HOME="$TMP_HOME" bash "$INSTALLER" >/dev/null 2>&1)
+assert_eq "5.1 marker-present pre-commit hook is executable after re-run" "1" \
+	"$([ -x "$R5/.git/hooks/pre-commit" ] && echo 1 || echo 0)"
+assert_eq "5.2 appended-to pre-push hook is executable after re-run" "1" \
+	"$([ -x "$R5/.git/hooks/pre-push" ] && echo 1 || echo 0)"
+
 # ── Summary ───────────────────────────────────────────────────────────────
 echo
 echo "test-repo-hook-install: $PASS passed, $FAIL failed"
