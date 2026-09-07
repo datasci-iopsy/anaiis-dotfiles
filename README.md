@@ -230,7 +230,7 @@ See `claude/skills/README.md` for trigger conditions.
 | `rules/environment.md` | macOS, Bash, direnv, uv, worktree safety |
 | `rules/tools.md` | gh, jq, gcloud, make, structured CLI output flags |
 | `rules/code-style.md` | Writing style, shell formatting, no emojis, convention conformance |
-| `rules/git.md` | Branch naming (`claude-<category>/<short-description>`), trivial-edit criteria, commits, push, PRs, worktrees for parallel work only |
+| `rules/git.md` | Typed branches (`claude-<type>/<ticket>-<desc>`), trivial-edit criteria, Conventional Commit subjects, PR title format, push, worktrees for parallel work only |
 | `rules/r-conventions.md` | Vectorization, lapply/vapply, lintr style |
 | `rules/python.md` | uv, direnv, ruff |
 | `rules/session.md` | Token efficiency, subagent limits, context thresholds, output preferences |
