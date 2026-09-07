@@ -19,6 +19,8 @@ set -u
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PRE_COMMIT="$REPO_DIR/claude/hooks/repo-pre-commit.sh"
 PRE_PUSH="$REPO_DIR/claude/hooks/repo-pre-push.sh"
+INSTALLER="$REPO_DIR/claude/scripts/install-repo-hooks.sh"
+ENSURE="$REPO_DIR/claude/hooks/ensure-repo-hooks.sh"
 
 PASS=0
 FAIL=0
@@ -72,6 +74,52 @@ assert_eq "1.2 pre-push dispatcher runs tests/run-all.sh" "1" "$(exists "$R1/.su
 rm -f "$R1/.suite-ran"
 (cd "$R1" && SKIP_TESTS=1 HOME="$TMP_HOME" bash "$PRE_PUSH" >/dev/null 2>&1)
 assert_eq "1.3 SKIP_TESTS=1 bypasses the pre-push suite run" "0" "$(exists "$R1/.suite-ran")"
+
+# ── 2. Installer on a fresh repo creates both hooks ───────────────────────
+# Fail-to-fail: 2.2 fails if install-repo-hooks.sh only handles pre-commit.
+echo "# 2. Installer on a fresh repo"
+R2="$WORK/r2"
+make_repo "$R2"
+(cd "$R2" && HOME="$TMP_HOME" bash "$INSTALLER" >/dev/null 2>&1)
+assert_eq "2.1 pre-commit hook carries its dispatcher marker" "1" \
+	"$(grep -cF 'repo-pre-commit.sh' "$R2/.git/hooks/pre-commit" 2>/dev/null || echo 0)"
+assert_eq "2.2 pre-push hook carries its dispatcher marker" "1" \
+	"$(grep -cF 'repo-pre-push.sh' "$R2/.git/hooks/pre-push" 2>/dev/null || echo 0)"
+assert_eq "2.3 pre-push hook is executable" "1" "$([ -x "$R2/.git/hooks/pre-push" ] && echo 1 || echo 0)"
+
+# ── 3. Pre-commit-only repo gains pre-push; pre-commit untouched ──────────
+# Fail-to-fail: 3.1 fails if the installer's early "dispatcher already
+# present" exit covers both hooks; 3.2 fails if the pre-push path rewrites
+# or migrates the existing pre-commit file; 3.3 fails if a re-run on a repo
+# with both hooks does anything but report them present.
+echo "# 3. Existing pre-commit-only repo"
+R3="$WORK/r3"
+make_repo "$R3"
+printf '#!/usr/bin/env bash\n# repo-specific guard kept by the migration\necho custom-guard\nbash "$HOME/.claude/hooks/repo-pre-commit.sh"\n' >"$R3/.git/hooks/pre-commit"
+chmod +x "$R3/.git/hooks/pre-commit"
+BEFORE=$(shasum "$R3/.git/hooks/pre-commit" | cut -d' ' -f1)
+(cd "$R3" && HOME="$TMP_HOME" bash "$INSTALLER" >/dev/null 2>&1)
+assert_eq "3.1 pre-push hook added alongside an existing pre-commit" "1" \
+	"$(grep -cF 'repo-pre-push.sh' "$R3/.git/hooks/pre-push" 2>/dev/null || echo 0)"
+assert_eq "3.2 existing pre-commit hook is byte-identical after re-run" "$BEFORE" \
+	"$(shasum "$R3/.git/hooks/pre-commit" | cut -d' ' -f1)"
+RERUN=$(cd "$R3" && HOME="$TMP_HOME" bash "$INSTALLER" 2>&1)
+assert_eq "3.3 re-run with both hooks present reports ok twice" "2" "$(printf '%s\n' "$RERUN" | grep -c '^  ok ')"
+
+# ── 4. ensure-repo-hooks.sh installs a missing pre-push ───────────────────
+# Fail-to-fail: 4.1 fails if ensure-repo-hooks.sh exits early on the
+# pre-commit marker alone (every repo on a dev machine already has it, so
+# no existing repo would ever receive pre-push).
+echo "# 4. Auto-installer on a pre-commit-only repo"
+R4="$WORK/r4"
+make_repo "$R4"
+printf '#!/usr/bin/env bash\nbash "$HOME/.claude/hooks/repo-pre-commit.sh"\n' >"$R4/.git/hooks/pre-commit"
+chmod +x "$R4/.git/hooks/pre-commit"
+(cd "$R4" && HOME="$TMP_HOME" bash "$ENSURE" >/dev/null 2>&1)
+assert_eq "4.1 ensure-repo-hooks installs pre-push when only pre-commit exists" "1" \
+	"$(grep -cF 'repo-pre-push.sh' "$R4/.git/hooks/pre-push" 2>/dev/null || echo 0)"
+ENSURE_OUT=$(cd "$R4" && HOME="$TMP_HOME" bash "$ENSURE" 2>&1)
+assert_eq "4.2 ensure-repo-hooks is silent once both hooks exist" "" "$ENSURE_OUT"
 
 # ── Summary ───────────────────────────────────────────────────────────────
 echo
