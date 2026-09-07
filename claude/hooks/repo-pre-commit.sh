@@ -5,6 +5,10 @@
 # When script paths change inside dotfiles, update only this file --
 # all repos pick up the change automatically.
 #
+# Runs only the staged-file linters, so commits stay fast. The full test
+# suite runs at pre-push via repo-pre-push.sh (SKIP_TESTS=1 git push to
+# bypass).
+#
 # Stable path (repos reference this; never rename it):
 #   bash "$HOME/.claude/hooks/repo-pre-commit.sh"
 #
@@ -26,9 +30,3 @@ bash "$SCRIPTS/ruff-lint-staged.sh"
 bash "$SCRIPTS/json-lint-staged.sh"
 bash "$SCRIPTS/shfmt-lint-staged.sh"
 bash "$SCRIPTS/sqlfmt-lint-staged.sh"
-
-# Run test suite if the repo has one. SKIP_TESTS=1 to bypass.
-REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
-if [ "${SKIP_TESTS:-0}" != "1" ] && [ -n "$REPO_ROOT" ] && [ -f "$REPO_ROOT/tests/run-all.sh" ]; then
-	bash "$REPO_ROOT/tests/run-all.sh"
-fi
