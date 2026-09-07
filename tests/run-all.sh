@@ -16,20 +16,31 @@ TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOTAL_PASS=0
 TOTAL_FAIL=0
 FAILED_SUITES=()
+TIMINGS=()
+SUITE_START=$(date +%s)
 
+# Wall time per suite, whole seconds: Bash 3.2 (macOS default) has no
+# EPOCHREALTIME, and the pre-commit/CI use case only needs to show which
+# suites dominate the total.
 for test_script in "$TESTS_DIR"/test-*.sh; do
 	[ -f "$test_script" ] || continue
 	name="$(basename "$test_script")"
 	echo "=== $name ==="
+	t0=$(date +%s)
 	if bash "$test_script"; then
 		TOTAL_PASS=$((TOTAL_PASS + 1))
 	else
 		TOTAL_FAIL=$((TOTAL_FAIL + 1))
 		FAILED_SUITES+=("$name")
 	fi
+	TIMINGS+=("$(printf '%4ds  %s' "$(($(date +%s) - t0))" "$name")")
 	echo ""
 done
 
+echo "=== Timing ==="
+printf '%s\n' "${TIMINGS[@]}"
+printf '%4ds  total\n' "$(($(date +%s) - SUITE_START))"
+echo ""
 echo "=== Summary ==="
 echo "Suites passed: $TOTAL_PASS"
 echo "Suites failed: $TOTAL_FAIL"
