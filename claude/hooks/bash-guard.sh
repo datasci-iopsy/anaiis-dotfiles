@@ -113,6 +113,43 @@ if command -v perl >/dev/null 2>&1; then
 		s/((?:^|\s)$f(?:=|\s+))\x27[^\x27]*\x27/${1}\x27\x27/gs;
 		s/((?:^|\s)$f(?:=|\s+))"\$\(\s*cat\s+<<-?\x27([A-Za-z_][A-Za-z0-9_]*)\x27\s*\n.*?\n[ \t]*\2\s*\)"/${1}""/gs;
 		s/((?:^|\s)$f(?:=|\s+))"[^"`\$]*"/${1}""/gs;
+		# grep/egrep/rg search PATTERN is regex text, not a file path -- a
+		# protected token quoted as the pattern is not a real read. Only the
+		# quoted token immediately after the command name and its flags is
+		# stripped, never a later argument, so a real FILE operand is
+		# untouched and still scanned below.
+		# A pattern-file flag (-f/--file/--from-file) ends the flag run: its
+		# operand is a file and the positional after it is the input file, so
+		# neither is scrubbed. A path-selecting flag (--include/--exclude/
+		# --glob/--iglob and rg\x27s short -g) has its own operand consumed and
+		# preserved; the next quoted token afterward is still scrubbed as the pattern.
+		my $pfstop = qr/(?:file|from-file|rawfile|slurpfile|argfile)/;
+		my $pfskip = qr/(?:include|exclude|exclude-dir|include-dir|glob|iglob|ignore-file|exclude-from|pre)/;
+		my $gtok = qr/(?:\x27[^\x27]*\x27|"[^"`\$]*"|\S+)/;
+		my $gelem1 = qr/-(?![A-Za-z]*[fg]\b)[A-Za-z]+|--(?!(?:$pfstop|$pfskip)\b)[A-Za-z][A-Za-z-]*(?:=\S*|\s+(?![\x27"])\S+)?/;
+		my $gelem2 = qr/(?:-[A-Za-z]*g\b|--$pfskip\b)(?:=$gtok|\s+$gtok)/;
+		my $g = qr/(?:grep|egrep|rg)/;
+		s/((?:^|[;&|]\s*)$g\b(?:\s+(?:$gelem2|$gelem1))*\s+)\x27[^\x27]*\x27/${1}\x27\x27/gs;
+		s/((?:^|[;&|]\s*)$g\b(?:\s+(?:$gelem2|$gelem1))*\s+)"[^"`\$]*"/${1}""/gs;
+		# The jq program is a filter expression, not a file path, and commonly
+		# appears after a shell keyword (a for-loop body\x27s "do") that the
+		# grep/rg separator anchor above would miss, so this one anchors on
+		# the bare word instead. Still strictly local: only the quoted token
+		# right after jq (and its flags) is blanked, never anything before or
+		# after, so a real path elsewhere in the same command is untouched.
+		s/(\bjq\b(?:\s+-(?!-?(?:f\b|[A-Za-z]*f\b|-file\b|-from-file\b|-rawfile\b|-slurpfile\b|-argfile\b))-?[A-Za-z][A-Za-z-]*)*\s+)\x27[^\x27]*\x27/${1}\x27\x27/gs;
+		s/(\bjq\b(?:\s+-(?!-?(?:f\b|[A-Za-z]*f\b|-file\b|-from-file\b|-rawfile\b|-slurpfile\b|-argfile\b))-?[A-Za-z][A-Za-z-]*)*\s+)"[^"`\$]*"/${1}""/gs;
+		# echo/printf\x27s quoted arguments are text being printed (to stdout, a
+		# log line, a ledger file), not a file path read. Every static quoted
+		# token right after echo/printf (and its flags) is blanked in turn; a
+		# redirect target after it (echo "..." > .env) is never touched and
+		# still scanned below.
+		my $e = qr/(?:echo|printf)/;
+		my $eflag = qr/-{1,2}[A-Za-z][A-Za-z-]*/;
+		my $eblank = qr/(?:\x27\x27|"")/;
+		my $ebare = qr/[^\s\x27"<>|;&()`\$]+/;
+		1 while s/(\b$e\b(?:\s+(?:$eflag|$eblank|$ebare))*\s+)\x27[^\x27]+\x27/${1}\x27\x27/s;
+		1 while s/(\b$e\b(?:\s+(?:$eflag|$eblank|$ebare))*\s+)"[^"`\$]+"/${1}""/s;
 	' 2>/dev/null) || GUARD_STR="$CMD"
 	[ -n "$GUARD_STR" ] || GUARD_STR="$CMD"
 fi
@@ -127,8 +164,21 @@ fi
 # still matches below. The trailing char class stands in for \b (word
 # boundary) -- BSD sed's -E doesn't support \b, unlike this file's grep -E
 # calls, which run through a GNU-compatible grep on this system.
+# Finally, strip a .env path under tests/fixtures/ -- that's test scaffolding,
+# not a real secret. The repeated directory-segment group explicitly excludes
+# segments starting with "." (rules out ".." specifically), so a traversal
+# escaping the fixtures dir (tests/fixtures/../../.env) never matches and
+# still gets caught below.
+# A jq file-valued flag (-f/--file/--from-file and combined forms like -nf)
+# makes the quoted token a real path, not a filter key, so this fallback
+# .env-key stripper must not fire when one is present.
+JQ_DOTENV_SED="s/(jq([[:space:]]+--?[A-Za-z][A-Za-z-]*)*[[:space:]]+)(['\"])\.env([^A-Za-z0-9_]|\$)/\1\3\4/g"
+if printf '%s' "$GUARD_STR" | grep -qE '\bjq\b[^|;&]*[[:space:]]-(-?f\b|[A-Za-z]*f\b|-file\b|-from-file\b|-rawfile\b|-slurpfile\b|-argfile\b)'; then
+	JQ_DOTENV_SED='s/&/&/'
+fi
 SCRUBBED=$(printf '%s' "$GUARD_STR" | sed -E 's/\.env\.(example|template)//g' \
-	| sed -E "s/(jq([[:space:]]+--?[A-Za-z][A-Za-z-]*)*[[:space:]]+)(['\"])\.env([^A-Za-z0-9_]|\$)/\1\3\4/g")
+	| sed -E "$JQ_DOTENV_SED" \
+	| sed -E 's#tests/fixtures/([^./[:space:]][^/[:space:]]*/)*\.env(\.[A-Za-z0-9_]+)*#tests/fixtures/FIXTURE#g')
 if printf '%s' "$SCRUBBED" | grep -qE '(\.env\b|\.ssh\b|\.bashrc(\.local)?|\.bash_profile|\.zshrc(\.local)?|\.profile\b|secrets/|\.pem\b|(^|[/[:space:]])\.?\w*\.key\b|credentials|\.aws\b|\.config/(gcloud|secrets|gh)\b|\.netrc\b|\.gnupg\b|\.docker/config|\.kube/config|\.npmrc\b|\.pypirc\b)'; then
 	log_secret_block "bash-guard:protected-path" "$CMD"
 	printf 'BLOCK: command references a protected secrets path. If a value is needed, ask the user to provide or load it.\n' >&2
@@ -136,7 +186,39 @@ if printf '%s' "$SCRUBBED" | grep -qE '(\.env\b|\.ssh\b|\.bashrc(\.local)?|\.bas
 fi
 
 # ── Secrets: environment dumps ──────────────────────────────────────────────
-if printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*($|\|)' \
+# Bare env/printenv (no pipe) is always a full dump, blocked outright. Piped
+# forms are more nuanced: a genuinely targeted lookup (env | grep <var>, or a
+# bare count via wc) reveals nothing when the search term/output isn't itself
+# secret-shaped, so those stay allowed. A targeted lookup requires a single
+# positive, anchored variable-name selector as the whole pattern (the complete
+# variable name followed by "=", optionally "^"-anchored; no -v/
+# --invert-match, no regex metacharacters, nothing piped or appended after
+# it); anything looser (a viewer like cat/less/head/tail/sort/tee, an extra
+# stage after the pattern, or a grep/egrep/rg whose selector is secret-shaped
+# or not a complete variable name followed by "=") is still effectively a
+# dump and stays blocked. Only a fixed whitelist of grep short options that
+# cannot select, invert, or emit more than the matched line is accepted.
+# Calibrated against real usage, see tests/fixtures/env-dump/usage-evidence.md.
+ENV_DUMP=false
+if printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*$'; then
+	ENV_DUMP=true
+elif printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|'; then
+	if printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|[[:space:]]*(grep|egrep|rg)\b'; then
+		if printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|[[:space:]]*(grep|egrep|rg)([[:space:]]+-[inwxFEGPsaHhbco]+)*[[:space:]]+('"'"'\^?[A-Za-z_][A-Za-z0-9_]*='"'"'|"\^?[A-Za-z_][A-Za-z0-9_]*="|\^?[A-Za-z_][A-Za-z0-9_]*=)[[:space:]]*$' \
+			&& ! printf '%s' "$CMD" | grep -qiE '(^|[[:space:]])(-[A-Za-z]*v[A-Za-z]*|--invert-match)([[:space:]]|$)' \
+			&& ! printf '%s' "$CMD" | grep -qiE '(TOKEN|SECRET|API_?KEY|PASSWORD)'; then
+			ENV_DUMP=false
+		else
+			ENV_DUMP=true
+		fi
+	elif printf '%s' "$CMD" | grep -qE '^[[:space:]]*(printenv|env)[[:space:]]*\|[[:space:]]*wc\b'; then
+		ENV_DUMP=false
+	else
+		ENV_DUMP=true
+	fi
+fi
+
+if $ENV_DUMP \
 	|| printf '%s' "$GUARD_STR" | grep -qE 'printenv[[:space:]]+.*(TOKEN|SECRET|API_?KEY|PASSWORD)' \
 	|| printf '%s' "$GUARD_STR" | grep -qE '\b(echo|printf)\b[^|;&]*\$\{?[A-Za-z0-9_]*(TOKEN|SECRET|API_?KEY|PASSWORD)'; then
 	log_secret_block "bash-guard:env-dump" "$CMD"
@@ -165,10 +247,10 @@ fi
 # Only python/python3 commands whose sole import is json are blocked. A comma
 # after json (import json, pandas) or any other import statement means the
 # script does more than parsing; allow it.
-if printf '%s' "$CMD" | grep -qE '\b(python|python3)\b' \
-	&& printf '%s' "$CMD" | grep -qE '\bimport\s+json\b' \
-	&& ! printf '%s' "$CMD" | grep -qE '\bimport\s+json\s*,' \
-	&& ! printf '%s' "$CMD" | sed 's/import[[:space:]]*json//g' | grep -qE '\bimport\s+\w'; then
+if printf '%s' "$GUARD_STR" | grep -qE '\b(python|python3)\b' \
+	&& printf '%s' "$GUARD_STR" | grep -qE '\bimport\s+json\b' \
+	&& ! printf '%s' "$GUARD_STR" | grep -qE '\bimport\s+json\s*,' \
+	&& ! printf '%s' "$GUARD_STR" | sed 's/import[[:space:]]*json//g' | grep -qE '\bimport\s+\w'; then
 	echo "Prefer jq over Python for JSON parsing -- import json is the only import, this is a pure parsing task. jq is pre-approved, streaming, and faster." >&2
 	exit 2
 fi

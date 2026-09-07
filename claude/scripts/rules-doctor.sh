@@ -183,8 +183,6 @@ fi
 echo "## H. Secrets denial"
 if command -v jq >/dev/null 2>&1 && [ -f "$SETTINGS" ]; then
 	REQUIRED_DENY=(
-		'Read(**/.env*)'
-		'Edit(**/.env*)'
 		'Read(**/*.key)'
 		'Edit(**/*.key)'
 		'Read(**/*.pem)'
@@ -242,6 +240,16 @@ if command -v jq >/dev/null 2>&1 && [ -f "$SETTINGS" ]; then
 		fail "H.2 Bash(cat:*) not auto-approved" "Bash(cat:*) in allow list bypasses the Read deny rules"
 	else
 		ok "H.2 Bash(cat:*) is not auto-approved"
+	fi
+	# The .env family has no settings.json deny glob (no negation syntax exists
+	# to carve out .env.example/.env.template from a wildcard), so protection
+	# lives solely in block-sensitive-writes.sh; it must be wired to Read too,
+	# not just Write/Edit, or Read of a real .env file goes unguarded.
+	if jq -e '.hooks.PreToolUse[].hooks[] | select(.command | test("block-sensitive-writes"))' "$SETTINGS" >/dev/null 2>&1 \
+		&& jq -e '.hooks.PreToolUse[] | select(.hooks[].command | test("block-sensitive-writes")) | .matcher | test("Read")' "$SETTINGS" >/dev/null 2>&1; then
+		ok "H.3 block-sensitive-writes.sh matcher covers Read"
+	else
+		fail "H.3 block-sensitive-writes.sh matcher covers Read" "matcher missing Read; .env-family Read protection now lives only in this hook"
 	fi
 else
 	fail "H.* prerequisites" "jq missing or settings.json absent"

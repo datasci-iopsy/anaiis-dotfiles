@@ -84,8 +84,6 @@
             "Bash(kubectl delete*)",
             "Bash(terraform apply*)",
             "Bash(terraform destroy*)",
-            "Read(**/.env*)",
-            "Edit(**/.env*)",
             "Read(**/*.key)",
             "Edit(**/*.key)",
             "Read(**/*.pem)",
@@ -218,7 +216,7 @@
                 ]
             },
             {
-                "matcher": "Write|Edit",
+                "matcher": "Read|Write|Edit",
                 "hooks": [
                     {
                         "type": "command",
