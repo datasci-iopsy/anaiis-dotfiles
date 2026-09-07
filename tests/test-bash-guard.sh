@@ -276,6 +276,12 @@ assert_block "2k.6 grep -f file-valued flag keeps the quoted path visible" "grep
 assert_block "2k.7 grep -nf combined file-valued flag keeps the quoted path visible" "grep -nf '.env' /etc/hosts" "BLOCK"
 assert_block "2k.8 rg -f file-valued flag keeps the quoted path visible" "rg -f '.env' ." "BLOCK"
 assert_allow "2k.9 grep -F fixed-strings is not file-valued, pattern still stripped" "grep -F '.env' settings.json"
+assert_block "2k.10 grep --include keeps the glob operand visible, not a pattern" "grep -r --include '.env' . src" "BLOCK"
+assert_block "2k.11 grep --exclude keeps the glob operand visible, not a pattern" "grep -r --exclude '.env' foo src" "BLOCK"
+assert_block "2k.12 rg --glob keeps the glob operand visible, not a pattern" "rg --glob '.env' foo ." "BLOCK"
+assert_block "2k.13 rg -g keeps the glob operand visible, not a pattern" "rg -g '.env' foo ." "BLOCK"
+assert_block "2k.14 rg --iglob keeps the glob operand visible, not a pattern" "rg --iglob '.env' foo ." "BLOCK"
+assert_allow "2k.15 grep --color is boolean, the quoted token is still a pattern" "grep -rn --color 'needle .env' src"
 
 echo "# 2l. jq program text is not a path reference"
 assert_allow "2l.1 jq program mentions .env deep inside a longer filter" "jq 'select(.path == \".env.local\") | .path' data.json"

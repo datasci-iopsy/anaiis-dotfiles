@@ -121,9 +121,11 @@ if command -v perl >/dev/null 2>&1; then
 		# A file-valued flag (-f/--file/--from-file and combined forms like
 		# -nf) is not consumed by the flag run, so its own operand keeps
 		# the quoted token visible instead of erasing it as a pattern.
+		# A path-selecting flag (--include/--exclude/--glob and similar,
+		# plus rg\x27s short -g) is excluded the same way, keeping its operand visible.
 		my $g = qr/(?:grep|egrep|rg)/;
-		s/((?:^|[;&|]\s*)$g\b(?:\s+-(?!-?(?:f\b|[A-Za-z]*f\b|-file\b|-from-file\b|-rawfile\b|-slurpfile\b|-argfile\b))-?[A-Za-z][A-Za-z-]*)*\s+)\x27[^\x27]*\x27/${1}\x27\x27/gs;
-		s/((?:^|[;&|]\s*)$g\b(?:\s+-(?!-?(?:f\b|[A-Za-z]*f\b|-file\b|-from-file\b|-rawfile\b|-slurpfile\b|-argfile\b))-?[A-Za-z][A-Za-z-]*)*\s+)"[^"`\$]*"/${1}""/gs;
+		s/((?:^|[;&|]\s*)$g\b(?:\s+-(?!-?(?:f\b|g\b|[A-Za-z]*f\b|[A-Za-z]*g\b|-file\b|-from-file\b|-rawfile\b|-slurpfile\b|-argfile\b|-include\b|-exclude\b|-exclude-dir\b|-include-dir\b|-glob\b|-iglob\b|-ignore-file\b|-exclude-from\b|-pre\b))-?[A-Za-z][A-Za-z-]*)*\s+)\x27[^\x27]*\x27/${1}\x27\x27/gs;
+		s/((?:^|[;&|]\s*)$g\b(?:\s+-(?!-?(?:f\b|g\b|[A-Za-z]*f\b|[A-Za-z]*g\b|-file\b|-from-file\b|-rawfile\b|-slurpfile\b|-argfile\b|-include\b|-exclude\b|-exclude-dir\b|-include-dir\b|-glob\b|-iglob\b|-ignore-file\b|-exclude-from\b|-pre\b))-?[A-Za-z][A-Za-z-]*)*\s+)"[^"`\$]*"/${1}""/gs;
 		# The jq program is a filter expression, not a file path, and commonly
 		# appears after a shell keyword (a for-loop body\x27s "do") that the
 		# grep/rg separator anchor above would miss, so this one anchors on
