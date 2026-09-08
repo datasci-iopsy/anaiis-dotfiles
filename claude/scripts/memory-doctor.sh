@@ -48,6 +48,7 @@ PRE_HOOK="$REPO_DIR/claude/hooks/pre-compact.sh"
 
 PASS=0
 FAIL=0
+SKIP=0
 
 ok() {
 	printf '  PASS  %s\n' "$1"
@@ -56,6 +57,13 @@ ok() {
 fail() {
 	printf '  FAIL  %s\n        %s\n' "$1" "$2"
 	FAIL=$((FAIL + 1))
+}
+# A check that had no evidence to evaluate. Kept out of PASS so the pass
+# count never carries an entry nothing was verified for; never affects the
+# exit status.
+skip() {
+	printf '  SKIP  %s\n' "$1"
+	SKIP=$((SKIP + 1))
 }
 
 # ── A. Global tier ────────────────────────────────────────────────────────
@@ -178,7 +186,7 @@ if [ -d "$GLOBAL_DIR" ] && [ -f "$GLOBAL_DIR/MEMORY.md" ]; then
 		fail "E.3 resume source" "expected empty output, got: $(printf '%s' "$OUT_RESUME" | head -c 80)"
 	fi
 else
-	ok "E.* skipped (no global memory directory yet, run seed-memory.sh)"
+	skip "E.* skipped (no global memory directory yet, run seed-memory.sh)"
 fi
 
 # ── F. pre-compact writes into handoffs/ subdir ───────────────────────────
@@ -264,7 +272,7 @@ if [ -d "$CURRENT_TRANSCRIPTS" ]; then
 fi
 
 if [ -z "$RECEIPT" ]; then
-	ok "H.1 skipped (no post-fix transcript carries the payload yet; expected until the next real session)"
+	skip "H.1 skipped (no post-fix transcript carries the payload yet; expected until the next real session)"
 else
 	ok "H.1 a real transcript carries a genuine SessionStart additionalContext attachment (most recent: $RECEIPT)"
 fi
@@ -353,7 +361,7 @@ if [ -f "$INDEX" ]; then
 		fail "L.1 payload budget" "global payload ~${TOTAL_TOKENS} tok exceeds the 2k budget"
 	fi
 else
-	ok "L.1 skipped (no global index)"
+	skip "L.1 skipped (no global index)"
 fi
 
 # ── M. Pending migration ────────────────────────────────────────────────────
@@ -376,6 +384,6 @@ fi
 # ── Summary ──────────────────────────────────────────────────────────────
 echo
 echo "──────────────────────────────────────────────"
-echo "memory-doctor: $PASS passed, $FAIL failed"
+echo "memory-doctor: $PASS passed, $FAIL failed, $SKIP skipped"
 echo "──────────────────────────────────────────────"
 [ "$FAIL" -eq 0 ]

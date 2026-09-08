@@ -55,6 +55,17 @@ assert_contains() {
 	fi
 }
 
+assert_not_contains() {
+	local name="$1" needle="$2" haystack="$3"
+	if printf '%s' "$haystack" | grep -qF -- "$needle"; then
+		printf '  FAIL  %s\n        expected NOT to contain: %s\n' "$name" "$needle"
+		FAIL=$((FAIL + 1))
+	else
+		printf '  PASS  %s\n' "$name"
+		PASS=$((PASS + 1))
+	fi
+}
+
 # ── Fixture: throwaway repo copy + throwaway HOME ──────────────────────────
 # Resolve the fixture root with pwd -P once: macOS mktemp returns a
 # /var/folders path that resolves to /private/var, and the doctor's A.1
@@ -169,6 +180,14 @@ mkdir -p "$T7_TRANSCRIPTS"
 # 7a. No transcript at all: skip, not fail.
 run_doctor "$OUT_DIR/7a.out" "$T7_TRANSCRIPTS"
 assert_contains "7a.1 no transcript skips H.1" "H.1 skipped" "$(cat "$OUT_DIR/7a.out")"
+# Issue #17 (DSIO-74): the no-receipt case must be reported as SKIP, not
+# PASS, so the pass count carries no evidence-free entries. Message text is
+# pinned verbatim above; these pin the reporting channel. Fail-to-fail: all
+# three fail when the branch routes through ok() instead of skip(), or when
+# the summary omits the skip count.
+assert_contains "7a.2 no-receipt H.1 is reported on the SKIP channel" "  SKIP  H.1 skipped" "$(cat "$OUT_DIR/7a.out")"
+assert_not_contains "7a.3 no-receipt H.1 is not counted as PASS" "  PASS  H.1 skipped" "$(cat "$OUT_DIR/7a.out")"
+assert_contains "7a.4 summary reports the skip count" "failed, 1 skipped" "$(cat "$OUT_DIR/7a.out")"
 
 # 7b. Decoy: assistant text quoting the header literally (e.g. writing the
 # hook's own source) must not count as receipt.
