@@ -511,8 +511,9 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 	#   2. Exactly one word in the whole command is an rm invocation, and no
 	#      word is another deletion-capable command (rmdir, unlink, shred,
 	#      find, xargs, or git clean).
-	#   3. The rm statement starts with rm, has at least one operand, and every
-	#      operand is a literal path on the cache list: .ruff_cache,
+	#   3. The rm statement starts with rm, carries a recursive flag, has at
+	#      least one operand, and every operand is a literal path on the cache
+	#      list: .ruff_cache,
 	#      .pytest_cache, .mypy_cache, .tox, __pycache__, .venv, node_modules,
 	#      optionally under a relative directory prefix whose segments do not
 	#      start with a dot (so never ..). dist, build, .next, and coverage
@@ -556,6 +557,7 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 							RM_CACHE_RM_STMTS=$((RM_CACHE_RM_STMTS + 1))
 							RM_CACHE_OPERANDS=0
 							RM_CACHE_DD=0
+							RM_CACHE_RECURSIVE=0
 							for ((RM_CI = 1; RM_CI < ${#RM_CSW[@]}; RM_CI++)); do
 								RM_CO="${RM_CSW[$RM_CI]}"
 								if [ "$RM_CACHE_DD" -eq 0 ]; then
@@ -563,7 +565,16 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 										RM_CACHE_DD=1
 										continue
 									fi
-									case "$RM_CO" in -*) continue ;; esac
+									case "$RM_CO" in
+										--recursive)
+											RM_CACHE_RECURSIVE=1
+											continue
+											;;
+										-*)
+											[[ "$RM_CO" =~ ^-[A-Za-z]*[rR][A-Za-z]*$ ]] && RM_CACHE_RECURSIVE=1
+											continue
+											;;
+									esac
 								fi
 								RM_CACHE_OPERANDS=$((RM_CACHE_OPERANDS + 1))
 								if ! [[ "$RM_CO" =~ $RM_CACHE_LITERAL_RE ]] || ! [[ "$RM_CO" =~ $RM_CACHE_PATH_RE ]]; then
@@ -571,6 +582,7 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 								fi
 							done
 							[ "$RM_CACHE_OPERANDS" -eq 0 ] && RM_CACHE_OK=0
+							[ "$RM_CACHE_RECURSIVE" -eq 1 ] || RM_CACHE_OK=0
 							;;
 						uv | ruff | pytest | python | python3 | npm | npx | pnpm | yarn | make | Rscript | quarto | dbt | sqlfmt | shfmt | shellcheck | echo | cd | ls)
 							RM_CACHE_RUNNER_STMTS=$((RM_CACHE_RUNNER_STMTS + 1))

@@ -449,6 +449,7 @@ assert_decision "7b.13 carve-out: a build-output dir is not a cache dir" "rm -rf
 assert_decision "7b.14 carve-out: a trailing command off the runner list still asks" "rm -rf .ruff_cache && ./deploy.sh" "ask"
 assert_decision "7b.15 carve-out: git clean riding along is a second deletion" "rm -rf .ruff_cache && git clean -fdx" "ask"
 assert_decision "7b.16 carve-out: traversal under a cache name is not a cache path" "rm -rf ../.venv && uv sync" "ask"
+assert_decision "7b.17 carve-out: a non-recursive rm reaching the section via a later -r still asks" $'rm -f .ruff_cache\nuv pip install -r requirements.txt' "ask"
 
 echo "# 7c. Catastrophic tripwire: hard-deny, on top of (not instead of) ask"
 assert_block "7c.1 bare root" "rm -rf /" "catastrophic"
