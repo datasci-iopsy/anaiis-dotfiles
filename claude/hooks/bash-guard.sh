@@ -496,6 +496,113 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 		exit 0
 	fi
 
+	# ── Cache-rm-then-runner carve-out (issue #15) ────────────────────────
+	# The operator check below asks for every compound command, and the one
+	# shape observed to trip it (13 of 13 prompts in the 2026-08 transcript
+	# audit) is a cache-directory rm chained onto the command that needs the
+	# cache gone: `rm -rf .ruff_cache && uv run ruff check x.py`. Allow that
+	# shape and only that shape. A PreToolUse allow covers the whole command
+	# string and bypasses the permission system for every statement in it, so
+	# each condition is load-bearing, not cosmetic:
+	#   1. Statement separators are limited to &&, ;, and newline. Any |, ||,
+	#      lone &, $, backtick, parenthesis, <, or > anywhere in the raw
+	#      command (quotes included) disqualifies: pipes, substitutions, and
+	#      redirections can carry anything.
+	#   2. Exactly one word in the whole command is an rm invocation, and no
+	#      word is another deletion-capable command (rmdir, unlink, shred,
+	#      find, xargs, or git clean).
+	#   3. The rm statement starts with rm, carries a recursive flag, has at
+	#      least one operand, and every operand is a literal path on the cache
+	#      list: .ruff_cache,
+	#      .pytest_cache, .mypy_cache, .tox, __pycache__, .venv, node_modules,
+	#      optionally under a relative directory prefix whose segments do not
+	#      start with a dot (so never ..). dist, build, .next, and coverage
+	#      stay off this list: they can hold real output, and remain allowed
+	#      only in the standalone form via RM_ARTIFACTS below.
+	#   4. Every other statement's first word is a known runner: uv, ruff,
+	#      pytest, python, python3, npm, npx, pnpm, yarn, make, Rscript,
+	#      quarto, dbt, sqlfmt, shfmt, shellcheck, echo, cd, ls.
+	# Anything else falls through to the operator check unchanged. Checks use
+	# bash pattern matching on the raw CMD (not GUARD_STR, whose quoted spans
+	# are blanked) so nothing inside quotes can hide a second statement.
+	RM_CACHE_ALLOW=0
+	RM_CACHE_FORBID='[|`$()<>]'
+	if ! [[ "$CMD" =~ $RM_CACHE_FORBID ]]; then
+		RM_CACHE_NORM="${CMD//$'\n'/;}"
+		RM_CACHE_NORM="${RM_CACHE_NORM//&&/;}"
+		if [[ "$RM_CACHE_NORM" != *'&'* ]]; then
+			RM_CACHE_RM_COUNT=0
+			RM_CACHE_OTHER_DELETE=0
+			RM_CACHE_PREV=""
+			for RM_CW in "${RM_WORDS[@]}"; do
+				case "$RM_CW" in
+					rm | */rm | '\rm') RM_CACHE_RM_COUNT=$((RM_CACHE_RM_COUNT + 1)) ;;
+					rmdir | unlink | shred | find | xargs) RM_CACHE_OTHER_DELETE=1 ;;
+					clean) [ "$RM_CACHE_PREV" = "git" ] && RM_CACHE_OTHER_DELETE=1 ;;
+				esac
+				RM_CACHE_PREV="$RM_CW"
+			done
+			if [ "$RM_CACHE_RM_COUNT" -eq 1 ] && [ "$RM_CACHE_OTHER_DELETE" -eq 0 ]; then
+				IFS=';' read -r -a RM_CACHE_STMTS <<<"$RM_CACHE_NORM"
+				RM_CACHE_OK=1
+				RM_CACHE_RM_STMTS=0
+				RM_CACHE_RUNNER_STMTS=0
+				RM_CACHE_LITERAL_RE='^[A-Za-z0-9._/-]+$'
+				RM_CACHE_PATH_RE='^(\./)?([^./][^/]*/)*(\.ruff_cache|\.pytest_cache|\.mypy_cache|\.tox|__pycache__|\.venv|node_modules)/?$'
+				for RM_CS in "${RM_CACHE_STMTS[@]}"; do
+					read -r -a RM_CSW <<<"$RM_CS"
+					[ "${#RM_CSW[@]}" -eq 0 ] && continue
+					case "${RM_CSW[0]}" in
+						rm | */rm | '\rm')
+							RM_CACHE_RM_STMTS=$((RM_CACHE_RM_STMTS + 1))
+							RM_CACHE_OPERANDS=0
+							RM_CACHE_DD=0
+							RM_CACHE_RECURSIVE=0
+							for ((RM_CI = 1; RM_CI < ${#RM_CSW[@]}; RM_CI++)); do
+								RM_CO="${RM_CSW[$RM_CI]}"
+								if [ "$RM_CACHE_DD" -eq 0 ]; then
+									if [ "$RM_CO" = "--" ]; then
+										RM_CACHE_DD=1
+										continue
+									fi
+									case "$RM_CO" in
+										--recursive)
+											RM_CACHE_RECURSIVE=1
+											continue
+											;;
+										-*)
+											[[ "$RM_CO" =~ ^-[A-Za-z]*[rR][A-Za-z]*$ ]] && RM_CACHE_RECURSIVE=1
+											continue
+											;;
+									esac
+								fi
+								RM_CACHE_OPERANDS=$((RM_CACHE_OPERANDS + 1))
+								if ! [[ "$RM_CO" =~ $RM_CACHE_LITERAL_RE ]] || ! [[ "$RM_CO" =~ $RM_CACHE_PATH_RE ]]; then
+									RM_CACHE_OK=0
+								fi
+							done
+							[ "$RM_CACHE_OPERANDS" -eq 0 ] && RM_CACHE_OK=0
+							[ "$RM_CACHE_RECURSIVE" -eq 1 ] || RM_CACHE_OK=0
+							;;
+						uv | ruff | pytest | python | python3 | npm | npx | pnpm | yarn | make | Rscript | quarto | dbt | sqlfmt | shfmt | shellcheck | echo | cd | ls)
+							RM_CACHE_RUNNER_STMTS=$((RM_CACHE_RUNNER_STMTS + 1))
+							;;
+						*) RM_CACHE_OK=0 ;;
+					esac
+				done
+				# Compound commands only: a standalone rm keeps taking the
+				# safe-list path below, so its decision and reason are unchanged.
+				[ "$RM_CACHE_RM_STMTS" -eq 1 ] && [ "$RM_CACHE_RUNNER_STMTS" -ge 1 ] || RM_CACHE_OK=0
+				RM_CACHE_ALLOW=$RM_CACHE_OK
+			fi
+		fi
+	fi
+	if [ "$RM_CACHE_ALLOW" -eq 1 ]; then
+		jq -n --arg r "single recursive rm of a known cache directory, chained only to known runner commands (issue #15 carve-out)" \
+			'{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow", "permissionDecisionReason": $r}}'
+		exit 0
+	fi
+
 	if grep -qE '[;&|`$()<>]' <<<"$GUARD_STR" || [[ "$GUARD_STR" == *$'\n'* ]]; then
 		jq -n --arg r "recursive rm alongside a shell operator/substitution -- cannot verify each path independently" \
 			'{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask", "permissionDecisionReason": $r}}'

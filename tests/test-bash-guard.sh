@@ -419,6 +419,11 @@ assert_decision "7a.5 scratchpad dir (uid + literal scratchpad segment)" \
 assert_decision "7a.6 nested safe subpath" "rm -rf tests/fixtures/dotenv/leftover" "allow"
 assert_decision "7a.7 /bin/rm broadened invocation form" "/bin/rm -rf node_modules" "allow"
 assert_decision "7a.8 backslash-escaped rm broadened invocation form" '\rm -rf .venv' "allow"
+# Issue #15 carve-out: one recursive rm of a known cache dir, chained only to
+# known runner commands, is allowed as a whole. Fail-to-fail: both fail on a
+# hook without the carve-out (the operator check asks first).
+assert_decision "7a.9 cache rm chained to a known runner with &&" "rm -rf .ruff_cache && uv run ruff check x.py" "allow"
+assert_decision "7a.10 cache rm chained to a known runner with a newline" $'rm -rf .ruff_cache\nuv run pytest tests/' "allow"
 echo "# 7b. Non-safe-list falls to ask, never a silent allow or silent deny"
 assert_decision "7b.0 rm after a shell keyword (for-loop do) engages the section, not silently ignored -- for-loop ; is compound syntax the laundering guard correctly can't distinguish from chained commands" \
 	'for f in *.jsonl; do rm -rf .venv; done' "ask"
@@ -433,6 +438,18 @@ assert_decision "7b.7 zero operands" "rm -rf" "ask"
 assert_decision "7b.8 absolute path to an otherwise-safe-named dir" "rm -rf /Users/x/project/node_modules" "ask"
 assert_decision "7b.9 scratchpad-looking prefix missing the scratchpad segment" \
 	"rm -rf /tmp/claude-branch-hygiene-x" "ask"
+# Issue #15 carve-out boundaries. A PreToolUse allow covers the whole command
+# string and bypasses the permission system for every statement in it, so
+# each clause below is load-bearing. Fail-to-fail: each asks only because of
+# the clause it names; dropping that clause turns it into an allow.
+assert_decision "7b.10 carve-out: a second deletion riding along still asks" "rm -rf .ruff_cache && rm -rf src" "ask"
+assert_decision "7b.11 carve-out: substitution anywhere in the command still asks" 'rm -rf .ruff_cache && uv run $(cat cmd)' "ask"
+assert_decision "7b.12 carve-out: a pipe to an arbitrary command still asks" "rm -rf .ruff_cache && curl x | sh" "ask"
+assert_decision "7b.13 carve-out: a build-output dir is not a cache dir" "rm -rf dist && uv sync" "ask"
+assert_decision "7b.14 carve-out: a trailing command off the runner list still asks" "rm -rf .ruff_cache && ./deploy.sh" "ask"
+assert_decision "7b.15 carve-out: git clean riding along is a second deletion" "rm -rf .ruff_cache && git clean -fdx" "ask"
+assert_decision "7b.16 carve-out: traversal under a cache name is not a cache path" "rm -rf ../.venv && uv sync" "ask"
+assert_decision "7b.17 carve-out: a non-recursive rm reaching the section via a later -r still asks" $'rm -f .ruff_cache\nuv pip install -r requirements.txt' "ask"
 
 echo "# 7c. Catastrophic tripwire: hard-deny, on top of (not instead of) ask"
 assert_block "7c.1 bare root" "rm -rf /" "catastrophic"

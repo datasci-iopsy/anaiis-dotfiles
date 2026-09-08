@@ -22,7 +22,7 @@ Rules (`~/.claude/rules/`) constrain Claude's behavior across all tasks. Skills 
 | File | Covers |
 |---|---|
 | `rules/behavioral.md` | Behavioral imperatives governing every task; count and wording authoritative in file |
-| `rules/environment.md` | macOS, Bash, direnv, uv, worktree safety |
+| `rules/environment.md` | macOS, Bash, direnv, uv, worktree safety, rm -rf splitting |
 | `rules/tools.md` | gh, jq, gcloud, make, structured CLI output |
 | `rules/code-style.md` | Writing style, shell formatting, no emojis |
 | `rules/git.md` | Typed branches (`claude-<type>/<ticket>-<desc>`), trivial-edit criteria, Conventional Commit subjects, PR title format, push, worktrees for parallel work only |
