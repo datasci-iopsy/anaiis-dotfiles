@@ -302,10 +302,11 @@ fi
 if [ "${ctx_pct:-0}" -gt 0 ] 2>/dev/null; then
 	col=$(pct_color "$ctx_pct")
 	bar=$(progress_bar "$ctx_pct" 8)
-	# 60% is the compaction policy threshold (rules/session.md); no native
-	# harness knob exists to trigger compaction at this point (only ~85%
-	# auto-compact), so context-watch.sh directs a checkpoint-and-/compact
-	# request instead. This marker is the deterministic visual companion.
+	# 60% is the harness's own auto-compact trigger, set via
+	# CLAUDE_AUTOCOMPACT_PCT_OVERRIDE in shared.bash (rules/session.md);
+	# context-watch.sh directs a checkpoint five points earlier, at 55%, so
+	# the model acts before this backstop lands. This marker is the
+	# deterministic visual companion to the 60% backstop.
 	compact_marker=""
 	[ "$ctx_pct" -ge 60 ] && compact_marker="$(printf " ${b_yel}${bd}compact:60+${rs}")"
 	line2+=("$(printf "${col}context:[%s${col}]%d%%${rs}%s" "$bar" "$ctx_pct" "$compact_marker")")

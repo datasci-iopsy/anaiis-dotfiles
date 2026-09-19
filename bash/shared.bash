@@ -99,6 +99,15 @@ export CLAUDE_CODE_EFFORT_LEVEL="high"
 export CLAUDE_CODE_MAX_OUTPUT_TOKENS="32000"
 export CLAUDE_CODE_DISABLE_MOUSE_CLICKS="0"
 
+# Auto-compact threshold: fire at 60% of context instead of the harness's
+# ~83% default, matching the 50-60% utilization band where models perform
+# best (see rules/session.md). Window is left unset deliberately: Claude Code
+# already defaults it to the active model's real max (967K on Sonnet 5/Opus
+# 5/Fable 5.1, 200K on Haiku 4.5) and tracks whichever model is active, so
+# PCT_OVERRIDE alone gives "60% of context" across every model in use here
+# without per-model tuning.
+export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE="60"
+
 # cost-guard.sh PreToolUse hook: per-session cap on general-purpose Agent
 # spawns (claude/hooks/cost-guard.sh reads this via ${COST_GUARD_GP_LIMIT:-10}).
 # Hooks are child processes of the claude CLI, so they inherit this like any
