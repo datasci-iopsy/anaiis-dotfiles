@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # tests/test-context-watch.sh -- context-watch.sh, a PostToolUse hook that
-# reads the pct file statusline-command.sh writes and, at >=60% context,
+# reads the pct file statusline-command.sh writes and, at >=55% context,
 # emits a one-shot additionalContext directive to checkpoint and request
-# /compact. No native harness knob triggers compaction at a chosen threshold
-# (only ~85% auto-compact), so this is the closest deterministic mechanism.
-# See tasks/plan.md T2.1.
+# /compact. Set 5 points ahead of the harness's own CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=60
+# auto-compact so the directive reliably lands first. See tasks/plan.md T2.1.
 #
 # Exit 0 if all tests pass; non-zero on any failure.
 
@@ -49,31 +48,31 @@ make_input() {
 	jq -n --arg sid "$sid" '{"session_id": $sid, "hook_event_name": "PostToolUse", "tool_name": "Read"}'
 }
 
-# ---- T1: below 60% is a no-op ------------------------------------------------
+# ---- T1: below 55% is a no-op ------------------------------------------------
 
 echo
-echo "--- T1: below 60% emits nothing"
+echo "--- T1: below 55% emits nothing"
 
 T1_SID="ctxwatch-$$-1"
 T1_PCT="/tmp/claude-context-${T1_SID}.pct"
 T1_FLAG="/tmp/claude-context-watch-${T1_SID}.fired"
 rm -f "$T1_PCT" "$T1_FLAG"
-echo "59" >"$T1_PCT"
+echo "54" >"$T1_PCT"
 
 T1_RESULT=$(make_input "$T1_SID" | bash "$HOOK" 2>/dev/null)
 rm -f "$T1_PCT" "$T1_FLAG"
-assert_empty "T1: 59% emits nothing" "$T1_RESULT"
+assert_empty "T1: 54% emits nothing" "$T1_RESULT"
 
-# ---- T2: at 60% emits the directive once ------------------------------------
+# ---- T2: at 55% emits the directive once ------------------------------------
 
 echo
-echo "--- T2: at 60% emits a directive exactly once"
+echo "--- T2: at 55% emits a directive exactly once"
 
 T2_SID="ctxwatch-$$-2"
 T2_PCT="/tmp/claude-context-${T2_SID}.pct"
 T2_FLAG="/tmp/claude-context-watch-${T2_SID}.fired"
 rm -f "$T2_PCT" "$T2_FLAG"
-echo "60" >"$T2_PCT"
+echo "55" >"$T2_PCT"
 
 T2_RESULT1=$(make_input "$T2_SID" | bash "$HOOK" 2>/dev/null)
 T2_CTX=$(printf '%s' "$T2_RESULT1" | jq -r '.hookSpecificOutput.additionalContext // ""' 2>/dev/null)
