@@ -97,7 +97,7 @@ export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku-4-5"
 # Effort and output sizing; overrides settings.json "effortLevel".
 export CLAUDE_CODE_EFFORT_LEVEL="high"
 export CLAUDE_CODE_MAX_OUTPUT_TOKENS="32000"
-export CLAUDE_CODE_DISABLE_MOUSE_CLICKS="1"
+export CLAUDE_CODE_DISABLE_MOUSE_CLICKS="0"
 
 # cost-guard.sh PreToolUse hook: per-session cap on general-purpose Agent
 # spawns (claude/hooks/cost-guard.sh reads this via ${COST_GUARD_GP_LIMIT:-10}).
@@ -108,8 +108,8 @@ export COST_GUARD_GP_LIMIT="75"
 
 # Privacy-focused, minimal-traffic configuration:
 # export DISABLE_TELEMETRY="1"
+# export DISABLE_FEEDBACK_COMMAND="1"
 export DISABLE_ERROR_REPORTING="1"
-export DISABLE_FEEDBACK_COMMAND="1"
 export DISABLE_AUTOUPDATER="1"
 
 # Bash and API timeouts. Research workflows can hit long-running R or DuckDB
