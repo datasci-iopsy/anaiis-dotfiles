@@ -41,7 +41,7 @@ Shell-side machine config lives in `~/.bashrc.local` (untracked). For machine-lo
 Two tiers, both auto-loaded:
 - **Global tier** at `~/.claude/memory/`, cross-project user-level facts (identity, preferences). Git-tracked in the dotfiles repo (`claude/memory/`, symlinked by `install.sh`); syncs across machines via git. Loaded once per session start (and again after `/compact`) via the `session-start-context.sh` SessionStart hook, delivered as `additionalContext`. Writes to it land in the dotfiles working tree; commit them from a dotfiles session.
 - **Project tier** at `~/.claude/projects/<project-key>/memory/`, project-specific facts, per-machine. The project's `MEMORY.md` index loads natively. Session handoffs live in the `handoffs/` subdirectory (rolling cap of 5, ISO-timestamped).
-Compaction targets 60% context, not the harness's ~85% backstop; see `rules/session.md`.
+Compaction targets 60% context; `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` in `shared.bash` sets the harness's own backstop to that threshold. See `rules/session.md`.
 Run `bash ~/.claude/scripts/memory-doctor.sh` to verify the pipeline end-to-end.
 
 @RTK.md

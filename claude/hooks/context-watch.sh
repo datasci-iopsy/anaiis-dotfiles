@@ -4,11 +4,13 @@
 #
 # No hook event receives context-usage metrics directly (only the statusline
 # does); statusline-command.sh bridges its exact context_window.used_percentage
-# into a per-session /tmp file, this hook reads it. CC 2.1.207 has no
-# configurable auto-compact threshold and no programmatic way to trigger
-# compaction (only the ~85% harness default and manual /compact), so 60% is
-# enforced as a one-shot directive asking the model to checkpoint and request
-# /compact itself, rather than a fully automatic trigger.
+# into a per-session /tmp file, this hook reads it. shared.bash sets
+# CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=60, so the harness's own auto-compact now
+# fires at 60% directly; this hook's one-shot directive is a checkpoint
+# nudge layered on top so the model wraps up the current step before
+# compaction happens, not the sole enforcement mechanism it was before that
+# env var existed. Ordering between the two at the same threshold is
+# unverified.
 #
 # Fires at most once per session (flag file guard). Silent when the pct file
 # is absent, unreadable, or below threshold.
@@ -40,7 +42,7 @@ touch "$FLAG" 2>/dev/null || exit 0
 
 DIRECTIVE="## Context threshold reached (${PCT}%)
 
-Context usage has reached ${PCT}%, at or above the 60% compaction policy threshold (rules/session.md). No automatic compaction fires until the harness's own ~85% backstop, so finish the current step, state a one-sentence checkpoint of what is done and what remains, then request \`/compact\` now rather than continuing toward that backstop."
+Context usage has reached ${PCT}%, at or above the 60% compaction policy threshold (rules/session.md). The harness's own auto-compact is also configured to fire at this threshold, so finish the current step and state a one-sentence checkpoint of what is done and what remains now, then request \`/compact\` yourself rather than waiting to find out whether the harness beats you to it."
 
 jq -n --arg ctx "$DIRECTIVE" --arg msg "context ${PCT}% -- checkpoint and /compact recommended" \
 	'{"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": $ctx}, "systemMessage": $msg}'
