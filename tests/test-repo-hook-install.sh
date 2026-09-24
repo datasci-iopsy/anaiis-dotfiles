@@ -60,20 +60,41 @@ make_repo() {
 
 exists() { [ -e "$1" ] && echo 1 || echo 0; }
 
+# Ref lines in the format git writes to pre-push's stdin:
+# "<local ref> <local sha> <remote ref> <remote sha>". A local sha of all
+# zeros is a branch deletion; an empty stdin is a push with nothing to send.
+SHA_A=1111111111111111111111111111111111111111
+SHA_B=2222222222222222222222222222222222222222
+ZERO=0000000000000000000000000000000000000000
+PUSH_LINE="refs/heads/main $SHA_A refs/heads/main $SHA_B"
+DELETE_LINE="(delete) $ZERO refs/heads/old $SHA_B"
+
 # ── 1. Which dispatcher runs the suite ────────────────────────────────────
 # Fail-to-fail: 1.1 fails if the run-all block stays in repo-pre-commit.sh;
-# 1.2 fails if repo-pre-push.sh is missing or omits the block.
+# 1.2 fails if repo-pre-push.sh is missing or omits the block; 1.4 fails if
+# the empty-stdin early exit is removed (git still invokes pre-push on a
+# no-op push, so the suite would run before "Everything up-to-date"); 1.5
+# fails if the zero-sha deletion check is removed.
 echo "# 1. Dispatcher responsibilities"
 R1="$WORK/r1"
 make_repo "$R1"
 (cd "$R1" && HOME="$TMP_HOME" bash "$PRE_COMMIT" >/dev/null 2>&1)
 assert_eq "1.1 pre-commit dispatcher does not run tests/run-all.sh" "0" "$(exists "$R1/.suite-ran")"
 rm -f "$R1/.suite-ran"
-(cd "$R1" && HOME="$TMP_HOME" bash "$PRE_PUSH" >/dev/null 2>&1)
-assert_eq "1.2 pre-push dispatcher runs tests/run-all.sh" "1" "$(exists "$R1/.suite-ran")"
+(cd "$R1" && printf '%s\n' "$PUSH_LINE" | HOME="$TMP_HOME" bash "$PRE_PUSH" >/dev/null 2>&1)
+assert_eq "1.2 pre-push dispatcher runs tests/run-all.sh when a ref sends commits" "1" "$(exists "$R1/.suite-ran")"
 rm -f "$R1/.suite-ran"
-(cd "$R1" && SKIP_TESTS=1 HOME="$TMP_HOME" bash "$PRE_PUSH" >/dev/null 2>&1)
+(cd "$R1" && printf '%s\n' "$PUSH_LINE" | SKIP_TESTS=1 HOME="$TMP_HOME" bash "$PRE_PUSH" >/dev/null 2>&1)
 assert_eq "1.3 SKIP_TESTS=1 bypasses the pre-push suite run" "0" "$(exists "$R1/.suite-ran")"
+rm -f "$R1/.suite-ran"
+(cd "$R1" && printf '' | HOME="$TMP_HOME" bash "$PRE_PUSH" >/dev/null 2>&1)
+assert_eq "1.4 empty ref list (nothing to push) does not run the suite" "0" "$(exists "$R1/.suite-ran")"
+rm -f "$R1/.suite-ran"
+(cd "$R1" && printf '%s\n' "$DELETE_LINE" | HOME="$TMP_HOME" bash "$PRE_PUSH" >/dev/null 2>&1)
+assert_eq "1.5 deletion-only push does not run the suite" "0" "$(exists "$R1/.suite-ran")"
+rm -f "$R1/.suite-ran"
+(cd "$R1" && printf '%s\n%s\n' "$DELETE_LINE" "$PUSH_LINE" | HOME="$TMP_HOME" bash "$PRE_PUSH" >/dev/null 2>&1)
+assert_eq "1.6 deletion plus a ref that sends commits still runs the suite" "1" "$(exists "$R1/.suite-ran")"
 
 # ── 2. Installer on a fresh repo creates both hooks ───────────────────────
 # Fail-to-fail: 2.2 fails if install-repo-hooks.sh only handles pre-commit.
