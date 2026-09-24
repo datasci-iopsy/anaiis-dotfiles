@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # tests/test-context-watch.sh -- context-watch.sh, a PostToolUse hook that
 # reads the pct file statusline-command.sh writes and, at >=55% context,
-# emits a one-shot additionalContext directive to checkpoint and request
-# /compact. Set 5 points ahead of the harness's own CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=60
-# auto-compact so the directive reliably lands first. See tasks/plan.md T2.1.
+# emits a one-shot additionalContext directive to checkpoint, then continue;
+# the harness's own CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=60 auto-compact handles the
+# actual compaction with no manual /compact needed. Set 5 points ahead so the
+# directive reliably lands first. See tasks/plan.md T2.1.
 #
 # Exit 0 if all tests pass; non-zero on any failure.
 

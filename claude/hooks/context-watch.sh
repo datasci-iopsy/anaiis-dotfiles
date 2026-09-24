@@ -7,10 +7,11 @@
 # into a per-session /tmp file, this hook reads it. shared.bash sets
 # CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=60, so the harness's own auto-compact fires
 # at 60% with no checkpoint of its own; this hook fires first, at 55%, so the
-# model reliably gets a chance to wrap up the current step and request
-# /compact itself before the harness's backstop lands. The 5-point gap is
-# deliberate: it removes the race between the two mechanisms by construction
-# instead of leaving them to compete at an identical threshold.
+# model reliably gets a chance to wrap up the current step and write a
+# one-sentence checkpoint before the harness's backstop compacts on its own,
+# no manual /compact required. The 5-point gap is deliberate: it removes the
+# race between the two mechanisms by construction instead of leaving them to
+# compete at an identical threshold.
 #
 # Fires at most once per session (flag file guard). Silent when the pct file
 # is absent, unreadable, or below threshold.
@@ -42,9 +43,9 @@ touch "$FLAG" 2>/dev/null || exit 0
 
 DIRECTIVE="## Context threshold reached (${PCT}%)
 
-Context usage has reached ${PCT}%, at or above the 55% checkpoint threshold (rules/session.md). The harness's own auto-compact fires automatically at 60% with no checkpoint of its own, so finish the current step and state a one-sentence checkpoint of what is done and what remains now, then request \`/compact\` yourself before that backstop lands."
+Context usage has reached ${PCT}%, at or above the 55% checkpoint threshold (rules/session.md). The harness's own auto-compact fires automatically at 60% with no checkpoint of its own, so finish the current step and state a one-sentence checkpoint of what is done and what remains now, then continue working. The automatic backstop will compact on its own; no manual \`/compact\` is needed."
 
-jq -n --arg ctx "$DIRECTIVE" --arg msg "context ${PCT}% -- checkpoint and /compact recommended" \
+jq -n --arg ctx "$DIRECTIVE" --arg msg "context ${PCT}% -- checkpoint, auto-compact will follow" \
 	'{"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": $ctx}, "systemMessage": $msg}'
 
 exit 0
