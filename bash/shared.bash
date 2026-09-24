@@ -90,7 +90,7 @@ fi
 # so /model picks resolve deterministically across machines.
 export ANTHROPIC_MODEL="opusplan"
 export ANTHROPIC_DEFAULT_FABLE_MODEL="claude-fable-5-1"
-export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-5"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-5-5"
 export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-5"
 export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku-4-5"
 
