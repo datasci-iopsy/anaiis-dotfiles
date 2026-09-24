@@ -8,3 +8,4 @@ Cross-project user-level facts (`user_*.md`, `feedback_*.md`, `reference_*.md`),
 - [rm -rf chained-operator confirmation](feedback_rmrf_chained_operator.md) -- never chain rm -rf with && onto the next command; bash-guard always asks regardless of path safety
 - [Concurrent-session git commits](feedback_concurrent_session_git_commits.md) -- verify branch/diff relevance before committing stop-hook-flagged changes; other sessions may own the diff
 - [AgentField undeclared env vars](feedback_agentfield_undeclared_env_vars.md) -- af run only persists declared config vars; undeclared ones (e.g. pr-af's PR_AF_WORKDIR) need re-export every invocation
+- [Style rules vs document voice](feedback_style_rule_document_voice.md) -- blanket register rules (STE) govern Claude's prose, never a user-owned document's; carve out and flag
