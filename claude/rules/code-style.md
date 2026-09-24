@@ -1,6 +1,6 @@
 ---
 name: code-style
-description: Writing, JSON, SQL, and shell formatting conventions enforced across all edits
+description: ASD-STE100 as the default writing register for all prose, plus JSON, SQL, and shell formatting conventions enforced across all edits
 ---
 
 # Code and Writing Style
@@ -21,6 +21,39 @@ Enforcement: the `block-em-dash.sh` PreToolUse hook denies any `Write`, `Edit`, 
 - Never use causal framing ("This is because..."). State the fact directly.
 - No emojis in code, comments, commit messages, or prose unless requested.
 - Commit messages: imperative mood, concise, no trailing period.
+
+## Default register: ASD-STE100
+
+All prose Claude writes follows ASD-STE100 (Simplified Technical English): responses, plans, tasks, specs, reports, code comments, docstrings, commit bodies, and PR descriptions. The tiers in `rules/session.md` set how much to write. This section sets how to write it.
+
+Sentence rules:
+- One topic per sentence. In procedures, one instruction per sentence.
+- Descriptive sentences: 25 words or fewer. Procedural sentences: 20 words or fewer.
+- Active voice, with the actor named: "the hook writes the file", not "the file is written".
+- Present tense for facts and behavior. Imperative for instructions. Simple past for events that occurred.
+- Do not use the `-ing` form of a verb, except as part of a technical name or as a modifier.
+- Put the condition before the instruction: "If the file is absent, exit 0."
+
+Word rules:
+- One word, one meaning. Use the same term for the same thing every time. Do not rotate synonyms for variety.
+- Noun clusters of three words or fewer. Break longer clusters apart with "of", "for", or "that".
+- Keep articles ("the", "a") and write full sentences. Telegraphic prose ("update threshold in hook") is not STE; write "Update the threshold in the hook."
+- No slang, no idiom, no filler ("basically", "essentially", "sort of"), no rhetorical questions.
+- Use technical names and technical verbs as their domain writes them (`jq`, `PostToolUse`, `vapply`, likelihood, gradient). Do not paraphrase them.
+
+Structure rules:
+- Paragraphs of six sentences or fewer. The first sentence states the topic.
+- Use numbered steps for a sequence and a bullet list for a set.
+- Put warnings and cautions before the step they apply to.
+
+Complex logic and mathematical modeling: clarity beats brevity. Terse means no padding, not less content.
+- Define each symbol and each term the first time it appears.
+- State each assumption and each input before the result.
+- Describe the mechanism step by step: what goes in, what changes it, what comes out. One transform per sentence.
+- When you introduce a formula or an algorithm, show one worked example with concrete values.
+- When a reader could assume a step does something it does not do, say so.
+
+Exception: when Claude edits or drafts text in the voice of a user-owned document, that text keeps the document's register. Examples: manuscript copyedits, and academic prose the user asked for in APA style. Claude's own comments on that document stay in STE.
 
 ## JSON formatting
 - Use 4-space indentation in all JSON files. Enforced automatically by the post-edit hook via `jq --indent 4`.
