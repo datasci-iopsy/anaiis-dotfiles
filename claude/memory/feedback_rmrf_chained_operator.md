@@ -1,21 +1,16 @@
 ---
 name: rmrf-chained-operator-confirmation
-description: never chain rm -rf on a disposable cache/build dir with && or other operators in the same Bash call; bash-guard always asks regardless of target safety
+description: Never chain rm -rf on a cache/build dir with && or another operator in one Bash call; bash-guard asks regardless of target safety
 metadata:
   type: feedback
 ---
 
-When clearing a disposable cache/build dir (`.ruff_cache`, `.venv`, `node_modules`,
-`dist`, `build`, `.next`, `coverage`, `__pycache__`, etc.) before running a follow-up
-command, issue the `rm -rf <path>` as its own standalone Bash call. Never chain it with
-`&&`, `;`, a pipe, or a newline onto the next command.
+Issue `rm -rf <cache-dir>` as its own Bash call. Never chain it with `&&`, `;`, a pipe, or
+a newline onto the next command. `rules/environment.md` holds the runner-command exception.
 
-**Why:** `bash-guard.sh` asks for confirmation on any recursive rm alongside a shell
-operator/substitution character, unconditionally, before checking the safe-list.
-Deliberate, not a bug: an "allow" covers the whole command, so a safe first operand must
-never launder a dangerous one riding along. Confirmed by transcript audit (2026-08-07):
-every rm-related prompt across several days was this shape. Tracked at
-[#15](https://github.com/datasci-iopsy/anaiis-dotfiles/issues/15).
+**Why:** `bash-guard.sh` asks on any recursive rm beside a shell operator before it consults
+the safe-list. This is deliberate: an allow covers the whole command, so a safe operand must
+never launder a dangerous one. Transcript audit (2026-08-07): every rm prompt had this shape.
+Tracked at [#15](https://github.com/datasci-iopsy/anaiis-dotfiles/issues/15).
 
-**How to apply:** split a cache-clear-then-something-else command into two Bash calls.
-Applies regardless of whether the path is on the safe-list; the operator check fires first.
+**How to apply:** split into two Bash calls, even when the path is on the safe-list.

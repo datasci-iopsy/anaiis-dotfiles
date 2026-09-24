@@ -1,23 +1,17 @@
 ---
 name: spec-task-file-placement
-description: Spec and task/plan files belong in spec/ and tasks/ directories (auto-created), with date-based spec filenames, never a bare SPEC.md in project root
+description: Specs go in spec/ with date-based filenames, plans and tasks go in tasks/; never a bare SPEC.md in the project root
 metadata:
   type: feedback
 ---
 
-Specs (spec-driven-development Phase 1) and plans/tasks (planning-and-task-breakdown Phase
-2-3) go in `spec/`/`specs/` and `tasks/` respectively, created if absent. Fall back to the
-project root only if directory creation is blocked. Spec filenames are date-based:
-`<spec-dir>/YYYY-MM-DD-<short-slug>.md`, never a bare `SPEC.md` that a later spec would
-overwrite.
+Specs go in `spec/` (or `specs/`) as `YYYY-MM-DD-<slug>.md`; plans and tasks go in `tasks/`.
+Create the directory if absent; use the project root only when creation is blocked. Never
+write a bare `SPEC.md` that a later spec would overwrite.
 
-**Why:** a 2026-08-01 spec-driven-development run wrote `SPEC.md` to repo root per the skill's
-literal default; the user moved it to `spec/SPEC.md` and asked this become the standing
-default.
+**Why:** a 2026-08-01 spec-driven-development run wrote `SPEC.md` to the repo root per the
+skill's default; the user moved it to `spec/` and made this the standing default.
 
-**How to apply:** `Glob`/`ls` the project root for `spec/`/`specs/` right before every spec
-`Write`, don't rely on an earlier same-session check (this lapsed once despite one). Same
-check applies to `tasks/`.
-
-**Gitignore check:** before treating "commit the spec" as automatic, check `.gitignore`. An
-already-gitignored `spec/` is deliberate (local scratch, not shipped); respect it silently.
+**How to apply:** check the project root for `spec/` and `tasks/` right before each spec
+`Write`; an earlier same-session check lapsed once. If `spec/` is gitignored, that is
+deliberate local scratch; do not commit it.
