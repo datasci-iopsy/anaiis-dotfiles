@@ -211,6 +211,9 @@ alias claude-turbo='CLAUDE_CODE_EFFORT_LEVEL=xhigh claude --model opusplan --per
 # Fable: Fable 5.1, high effort
 alias claude-fable='CLAUDE_CODE_EFFORT_LEVEL=high claude --model claude-fable-5-1 --permission-mode bypassPermissions'
 
+# Fable: Fable 5.1, xhigh effort
+alias claude-fable-turbo='CLAUDE_CODE_EFFORT_LEVEL=xhigh claude --model claude-fable-5-1 --permission-mode bypassPermissions'
+
 # Fable max: Fable 5.1, max effort
 alias claude-fable-max='CLAUDE_CODE_EFFORT_LEVEL=max claude --model claude-fable-5-1 --permission-mode bypassPermissions'
 
