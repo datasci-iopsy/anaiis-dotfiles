@@ -282,7 +282,8 @@
         "anaiis-meta@anaiis-plugins": true,
         "dbt@dbt-agent-marketplace": true,
         "dbt-extras@dbt-agent-marketplace": true,
-        "agent-skills@addy-agent-skills": true
+        "agent-skills@addy-agent-skills": true,
+        "typesafe-ai@typesafe-ai": true
     },
     "extraKnownMarketplaces": {
         "anaiis-plugins": {
@@ -302,9 +303,18 @@
                 "source": "github",
                 "repo": "addyosmani/agent-skills"
             }
+        },
+        "typesafe-ai": {
+            "source": {
+                "source": "github",
+                "repo": "typesafe-ai/skills"
+            }
         }
     },
+    "tui": "fullscreen",
     "skipDangerousModePermissionPrompt": true,
     "autoCompactEnabled": true,
-    "tui": "fullscreen"
+    "remoteControlAtStartup": false,
+    "inputNeededNotifEnabled": true,
+    "agentPushNotifEnabled": true
 }
