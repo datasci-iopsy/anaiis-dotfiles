@@ -118,6 +118,8 @@ export COST_GUARD_GP_LIMIT="75"
 # Privacy-focused, minimal-traffic configuration:
 # export DISABLE_TELEMETRY="1"
 export DISABLE_FEEDBACK_COMMAND="1"
+export CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY="1"
+export CLAUDE_CODE_SEND_FEEDBACK="0"
 export DISABLE_ERROR_REPORTING="1"
 export DISABLE_AUTOUPDATER="1"
 
