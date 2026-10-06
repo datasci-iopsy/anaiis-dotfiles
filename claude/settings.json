@@ -127,7 +127,7 @@
             "Read(~/.config/gh/**)",
             "Edit(~/.config/gh/**)"
         ],
-        "defaultMode": "default",
+        "defaultMode": "bypassPermissions",
         "disableAutoMode": "disable"
     },
     "skillOverrides": {
