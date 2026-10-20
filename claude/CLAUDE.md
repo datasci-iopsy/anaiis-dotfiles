@@ -45,3 +45,7 @@ Compaction targets 60% context; `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` in `shared.bas
 Run `bash ~/.claude/scripts/memory-doctor.sh` to verify the pipeline end-to-end.
 
 @RTK.md
+
+<!-- postman-cli:installation:start -->
+Postman CLI is installed on this device, and can be used for API Engineering work.
+<!-- postman-cli:installation:end -->
