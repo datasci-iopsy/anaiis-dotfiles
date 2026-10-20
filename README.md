@@ -4,7 +4,7 @@
 
 **Shell config.** `bash/shared.bash` is the tracked, portable shell config (PATH, aliases, tool inits, prompt). It is sourced by `~/.bashrc`, which is machine-local and not tracked. The wiring on each machine follows a three-file hierarchy: `~/.bash_profile` (entry point only, sources `~/.bashrc`) -> `~/.bashrc` (sources `shared.bash`, then `~/.bashrc.local`) -> `~/.bashrc.local` (secrets and machine overrides, gitignored). Never add config to `~/.bash_profile` directly; put portable things in `shared.bash` and machine-local secrets in `~/.bashrc.local`.
 
-**The "anaiis-" prefix** is the namespace for this repo's custom skills, distinct from upstream Anthropic skills (which keep their unprefixed names). When you see `/anaiis-litreview` or `/anaiis-duckdb`, that's a custom skill defined in `claude/skills/`.
+**The "anaiis-" prefix** is the namespace for the custom skills, distinct from upstream Anthropic skills (which keep their unprefixed names). They are served by the `datasci-iopsy/anaiis-plugins` marketplace registered in `claude/settings.json`; `claude/skills/` holds no copies of them.
 
 **Two-machine model.** The same repo is checked out on personal and work machines. `claude/settings.json` (symlinked to `~/.claude/settings.json`) is the single tracked source of truth for Claude Code config on both; Claude Code reads no user-level `settings.local.json` or `CLAUDE.local.md`, so this repo ships neither. Machine-local shell config and secrets live in `~/.bashrc.local` (untracked); secrets are environment variables loaded per-project via direnv (see `rules/environment.md`). Machine-local Claude instructions, when needed, are files under `~/.claude/` imported explicitly from `claude/CLAUDE.md` with `@~/.claude/<name>.md`.
 
@@ -13,7 +13,7 @@
 **Install in 60 seconds.**
 
 ```bash
-git clone --recurse-submodules git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/anaiis-dotfiles
+git clone git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/anaiis-dotfiles
 bash ~/anaiis-dotfiles/install.sh
 # Then add to your shell config (~/.bashrc, ~/.zshrc, etc.):
 #   export PATH="$HOME/anaiis-dotfiles/bin:$PATH"
@@ -29,22 +29,26 @@ That installs the Claude policy stack and prints a one-line snippet to add to yo
 anaiis-dotfiles/
 ├── install.sh                      Symlinks claude/* into ~/.claude/; prints PATH snippet
 ├── README.md                       This file
+├── AGENTS.md                       Project instructions for Claude Code sessions in this repo
+├── Brewfile                        Homebrew formulae, casks, taps; refreshed daily by shared.bash
 ├── .lintr                          → ~/.lintr   Global R style config
 ├── .env.example                    Structural template, this repo consumes nothing from .env
 ├── bash/
-│   └── shared.bash                 Shared bash helpers sourced by hook and test scripts
+│   └── shared.bash                 Tracked shell config (PATH, aliases, tool inits, prompt); also sourced by context-watch.sh and statusline-command.sh
 ├── bin/
 │   └── web-verify                  CLI wrapper: serve + Playwright verify + teardown
 ├── claude/
-│   ├── CLAUDE.md                   → ~/.claude/CLAUDE.md   Short index; rules live in rules/
+│   ├── CLAUDE.md                   → ~/.claude/CLAUDE.md   Short index; rules live in rules/; imports RTK.md
+│   ├── RTK.md                      rtk (token-saving CLI proxy) usage notes, imported by CLAUDE.md
 │   ├── settings.json               → ~/.claude/settings.json   Permissions, hooks, model, status line
 │   ├── keybindings.json            → ~/.claude/keybindings.json   shift+enter / alt+enter = newline
 │   ├── rules/                      → ~/.claude/rules/   Behavioral constraints (auto-loaded)
 │   ├── commands/                   → ~/.claude/commands/   Custom slash commands
-│   ├── skills/                     → ~/.claude/skills/   Custom skills (lazy-loaded by description)
-│   ├── agents/                     → ~/.claude/agents/   Specialized sub-agents
+│   ├── skills/                     → ~/.claude/skills/   Mount point for local and synced skills; anaiis-* skills come from the marketplace
+│   ├── agents/                     → ~/.claude/agents/   Intentionally empty; skill agents live in the plugin cache
 │   ├── hooks/                      → ~/.claude/hooks/   Hook scripts (referenced by settings.json)
-│   ├── scripts/                    → ~/.claude/scripts/   Utility scripts
+│   ├── scripts/                    → ~/.claude/scripts/   Utility scripts (brew-sync.sh, brew-share.sh, seed-memory.sh, usage-report.sh, lint-staged dispatchers)
+│   ├── memory/                     → ~/.claude/memory/   Global memory tier (git-tracked, delivered at SessionStart)
 │   └── memory-templates/           Project-tier templates copied by seed-memory.sh (MEMORY.md, project_current_phase.md)
 ├── templates/
 │   ├── dashboard/                  anaiis-dashboard: manifest validator, bootstrap.js, inline helper, Playwright spec
@@ -71,12 +75,11 @@ anaiis-dotfiles/
 │   ├── test-migrate-memory-guard.sh  migrate-memory.sh dry-run-default and template-stub-refusal assertions
 │   ├── test-post-edit-lint-dispatch.sh  PostToolUse lint hook dispatch tests
 │   ├── test-r-lint-staged.sh       r-lint-staged.sh assertions
+│   ├── test-repo-hook-install.sh   install-repo-hooks.sh and ensure-repo-hooks.sh assertions
 │   ├── test-session-start-context.sh  session-start-context.sh additionalContext delivery assertions
 │   ├── test-staged-lint-dispatch.sh     Pre-commit staged-lint hook dispatch tests
 │   ├── test-statusline-context-bridge.sh  statusline pct-file write and 60% marker assertions
 │   └── test-stop-hook-git-check.sh  stop-hook-git-check.sh exit-code assertions
-└── vendor/
-    └── graphify/                   git submodule (pinned to v7); source for /graphify skill
 ```
 
 ---
@@ -86,13 +89,7 @@ anaiis-dotfiles/
 ### 1. Clone
 
 ```bash
-git clone --recurse-submodules git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/anaiis-dotfiles
-```
-
-If you already cloned without `--recurse-submodules`, run this before Step 2:
-
-```bash
-cd ~/anaiis-dotfiles && git submodule update --init --recursive
+git clone git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/anaiis-dotfiles
 ```
 
 ### 2. Run the installer
@@ -141,7 +138,7 @@ bash ~/.claude/scripts/install-repo-hooks.sh
 Memory, compaction, and session history are three separate layers:
 
 - **Memory files** (`claude/memory/` global tier, `~/.claude/projects/<key>/memory/` project tier): stable facts explicitly saved; persist across sessions; delivered to the model by `session-start-context.sh` (a SessionStart hook, matchers `startup|resume|clear|compact`) via `hookSpecificOutput.additionalContext`. This is the channel that actually reaches Claude, not `systemMessage`, which is display-only and never delivered to the model, a bug that went undetected for months before the 2026-07-15 memory-system review.
-- **Compaction**: triggered manually (`/compact`) or automatically by the harness at ~85% context (a safety backstop, not the target; policy is to compact at 60%, see `rules/session.md`). The compactor summarizes the conversation itself and does not read memory files to decide what to keep.
+- **Compaction**: triggered manually (`/compact`) or automatically by the harness at 60% context (`CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=60` in `shared.bash`; policy in `rules/session.md`). The compactor summarizes the conversation itself and does not read memory files to decide what to keep.
 - **Session history**: full JSONL transcript on disk, persists until pruned.
 
 **Compaction continuity is a separate mechanism from compaction itself.** `pre-compact.sh` (PreCompact hook) writes a structured handoff file to the current project's `memory/handoffs/` subdirectory (rolling cap of 5) before compaction runs. `session-start-context.sh`, invoked again immediately after compaction completes (`source: compact`), restores the newest handoff as context. The compacted conversation summary itself does not carry this; the handoff file is what survives the boundary.
@@ -162,46 +159,32 @@ Templates for new project-tier memory entries live in `claude/memory-templates/`
 
 ## CodeRabbit workflow
 
-CodeRabbit reviews are driven entirely from the terminal via the `/anaiis-coderabbit` skill. No VS Code paste, no wrapper script.
+CodeRabbit reviews are driven entirely from the terminal via the `anaiis-review:rabbit-sweep` skill (marketplace plugin `anaiis-review`). No VS Code paste, no wrapper script.
 
 ```bash
-# From any non-main branch (after committing your work):
-/anaiis-coderabbit
-# Optional overrides:
-/anaiis-coderabbit --base feat/my-branch --type committed
+# Local mode, from any non-main branch after committing your work:
+/anaiis-review:rabbit-sweep
+# PR mode, triage the CodeRabbit bot comments on an open PR:
+/anaiis-review:rabbit-sweep --pr 42
+# Optional local-mode overrides:
+/anaiis-review:rabbit-sweep --base feat/my-branch --type committed
 ```
 
-### What the skill does
-
-1. Verifies auth (`coderabbit auth status --agent`) and that you are not on `main`.
-2. Resolves the base branch and asks you to confirm scope before running.
-3. Calls `coderabbit review --agent --base <base> --no-color` and captures NDJSON findings.
-4. Triages each finding: skip 1-2 with logged rationale; fix 3-5 (severity 3 gets an extra cost-vs-benefit reasoning step before defaulting to fix).
-5. Spawns `code-surgeon` for each fix, then verifies with formatters and project-detected tests.
-6. Commits grouped fixes by logical concern (one finding per commit by default).
-7. Re-runs the review to confirm all addressed findings are resolved.
-
-### Triage rubric
-
-| Severity | Action |
-|---|---|
-| 1-2 | Skip with one-sentence rationale; no edit |
-| 3 | Read callers, weigh cost vs. benefit; default fix unless evidence says otherwise |
-| 4-5 | Fix immediately; no extra reasoning needed |
-
-All fixes run formatters and project-detected tests before committing. A fix that fails verification is reverted automatically.
+Both modes share one loop: triage by severity (skip 1-2 with a logged rationale, fix 3-5), fix with the plugin's `code-surgeon` agent, verify in two stages (tests, then intent), commit, and push committed fixes behind branch guards. Hard limits, the mode router, and the phase files are documented in the skill's `SKILL.md`. Its companion `anaiis-review:pr-af` runs the AgentField pr-af engine on a PR and cross-references its findings against the CodeRabbit threads.
 
 ### After triage
 
 ```
-/anaiis-gitrebase   consolidate CR fix commits into logical groups
-/anaiis-changelog   generate PR description from clean history
-/anaiis-gitpr       open the PR
+/anaiis-git-ops:rebase      consolidate CR fix commits into logical groups
+/anaiis-git-ops:changelog   generate PR description from clean history
+/anaiis-git-ops:pr          open the PR
 ```
+
+The skill never chains into these on its own; each is a separate explicit invocation.
 
 ### Audit trail
 
-Each session writes a JSONL ledger to `~/.claude/anaiis-coderabbit/runs/<branch>-<iso>.jsonl` with every triage decision, verification result, and commit event.
+Each run writes a JSONL ledger under `~/.claude/rabbit-sweep/runs/` with every triage decision, verification result, and commit event.
 
 ---
 
@@ -209,13 +192,19 @@ Each session writes a JSONL ledger to `~/.claude/anaiis-coderabbit/runs/<branch>
 
 ### Skills (custom, lazy-loaded)
 
-`anaiis-agents`, `anaiis-changelog`, `anaiis-coderabbit`, `anaiis-copyedit`, `anaiis-dashboard`, `anaiis-docaudit`, `anaiis-duckdb`, `anaiis-gitpr`, `anaiis-gitrebase`, `anaiis-litreview`, `anaiis-peerreview`, `anaiis-preflight`, `anaiis-skillreview`, `anaiis-webverify`, `graphify` (15 registered; `anaiis-*` served from `datasci-iopsy/anaiis-plugins` marketplace, `graphify` vendored locally).
+All custom skills are served by the `datasci-iopsy/anaiis-plugins` marketplace, enabled per plugin in `claude/settings.json`. None of them has a copy in this repo. Invoke as `/<plugin>:<skill>`:
+
+| Plugin | Skills |
+|---|---|
+| `anaiis-review` | `anaiis-docaudit`, `anaiis-peerreview`, `anaiis-skillreview`, `pr-af`, `rabbit-sweep` |
+| `anaiis-git-ops` | `changelog`, `pr`, `rebase` |
+| `anaiis-data` | `anaiis-dashboard`, `anaiis-duckdb`, `anaiis-termchart`, `anaiis-webverify`, `graphify` |
+| `anaiis-writing` | `anaiis-copyedit`, `anaiis-litreview` |
+| `anaiis-meta` | `anaiis-agents` |
 
 `dbt-*` skills are served via the `dbt-labs/dbt-agent-skills` marketplace (registered in `claude/settings.json` under `extraKnownMarketplaces`). They require no local files and do not appear in this repo.
 
-Skills with overlap against an Anthropic built-in declare a `built_in_alternative` field in their `SKILL.md` frontmatter explaining the differentiation (currently: `anaiis-changelog`, `anaiis-docaudit`).
-
-See `claude/skills/README.md` for trigger conditions.
+`claude/skills/` is the mount point for local skills (Anthropic-synced skills under `synced/`, AgentField skill symlinks); both are gitignored. See `claude/skills/README.md` for the conventions.
 
 ### Commands
 
@@ -228,10 +217,10 @@ See `claude/skills/README.md` for trigger conditions.
 
 | File | Covers |
 |---|---|
-| `rules/behavioral.md` | The 9 imperatives: surface tradeoffs, minimum code, surgical changes, verify, model judgment scope, surface conflicts, fail loud, plan and checkpoint, hook output is not user input |
+| `rules/behavioral.md` | The 10 imperatives: surface tradeoffs, minimum code, surgical changes, verify, model judgment scope, surface conflicts, fail loud, plan and checkpoint, hook output is not user input, investigate is read-only |
 | `rules/environment.md` | macOS, Bash, direnv, uv, worktree safety, rm -rf splitting |
 | `rules/tools.md` | gh, jq, gcloud, make, structured CLI output flags |
-| `rules/code-style.md` | Writing style, shell formatting, no emojis, convention conformance |
+| `rules/code-style.md` | ASD-STE100 default writing register, shell formatting, no emojis, convention conformance |
 | `rules/git.md` | Typed branches (`claude-<type>/<ticket>-<desc>`), trivial-edit criteria, Conventional Commit subjects, PR title format, push, worktrees for parallel work only |
 | `rules/r-conventions.md` | Vectorization, lapply/vapply, lintr style |
 | `rules/python.md` | uv, direnv, ruff |
@@ -241,11 +230,9 @@ See `claude/skills/README.md` for trigger conditions.
 | `rules/testing.md` | Test-intent discipline: tests must encode why, not just what; fail-to-fail check |
 | `rules/dashboards.md` | Dashboard data provenance, manifest discipline, narrative-data alignment, audience language |
 
-### Agents (Sonnet, restricted tools)
+### Agents
 
-- `code-reviewer.md`, diff review (Read/Grep/Glob)
-- `security-auditor.md`, credential and injection checks (Read/Grep/Glob)
-- `code-surgeon.md`, surgical fixes from CodeRabbit triage (Read/Grep/Glob/Edit)
+`claude/agents/` is intentionally empty. Skill-specific agents (`code-surgeon`, `coderabbit-triage`, `intent-verifier`, `rebase-planner`) belong to the plugin that defines their inputs and outputs and live in the plugin cache. See `claude/agents/README.md` for when a cross-skill agent would belong here.
 
 ---
 
@@ -260,11 +247,12 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 | `UserPromptSubmit` |, | `list-merged-claude-branches.sh` | Advisory: lists merged `claude/*` branches and shows the delete command |
 | `SessionStart` | `startup\|resume\|clear\|compact` | `session-start-context.sh` | Delivers the global memory tier via `additionalContext` (startup/clear/compact); restores the newest pre-compact handoff (compact); advises `/seed-project` when the current project has no memory dir; delivery-gated monthly staleness advisory |
 | `PostToolUse` | `Edit\|Write` | `post-edit-lint.sh` | `.py` ruff; `.sh` shfmt (auto-fix) + shellcheck; `.sql` sqlfmt; `.R` lintr; `.json` jq --indent 4 |
-| `PostToolUse` | `*` | `context-watch.sh` | At >=60% context (read from the statusline's per-session pct file), emits a one-shot directive to checkpoint and request `/compact` |
-| `PreToolUse` | `Write\|Edit\|MultiEdit\|NotebookEdit` | `block-em-dash.sh` | Rejects any payload containing U+2014 (em dash); enforces no-em-dash code style rule |
+| `PostToolUse` | `*` | `context-watch.sh` | At >=55% context (read from the statusline's per-session pct file), five points ahead of the 60% harness backstop, emits a one-shot directive to checkpoint and continue |
+| `PreToolUse` | `Write\|Edit\|MultiEdit\|NotebookEdit`, `ExitPlanMode` | `block-em-dash.sh` | Rejects any payload containing U+2014 (em dash); enforces no-em-dash code style rule |
 | `PreToolUse` | `Write\|Edit\|MultiEdit\|NotebookEdit` | `block-edit-on-main.sh` | Blocks all edits when the current branch is `main` or `master` |
 | `PreToolUse` | `Read\|Write\|Edit` | `block-sensitive-writes.sh` | Read: block `*.env`/`*.env.*`; Write/Edit: block `*.lock`, `*.env`/`*.env.*`, `*credentials*`, `*secret*`, `*.pem`, `*.key`; both allow `*.env.example`/`*.env.template` |
 | `PreToolUse` | `Bash` | `bash-guard.sh` | Single guard: blocks destructive commands (`bq rm`, `gcloud delete*`, `uv cache clean`/`pip uninstall`), reads/writes to `.env`, credential paths (`.key`, `.pem`, `~/.aws/**`, `~/.config/gcloud/**`), shell rc files, and environment dumps (`printenv`/`echo $SECRET`); blocks Python for pure JSON parsing (jq's job); emits a non-blocking `[deps]` notice for `uv add`/`uv pip install`; recursive `rm` gets a scoped `allow`/`ask` decision (safe-list paths silently allowed, everything else asks, catastrophic operands like bare `/` or `~` hard-deny) instead of settings.json's old blanket deny |
+| `PreToolUse` | `Bash` | `rtk hook claude` | Rewrites routine commands (git, gh, ls, ruff, uv, gcloud, ...) through `rtk` to trim output; see `claude/RTK.md` |
 | `PreToolUse` | `Agent\|WebFetch` | `cost-guard.sh` | Cost tiering MEDIUM/HIGH/VERY HIGH; hard-blocks (exit 2) general-purpose agents above per-session cap (default 5, override via `COST_GUARD_GP_LIMIT`); blocks logged to `~/.claude/logs/cost-guard-blocks.log` |
 | `Stop` |, | `stop-hook-git-check.sh` | Exits 2 (continues agent loop) on uncommitted changes, untracked files, or unpushed commits; exits 0 when clean |
 | `PreCompact` | `*` | `pre-compact.sh` | Writes a structured handoff to project memory |
@@ -363,14 +351,13 @@ It adds one inheritable ACL entry for group `admin` to the prefix. Files any adm
 
 ## Per-machine prerequisites
 
-`install.sh` only handles symlinks. The following must be installed per machine:
+`install.sh` only handles symlinks. The CLI tools the hooks need (`gh`, `jq`, `shellcheck`, `shfmt`, `ruff`, `uv`, `shandy-sqlfmt`) are in the Brewfile; install them with:
 
 ```bash
-brew install gh jq shellcheck shfmt ruff uv
-uv tool install shandy-sqlfmt
+bash ~/anaiis-dotfiles/claude/scripts/brew-sync.sh install
 ```
 
-The `graphify` skill is a Claude Code skill (not a uv tool). It auto-installs its Python dependency (`pip install graphifyy`) on first use via Step 1 of the skill. No manual install required.
+The `graphify` skill is served by the `anaiis-data` marketplace plugin. Nothing to install per machine.
 
 R packages (global, not renv-managed):
 

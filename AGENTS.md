@@ -27,7 +27,7 @@ Three-file hierarchy (none are symlinked; all machine-local except `shared.bash`
 
 ## Install
 
-Run `install.sh` once on a new machine to create all symlinks. Also provisions the graphify Python environment (see below).
+Run `install.sh` once on a new machine to create all symlinks.
 
 ## Skills
 
@@ -35,4 +35,6 @@ Run `install.sh` once on a new machine to create all symlinks. Also provisions t
 
 `dbt-*` skills are served by the `dbt-labs/dbt-agent-skills` marketplace (also registered under `extraKnownMarketplaces`). No local copies or submodule needed.
 
-`graphify` is vendored locally in `vendor/graphify/` (a git submodule) with its Python environment in `vendor/graphify-venv/`. The skill lives in `claude/skills/graphify/`. It is also served as `anaiis-data:graphify` in the marketplace; the local vendor copy remains the active fallback until the marketplace version is confirmed as primary.
+`graphify` is served as `anaiis-data:graphify` from the same marketplace. The former `vendor/graphify` submodule and its venv were removed on 2026-07-05; no local copy exists.
+
+Global Claude instructions stay in `claude/CLAUDE.md` (symlinked to `~/.claude/CLAUDE.md`). Claude Code reads `AGENTS.md` only in the working directory and its ancestors, never at `~/.claude/`, so that file cannot be renamed.
