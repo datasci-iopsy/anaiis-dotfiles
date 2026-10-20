@@ -5,13 +5,6 @@ metadata:
   type: feedback
 ---
 
-Specs go in `spec/` (or `specs/`) as `YYYY-MM-DD-<slug>.md`; plans and tasks go in `tasks/`.
-Create the directory if absent; use the project root only when creation is blocked. Never
-write a bare `SPEC.md` that a later spec would overwrite.
+Specs go in `spec/` (or `specs/`) as `YYYY-MM-DD-<slug>.md`; plans and tasks go in `tasks/`. Create the directory if absent. Never write a bare `SPEC.md` at the repo root. If `spec/` is gitignored, that is deliberate scratch; do not commit it.
 
-**Why:** a 2026-08-01 spec-driven-development run wrote `SPEC.md` to the repo root per the
-skill's default; the user moved it to `spec/` and made this the standing default.
-
-**How to apply:** check the project root for `spec/` and `tasks/` right before each spec
-`Write`; an earlier same-session check lapsed once. If `spec/` is gitignored, that is
-deliberate local scratch; do not commit it.
+**How to apply:** check for `spec/` and `tasks/` right before each spec `Write`; an earlier same-session check lapsed once (2026-08-01).
