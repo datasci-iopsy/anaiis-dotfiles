@@ -45,7 +45,7 @@ if command -v brew &>/dev/null && [ -f "$_brewfile" ] \
 		touch "$_bfstamp"
 		(
 			_bfnew="$(mktemp)"
-			if brew bundle dump --force --file="$_bfnew" &>/dev/null \
+			if brew bundle dump --no-describe --force --file="$_bfnew" &>/dev/null \
 				&& ! cmp -s "$_bfnew" "$_brewfile"; then
 				command cp -f "$_bfnew" "$_brewfile"
 				echo "[dotfiles] Brewfile refreshed from installed packages; commit it from the dotfiles repo."
