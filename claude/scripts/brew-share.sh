@@ -20,13 +20,20 @@ if [ ! -d "$PREFIX" ]; then
 	exit 1
 fi
 
+# Only files and directories take an ACL. chmod -R follows symlinks and fails
+# on a broken one (brew doctor lists those; brew cleanup removes them), so
+# feed it the paths through find instead.
+apply() {
+	find "$PREFIX" \( -type f -o -type d \) -exec chmod "$@" {} +
+}
+
 # Strip inherited copies first so a re-run does not stack duplicate entries
 # (chmod complains about paths with no ACL; that is the normal first-run
 # state). Then give every existing path one explicit entry. New paths inherit
 # from their parent directory.
-chmod -R -I "$PREFIX" 2>/dev/null || true
+apply -I 2>/dev/null || true
 rc=0
-chmod -R +a "$ENTRY" "$PREFIX" || rc=$?
+apply +a "$ENTRY" || rc=$?
 
 if [ "$rc" -ne 0 ]; then
 	if [ "$(id -u)" -ne 0 ]; then
