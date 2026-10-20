@@ -20,14 +20,13 @@ See also: `rules/behavioral.md` rule 3 (touch only what you must).
 
 ### Read scope
 - **Config and settings files:** read only the section relevant to the current task. Use offset/limit to target it. Read the full file only when understanding the file's full structure is the explicit task.
-- **Files over 200 lines:** always use offset/limit. Estimate the relevant section before reading. If uncertain, use Grep first to locate the line range.
-- **New files (never read this session):** use Glob or Grep to confirm existence and locate the relevant section before calling Read.
+- **Files over 200 lines:** always use offset/limit. Estimate the relevant section before reading. If uncertain, search first to locate the line range.
+- **New files (never read this session):** search to confirm existence and locate the relevant section before calling Read.
 
 ### Tool discipline
-- Use Grep (not Bash grep/rg) and Glob (not Bash find/ls) for all search. Never use Bash(grep), Bash(rg), Bash(find).
-- Never use Bash(cat), Bash(head), or Bash(tail), use Read with offset/limit.
+- Search with the tools the session provides. On macOS and Linux, Claude Code omits the Glob and Grep tools by default and routes `find` and `grep` through Bash, where they run embedded `bfs` and `ugrep`; use those. When a session does provide Glob and Grep, prefer them. Never spawn an agent for a single search.
+- Prefer Read with offset/limit for file contents. Bash `cat`, `sed -n`, `head`, or `tail` are fine when piping (`cat file | jq`) or when the session directs Bash-first work.
 - Chain independent read-only shell commands with `&&` in a single Bash call.
-- Prefer Read over Bash(cat) unless piping to another command (e.g., `cat file | jq`).
 - Subagents: reach for an Explore agent only when scope is genuinely uncertain or would span 4+ search tool calls; at most 2 in parallel; prefer sequential in plan mode. Never spawn an agent for file listing, a single-file read, or a targeted search (measured: a single broad Explore agent read 36 files for 58.7k tokens; 3 parallel Explore agents burned 24% of a weekly session before implementation began).
 
 ### CLI output discipline
