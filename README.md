@@ -347,6 +347,18 @@ git add Brewfile && git commit -m "chore: add <formula> to Brewfile"
 
 `install.sh` prints the `install` command as a reminder but does not run it automatically (bundle install can take several minutes on a fresh machine and may prompt for sudo).
 
+`shared.bash` refreshes the Brewfile from the installed packages once per day in the background. The file changes only when the package set changed, and the shell prints a one-line notice when it does. Commit the refreshed file from a dotfiles session.
+
+### Shared prefix across macOS profiles
+
+Several admin profiles on one Mac share `/opt/homebrew`. Homebrew creates files with the mode of the invoking profile, so a keg installed by one profile blocks upgrades from the others. One command fixes this for existing and future files:
+
+```bash
+sudo bash ~/anaiis-dotfiles/claude/scripts/brew-share.sh
+```
+
+It adds one inheritable ACL entry for group `admin` to the prefix. Files any admin profile creates later inherit the entry. Homebrew gains no rights and still runs as the invoking profile. The script is idempotent; re-run it to repair files created outside the ACL.
+
 ---
 
 ## Per-machine prerequisites

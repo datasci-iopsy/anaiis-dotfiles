@@ -32,33 +32,29 @@ for _brew_prefix in \
 done
 unset _brew_prefix
 
-# Warn when installed packages diverge from Brewfile (once per day, non-blocking)
+# Refresh the Brewfile from installed packages (once per day, non-blocking) so
+# it cannot drift. The file changes only when the package set changed; commit
+# it from a dotfiles session. Cross-profile write access to the prefix is an
+# ACL, see claude/scripts/brew-share.sh.
 _brewfile="$HOME/anaiis-dotfiles/Brewfile"
 _bfstamp="${XDG_CACHE_HOME:-$HOME/.cache}/brewfile-check.stamp"
-_brew_prefix="$(brew --prefix 2>/dev/null)"
 if command -v brew &>/dev/null && [ -f "$_brewfile" ] \
-	&& [ -w "${_brew_prefix:-/opt/homebrew}" ]; then
+	&& [ -w "${HOMEBREW_PREFIX:-/opt/homebrew}" ]; then
 	_bfage=$(($(date +%s) - $(stat -f %m "$_bfstamp" 2>/dev/null || echo 0)))
 	if [ ! -f "$_bfstamp" ] || [ "$_bfage" -gt 86400 ]; then
 		touch "$_bfstamp"
-		(brew bundle check --file="$_brewfile" &>/dev/null \
-			|| echo "[dotfiles] Brewfile out of sync. Run: brew bundle --file=$_brewfile") &
+		(
+			_bfnew="$(mktemp)"
+			if brew bundle dump --force --file="$_bfnew" &>/dev/null \
+				&& ! cmp -s "$_bfnew" "$_brewfile"; then
+				command cp -f "$_bfnew" "$_brewfile"
+				echo "[dotfiles] Brewfile refreshed from installed packages; commit it from the dotfiles repo."
+			fi
+			command rm -f "$_bfnew"
+		) &
 	fi
 fi
-unset _brewfile _bfstamp _bfage _brew_prefix
-
-# Wrap brew to create lock files as group-writable (664) so multiple macOS
-# profiles sharing /opt/homebrew (both in the admin group) can upgrade without
-# leaving stale 644 locks that block each other.
-brew() {
-	local _old_umask
-	_old_umask=$(umask)
-	umask 002
-	command brew "$@"
-	local _rc=$?
-	umask "$_old_umask"
-	return $_rc
-}
+unset _brewfile _bfstamp _bfage
 
 # ── bash-completion (interactive shells only) ─────────────────────────────────
 if [[ $- == *i* ]] && [ -n "$HOMEBREW_PREFIX" ] && [ -r "$HOMEBREW_PREFIX/etc/profile.d/bash_completion.sh" ]; then

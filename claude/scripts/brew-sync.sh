@@ -23,7 +23,7 @@ case "$verb" in
 		brew bundle check --file="$BREWFILE" --verbose
 		;;
 	dump)
-		brew bundle dump --describe --force --file="$BREWFILE"
+		brew bundle dump --force --file="$BREWFILE"
 		echo "Brewfile updated at $BREWFILE"
 		;;
 	*)

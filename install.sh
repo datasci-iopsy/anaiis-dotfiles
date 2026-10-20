@@ -147,6 +147,8 @@ echo "=== Homebrew packages ==="
 if command -v brew >/dev/null 2>&1; then
 	echo "  Brewfile present. Run to install or sync:"
 	echo "      bash $CANONICAL/claude/scripts/brew-sync.sh install"
+	echo "  Several admin profiles share the prefix? Run once:"
+	echo "      sudo bash $CANONICAL/claude/scripts/brew-share.sh"
 else
 	echo "  brew not found, skipping (install Homebrew first if needed)"
 fi
