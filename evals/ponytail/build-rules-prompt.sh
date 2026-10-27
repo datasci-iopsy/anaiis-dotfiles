@@ -8,10 +8,10 @@
 # code-affecting rules and writes the case.yaml beside it.
 #
 #   bash evals/ponytail/build-rules-prompt.sh trimmed    # rules from the current branch
-#   bash evals/ponytail/build-rules-prompt.sh statusquo  # behavioral.md from main, rest from the branch
+#   bash evals/ponytail/build-rules-prompt.sh statusquo  # behavioral.md from STATUSQUO_REV, rest from the branch
 #
 # Only behavioral.md differs between the two variants, so that is the only
-# file read from main. The subset (behavioral, code-style, testing, python,
+# file read from STATUSQUO_REV. The subset (behavioral, code-style, testing, python,
 # r-conventions) is the set of rules that can change what code the agent
 # writes; git, session, tools, environment, duckdb, citations and dashboards
 # govern hooks and tools that do not exist inside a sandboxed `claude -p` run.
@@ -31,13 +31,16 @@ REPO_DIR="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/../.." && pwd)"
 cd "$REPO_DIR"
 
 RULES_DIR="claude/rules"
+# Last main commit before ponytail replaced four imperatives. Pinned because
+# main:behavioral.md holds the trimmed file once this branch merges.
+STATUSQUO_REV="51fb22664342cdb211390f82beae5725f60d123b"
 OUT_DIR="evals/ponytail/rules"
 mkdir -p "$OUT_DIR"
 RULES_FILE="$OUT_DIR/$VARIANT.md"
 
 {
 	if [ "$VARIANT" = "statusquo" ]; then
-		git show main:"$RULES_DIR/behavioral.md"
+		git show "$STATUSQUO_REV:$RULES_DIR/behavioral.md"
 	else
 		cat "$RULES_DIR/behavioral.md"
 	fi
