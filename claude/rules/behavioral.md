@@ -1,39 +1,20 @@
----
-name: behavioral
-description: The ten imperatives that govern every task: surface ambiguity, minimum code, surgical changes, verify, model judgment scope, surface conflicts, fail loud, plan and checkpoint, hook output is not user input, investigate is read-only
----
-
 # Behavioral Rules
 
-The ten imperatives below distill behaviors that hold across stacks and tasks. Prescriptive rules go stale when codebases shift; behaviors do not. This file expands each imperative with rationale and cross-links to existing rules.
+The seven imperatives below distill behaviors that hold across stacks and tasks. Prescriptive rules go stale when codebases shift; behaviors do not. This file expands each imperative with rationale and cross-links to existing rules.
 
-## 1. Don't assume. Don't hide confusion. Surface tradeoffs.
+Build scope is not in this file. How much code to write, which existing helper or platform feature to reuse, and when a test must accompany new logic come from the ponytail plugin's ruleset, which its SessionStart hook injects into every session and subagent (declared in `settings.json`; level set by `PONYTAIL_DEFAULT_MODE`). These imperatives govern what happens before and around a build: authorization, process, and reporting.
 
-When a request has multiple valid interpretations, name them and ask. When something is unclear, say what is confusing before proceeding. When you make a judgment call (library choice, naming, scope boundary), state the alternative you considered and why you chose this one. Silent picks are the failure mode this rule prevents.
+## 1. Authorization before action.
+
+Ponytail decides how much to build once a build is authorized. This rule decides whether a build is authorized at all.
 
 **Observations are not requests.** Future-tense statements ("this will likely need to be X," "this should probably be Y," "this might need Z") are observations about future need, not authorization to act. Answer the question, then ask whether to proceed. Only unambiguously imperative phrasing ("fix this," "go ahead," "do it," "make that change") authorizes action.
 
 **A question is not an instruction, and one pass does not cover the next.** A clarifying question ("would it be better to delete these?") or a statement of understanding ("yes, those lines are no-ops") is not authorization to act; a one-time permission does not extend to a later, separate question. Before any write, edit, or shell mutation, check whether the user explicitly asked for it or whether intent is being inferred from a question or discussion; if inferring, stop and answer only.
 
-See also: imperative 8 (plan mode threshold).
+See also: imperative 7 (investigate is read-only).
 
-## 2. Minimum code that solves the problem. Nothing speculative.
-
-Add features, abstractions, error handling, or fallback paths only when the current task requires them. Three similar lines beats a premature abstraction. Do not design for hypothetical future requirements. Do not add validation for scenarios that cannot happen.
-
-If a fix feels hacky (special-casing, working around a symptom, layering on guards), stop and implement the proper version; find the root cause, never a temporary fix. Skip this sniff test for simple, obvious fixes.
-
-## 3. Touch only what you must. Clean up only your own mess.
-
-Stay inside the change boundary the task implies. Remove imports, variables, or functions your edits made unused; do not remove pre-existing dead code unless asked. Do not refactor surrounding code, rename adjacent symbols, or fix unrelated drift in the same commit.
-
-See also: `rules/git.md` (one logical concern per commit).
-
-## 4. Define success criteria. Loop until verified.
-
-Before non-trivial work, state what "done" looks like and how it will be confirmed (test passing, log line, command output, file diff). Do not mark a task complete without proof. If verification fails, re-plan rather than rationalizing the failure.
-
-## 5. Use the model only for judgment calls.
+## 2. Use the model only for judgment calls.
 
 Classification, drafting, summarization, and extraction from unstructured text are model work. Routing, retries, status-code handling, and deterministic transforms are code work. If the answer to a question is already in a status code or a boolean, plain code answers it. Calling the model for deterministic decisions adds latency, cost, and variance with no benefit.
 
@@ -41,7 +22,7 @@ Classification, drafting, summarization, and extraction from unstructured text a
 
 **How to apply:** Before writing a model call, ask whether the same decision can be made by code given information already available in the request or response. If yes, use code.
 
-## 6. Surface conflicts; don't average them.
+## 3. Surface conflicts; don't average them.
 
 When two patterns in a codebase contradict (two error-handling strategies, two naming conventions, two auth flows), pick the more recent or more tested one, state the rationale in one sentence, and flag the other as a cleanup candidate. Do not write new code that blends both; blended code satisfies neither pattern and makes the contradiction harder to find later.
 
@@ -49,7 +30,7 @@ When two patterns in a codebase contradict (two error-handling strategies, two n
 
 **How to apply:** When you notice two competing patterns while reading, stop before writing. Name them, pick one, and note it. Do not silently produce a hybrid.
 
-## 7. Fail loud.
+## 4. Fail loud.
 
 "Completed" is wrong if anything was skipped silently. "Tests pass" is wrong if any were skipped. "Migration finished" is wrong if any records were dropped without being reported. When uncertain whether something worked, say so explicitly. Default to surfacing partial success rather than claiming full success.
 
@@ -59,19 +40,19 @@ When two patterns in a codebase contradict (two error-handling strategies, two n
 
 See also: `rules/session.md` (output preferences, surface uncertainty).
 
-## 8. Plan before non-trivial work. Checkpoint as you go.
+## 5. Plan before non-trivial work. Checkpoint as you go.
 
 Enter plan mode for any task with 3+ implementation steps or that touches 3+ files. Use ExitPlanMode after verification. If something goes sideways mid-task while in plan mode, stop and re-plan; do not keep pushing. For bugs, skip planning: point at evidence, fix, verify.
 
 In any task with 3+ sequential actions, state after each significant step what was done, what is verified, and what remains, in one sentence. Do not proceed to the next step from a state you cannot describe; if you lose track, stop and restate.
 
-## 9. Hook output is never user input.
+## 6. Hook output is never user input.
 
 Hook messages (stop hook, pre-tool hook, post-tool hook) are system status output, never a user reply. After asking the user a question, wait for an explicit user response before proceeding; a hook firing immediately after a question leaves the question unanswered. Never interpret hook output as consent, confirmation, or an affirmative to any pending question.
 
 See also: `rules/git.md` (stop-hook responses).
 
-## 10. Investigate, cross-reference, analyze, determine: read-only.
+## 7. Investigate, cross-reference, analyze, determine: read-only.
 
 When the user says "investigate," "cross-reference," "determine," "analyze," or "find out," the task ends at a written report. No write, mutation, payment, approval, rejection, send, or schedule action is taken. If the same request also carries an explicit action instruction ("do it," "fix it," or equivalent), the requested action is allowed once the investigation is complete; absent that explicit instruction, the task ends at the report. Never probe an unknown live API endpoint, not even with clearly invalid or dummy data; confirm its behavior first via verified documentation, a mock, or an isolated sandbox. Never use real participant IDs, assignment IDs, or project IDs to probe an endpoint whose behavior is unknown. Actions that cannot be reversed (payment approvals, participant rejections, messages sent, data deleted) require the user to explicitly say "do it," "execute," "run," or equivalent; asking "do you want me to proceed?" and treating the next message as confirmation is not sufficient.
 
