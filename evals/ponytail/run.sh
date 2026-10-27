@@ -7,6 +7,11 @@
 #   bash evals/ponytail/run.sh --case smoke --runs 1 --keep-temp --max-cost-usd 0.50 --json
 #   bash evals/ponytail/run.sh --tag ab --runs 3 --scaffold --keep-temp --max-cost-usd 8 --json out.json
 #
+# First run in a fresh checkout: `claude plugin eval` asks you to trust the
+# plugin directory. Answer it once with a small run (--case smoke --runs 1)
+# before the paid --json run. Do not add --trust-plugin here; it skips that
+# decision for any plugin and is meant for CI.
+#
 # A named target (ponytail@ponytail) reads cases from the plugin's own cache
 # directory, which ships none. So the suite directory is the target and each
 # case names the plugin through its `plugins:` field as ../../plugin. The
