@@ -139,8 +139,12 @@ rc=$?
 assert_eq "--symlinks-only: exits 0" "0" "$rc"
 assert_eq "--symlinks-only: .bashrc untouched" "# untouched" "$(cat "$FAKE_HOME/.bashrc")"
 linked=$(cd "$FAKE_HOME/.claude/memory" 2>/dev/null && pwd -P)
-assert_eq "--symlinks-only: ~/.claude/memory resolves into the repo" \
-	"$(cd "$REPO_DIR/claude/memory" && pwd -P)" "$linked"
+# install.sh always links the main worktree, never a linked one, so a run from
+# a linked worktree expects the main worktree's memory directory. The first
+# `git worktree list` entry is the main worktree; outside git, REPO_DIR is it.
+MAIN_DIR=$(git -C "$REPO_DIR" worktree list --porcelain 2>/dev/null | awk '/^worktree/{sub(/^worktree /, ""); print; exit}')
+assert_eq "--symlinks-only: ~/.claude/memory resolves into the main worktree" \
+	"$(cd "${MAIN_DIR:-$REPO_DIR}/claude/memory" && pwd -P)" "$linked"
 lintr_present=$([ -e "$FAKE_HOME/.lintr" ] && echo 1 || echo 0)
 assert_eq "--symlinks-only: .lintr not linked" "0" "$lintr_present"
 
