@@ -88,12 +88,14 @@ seed_for() {
 }
 
 echo "case,arm,run,loc_added,files_added,cost_usd,duration_s,turns,score,passed,graders,kept_root" >"$OUT"
+missing=0
 while IFS=$'\t' read -r case arm run trace cost secs turns score passed graders; do
 	root="$(dirname "$(dirname "$trace")")"
 	cwd="$root/sealed/home/cwd"
 	chmod 700 "$root" "$root/sealed" 2>/dev/null || true
 	if [ ! -d "$cwd" ]; then
 		echo "missing workspace for $case/$arm/$run: $cwd" >&2
+		missing=$((missing + 1))
 		continue
 	fi
 	seed="$(seed_for "$case")"
@@ -111,3 +113,8 @@ done < <(jq -r '
 	| @tsv' "$JSON")
 
 echo "wrote $OUT ($(($(wc -l <"$OUT") - 1)) rows)"
+# Unequal run counts would skew the arm comparison, so an incomplete CSV is an error.
+[ "$missing" -eq 0 ] || {
+	echo "$missing run(s) had no kept workspace; rerun the suite with --keep-temp" >&2
+	exit 1
+}
