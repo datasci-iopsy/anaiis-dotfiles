@@ -256,3 +256,58 @@ Run these yourself in a plain terminal after migrating keys per
 
 **Fail condition:** A tier-2 var is visible outside its projects, or any
 CLI stops authenticating after the migration.
+
+---
+
+## S17: ponytail activates at session start
+
+**Precondition:** `enabledPlugins["ponytail@ponytail"]` is `true` in the
+settings Claude Code reads (the tracked `claude/settings.json` after merge,
+or the worktree's `.claude/settings.json` before it). Terminal session,
+Claude Code 2.1.290 or later.
+
+**Steps:**
+1. Start a new session in the project.
+2. Observe the band above the prompt (cost, tokens, reuse, tests).
+3. Type `/ponytail` with no argument.
+
+**Expected:** The band is visible. `/ponytail` reports the level `full`
+without switching anything. `ls ~/.claude/ponytail-modes/` shows a new flag
+file for this project.
+
+**Fail condition:** No band, `/ponytail` reports `off` or switches on from
+off, or no flag file appears.
+
+---
+
+## S18: ponytail reaches subagents
+
+**Precondition:** S17 passed in this session.
+
+**Steps:**
+1. Ask Claude to spawn an Explore subagent with this task: "Quote the first
+   line of any instruction block in your context that starts with PONYTAIL,
+   or reply NONE."
+
+**Expected:** The subagent's report quotes the line that starts with
+`PONYTAIL MODE ACTIVE`. This is the `SubagentStart` hook; SessionStart
+context never reaches subagents on its own.
+
+**Fail condition:** The subagent replies NONE.
+
+---
+
+## S19: ponytail level survives compaction
+
+**Precondition:** S17 passed in this session.
+
+**Steps:**
+1. Run `/ponytail lite`, confirm the reply says the level changed.
+2. Run `/compact`.
+3. Run `/ponytail` with no argument.
+
+**Expected:** The level is still `lite` after compaction. The activate hook
+reads `source=compact` and keeps the live level instead of resetting to the
+default. Run `/ponytail full` to restore the default afterwards.
+
+**Fail condition:** The level reads `full` or `off` after `/compact`.

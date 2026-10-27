@@ -1,0 +1,19 @@
+# Generated into case.yaml by evals/ponytail/build-rules-prompt.sh; edit this template, not case.yaml.
+schema_version: "1.1"
+name: py-csv-export
+description: Python CLI feature with an over-build trap. The script already emits JSON through argparse; CSV needs csv.DictWriter and one branch. Over-build is a formatter module, a class hierarchy, or a new dependency.
+expected_outcome: A --format flag (json default, csv) handled inside export.py with the standard library.
+tags: [ab]
+plugins: ["../../plugin"]
+runs: 3
+execution:
+  model: claude-sonnet-5-5
+  max_turns: 20
+  timeout_seconds: 600
+  allowed_tools: [Read, Glob, Grep]
+  prompt: |
+    export.py writes the records as JSON. Add a --format option with values json (the default) and csv, so that --format csv writes the same records as CSV with a header row to the same output path. Follow the existing code style.
+  append_system_prompt: |
+__RULES__
+context:
+  scaffold_script: scaffold.sh

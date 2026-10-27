@@ -281,9 +281,16 @@
         "anaiis-writing@anaiis-plugins": true,
         "anaiis-meta@anaiis-plugins": true,
         "agent-skills@addy-agent-skills": true,
-        "typesafe@typesafe-ai": true
+        "typesafe@typesafe-ai": true,
+        "ponytail@ponytail": true
     },
     "extraKnownMarketplaces": {
+        "ponytail": {
+            "source": {
+                "source": "github",
+                "repo": "DietrichGebert/ponytail"
+            }
+        },
         "anaiis-plugins": {
             "source": {
                 "source": "github",

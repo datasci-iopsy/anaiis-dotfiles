@@ -2,7 +2,7 @@
 
 ## Behavioral rules
 
-Imperatives governing every task live in `rules/behavioral.md`, loaded natively with every file in `~/.claude/rules/`; count and wording authoritative in that file.
+Imperatives governing authorization, process, and reporting live in `rules/behavioral.md`, loaded natively with every file in `~/.claude/rules/`; count and wording authoritative in that file. Build scope (how much code to write, reuse before new code, one test per piece of new logic) comes from the ponytail plugin, whose SessionStart hook injects its ruleset into every session and subagent. It is declared in `settings.json` under `extraKnownMarketplaces` and `enabledPlugins`; `PONYTAIL_DEFAULT_MODE` in the shell sets the level. `/ponytail` reports or changes the level for one session.
 
 This file provides project context and author identity. Detailed rules live in `~/.claude/rules/`.
 
@@ -21,7 +21,7 @@ Rules (`~/.claude/rules/`) constrain Claude's behavior across all tasks. Skills 
 ## Rules index
 | File | Covers |
 |---|---|
-| `rules/behavioral.md` | Behavioral imperatives governing every task; count and wording authoritative in file |
+| `rules/behavioral.md` | Imperatives for authorization, process, and reporting; build scope is ponytail's; count and wording authoritative in file |
 | `rules/environment.md` | macOS, Bash, direnv, uv, worktree safety, rm -rf splitting |
 | `rules/tools.md` | gh, jq, gcloud, make, structured CLI output |
 | `rules/code-style.md` | ASD-STE100 default writing register, writing style, shell formatting, no emojis |

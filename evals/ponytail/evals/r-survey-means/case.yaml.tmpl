@@ -1,0 +1,19 @@
+# Generated into case.yaml by evals/ponytail/build-rules-prompt.sh; edit this template, not case.yaml.
+schema_version: "1.1"
+name: r-survey-means
+description: R feature with an over-build trap. The repo already has a CSV reader; base R colMeans with na.rm does the rest. Over-build is a new reader, a per-column loop, or a tidyverse dependency.
+expected_outcome: One small function in R/survey.R that reuses read_survey and returns named item means ignoring NA.
+tags: [ab]
+plugins: ["../../plugin"]
+runs: 3
+execution:
+  model: claude-sonnet-5-5
+  max_turns: 20
+  timeout_seconds: 600
+  allowed_tools: [Read, Glob, Grep]
+  prompt: |
+    In R/survey.R, add a function item_means(path) that reads the survey CSV at path and returns the mean of every numeric item column (q1 to q5), ignoring NA values. Follow the existing code style in the file.
+  append_system_prompt: |
+__RULES__
+context:
+  scaffold_script: scaffold.sh

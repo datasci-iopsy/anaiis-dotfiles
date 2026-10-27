@@ -90,6 +90,17 @@ export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-5-5"
 export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-sonnet-5-5"
 export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-haiku-4-5"
 
+# ponytail plugin default level. Resolution in hooks/ponytail-config.js: this
+# variable, then ~/.config/ponytail/config.json, then "full". Explicit here so
+# every machine that sources shared.bash starts at the same level.
+export PONYTAIL_DEFAULT_MODE="full"
+# The two switches below work only in the pi harness. Claude Code ignores them
+# (plugin 5.3.2). Any value except empty, 0, false, or no turns them on.
+# Hide the ponytail status-bar indicator; the ruleset stays active.
+# export PONYTAIL_HIDE_STATUS=1
+# Silence the "Ponytail loaded" startup toast; the ruleset stays active.
+# export PONYTAIL_QUIET_STARTUP=1
+
 # Effort and output sizing; overrides settings.json "effortLevel".
 export CLAUDE_CODE_EFFORT_LEVEL="high"
 export CLAUDE_CODE_MAX_OUTPUT_TOKENS="32000"

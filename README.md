@@ -37,6 +37,8 @@ anaiis-dotfiles/
 │   └── shared.bash                 Tracked shell config (PATH, aliases, tool inits, prompt); also sourced by context-watch.sh and statusline-command.sh
 ├── bin/
 │   └── web-verify                  CLI wrapper: serve + Playwright verify + teardown
+├── evals/
+│   └── ponytail/                   `claude plugin eval` suite for the ponytail plugin: run.sh, build-rules-prompt.sh, loc.sh, cases under evals/
 ├── claude/
 │   ├── CLAUDE.md                   → ~/.claude/CLAUDE.md   Short index; rules live in rules/; imports RTK.md
 │   ├── RTK.md                      rtk (token-saving CLI proxy) usage notes, imported by CLAUDE.md
@@ -206,6 +208,10 @@ All custom skills are served by the `datasci-iopsy/anaiis-plugins` marketplace, 
 
 `claude/skills/` is the mount point for local skills (Anthropic-synced skills under `synced/`, AgentField skill symlinks); both are gitignored. See `claude/skills/README.md` for the conventions.
 
+**ponytail** (`DietrichGebert/ponytail`, declared in `claude/settings.json` under `extraKnownMarketplaces` and `enabledPlugins`) is the build-behavior layer. Its SessionStart hook injects a lazy-senior-dev ruleset into every session and subagent: reuse what exists, prefer the standard library and platform features, write the smallest complete change, never cut validation at trust boundaries. It replaced the four Karpathy-derived imperatives that used to open `rules/behavioral.md` (2026-10-26). `PONYTAIL_DEFAULT_MODE` in `bash/shared.bash` pins the level to `full`; `/ponytail lite|full|ultra|off` changes it for one session. A new machine picks the plugin up on the first session start after `install.sh`. The hook path is the only one that works: a copy of the skill file in a skills folder measured zero activations in JetBrains' test, so never hand-copy it.
+
+`evals/ponytail/` measures it with Claude Code's own `claude plugin eval` (with-plugin versus no-plugin arms). `bash evals/ponytail/build-rules-prompt.sh trimmed` generates the case files with the current rules as the system prompt; `bash evals/ponytail/run.sh --tag ab --runs 3 --scaffold --keep-temp --allow-tools Write Edit --max-cost-usd 8 --json out.json` runs the paid suite; `bash evals/ponytail/loc.sh out.json` adds lines-of-code per run from the kept workspaces. Results and the plugin copy under test are gitignored; the write-up lives in `reports/`.
+
 ### Commands
 
 | Command | What it does |
@@ -217,7 +223,7 @@ All custom skills are served by the `datasci-iopsy/anaiis-plugins` marketplace, 
 
 | File | Covers |
 |---|---|
-| `rules/behavioral.md` | The 10 imperatives: surface tradeoffs, minimum code, surgical changes, verify, model judgment scope, surface conflicts, fail loud, plan and checkpoint, hook output is not user input, investigate is read-only |
+| `rules/behavioral.md` | The 7 imperatives: authorization before action, model judgment scope, surface conflicts, fail loud, plan and checkpoint, hook output is not user input, investigate is read-only. Build scope (how much code to write) is the ponytail plugin's, see Skills |
 | `rules/environment.md` | macOS, Bash, direnv, uv, worktree safety, rm -rf splitting |
 | `rules/tools.md` | gh, jq, gcloud, make, structured CLI output flags |
 | `rules/code-style.md` | ASD-STE100 default writing register, shell formatting, no emojis, convention conformance |
