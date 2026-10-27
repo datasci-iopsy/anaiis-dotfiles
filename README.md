@@ -345,7 +345,7 @@ Several admin profiles on one Mac share `/opt/homebrew`. Homebrew creates files 
 sudo bash ~/anaiis-dotfiles/claude/scripts/brew-share.sh
 ```
 
-It adds one inheritable ACL entry for group `admin` to the prefix. Files any admin profile creates later inherit the entry. Homebrew gains no rights and still runs as the invoking profile. The script is idempotent; re-run it to repair files created outside the ACL.
+It adds two inheritable ACL entries for group `admin` to the prefix, one for directories and one for files. Paths any admin profile creates later inherit them. Homebrew gains no rights and still runs as the invoking profile. The file entry omits `execute` on purpose: a file with an ACL `execute` grant reports as executable, so the cask installer skips its own `chmod +x` and the binary lands without an x bit. The script is idempotent; re-run it to repair files created outside the ACL or to migrate the older single-entry layout.
 
 ---
 
