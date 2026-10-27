@@ -143,8 +143,10 @@ linked=$(cd "$FAKE_HOME/.claude/memory" 2>/dev/null && pwd -P)
 # a linked worktree expects the main worktree's memory directory. The first
 # `git worktree list` entry is the main worktree; outside git, REPO_DIR is it.
 MAIN_DIR=$(git -C "$REPO_DIR" worktree list --porcelain 2>/dev/null | awk '/^worktree/{sub(/^worktree /, ""); print; exit}')
+expected=$(cd "${MAIN_DIR:-$REPO_DIR}/claude/memory" 2>/dev/null && pwd -P)
+# An unresolved expected path must fail; two empty strings would compare equal.
 assert_eq "--symlinks-only: ~/.claude/memory resolves into the main worktree" \
-	"$(cd "${MAIN_DIR:-$REPO_DIR}/claude/memory" && pwd -P)" "$linked"
+	"${expected:-<main worktree memory directory not found>}" "$linked"
 lintr_present=$([ -e "$FAKE_HOME/.lintr" ] && echo 1 || echo 0)
 assert_eq "--symlinks-only: .lintr not linked" "0" "$lintr_present"
 
