@@ -28,10 +28,13 @@ assert() {
 }
 
 # tracked_hits <pathspec...>: tracked files whose text mentions rtk, one per line.
+# The two tests that assert rtk is absent must name it, so they are not counted.
 tracked_hits() {
 	local f
 	while IFS= read -r -d '' f; do
-		[ "$f" = tests/test-no-rtk.sh ] && continue
+		case "$f" in
+			tests/test-no-rtk.sh | tests/e2e-nested-session.sh) continue ;;
+		esac
 		grep -Iiq rtk "$REPO_DIR/$f" && printf '%s\n' "$f"
 	done < <(git -C "$REPO_DIR" ls-files -z -- "$@")
 }
@@ -55,14 +58,22 @@ grep -Iiq rtk "$FIX/clean.md"
 assert "0.2 text detector passes a clean file" 1 $?
 assert "0.3 json detector flags an rtk hook" 1 "$(json_hits "$FIX/settings.json")"
 assert "0.4 json detector passes a clean file" 0 "$(json_hits "$FIX/clean.json")"
+assert "0.5 path check exempts only this test" "claude/RTK.md" \
+	"$(printf 'claude/RTK.md\ntests/test-no-rtk.sh\n' | grep -i rtk | grep -vx tests/test-no-rtk.sh)"
 
 # ── 1. Wiring ──────────────────────────────────────────────────────────────
 echo "# 1. Wiring"
-assert "1.1 no tracked path names rtk" "" "$(git -C "$REPO_DIR" ls-files | grep -i rtk)"
+assert "1.1 no tracked path names rtk" "" "$(git -C "$REPO_DIR" ls-files | grep -i rtk | grep -vx tests/test-no-rtk.sh)"
 assert "1.2 settings.json holds no rtk string" 0 "$(json_hits "$REPO_DIR/claude/settings.json")"
 assert "1.3 install.sh does not mention rtk" "" "$(tracked_hits install.sh)"
 assert "1.4 CLAUDE.md does not mention rtk" "" "$(tracked_hits claude/CLAUDE.md)"
 assert "1.5 Brewfile keeps exactly one brew rtk line" 1 "$(grep -c '^brew "rtk"$' "$REPO_DIR/Brewfile")"
+
+# ── 2. Rules and docs ──────────────────────────────────────────────────────
+echo "# 2. Rules and docs"
+assert "2.1 no rule file mentions rtk" "" "$(tracked_hits claude/rules)"
+assert "2.2 README does not mention rtk" "" "$(tracked_hits README.md)"
+assert "2.3 no tracked file other than Brewfile mentions rtk" "" "$(tracked_hits . | grep -vx Brewfile)"
 
 printf '\ntest-no-rtk: %s passed, %s failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

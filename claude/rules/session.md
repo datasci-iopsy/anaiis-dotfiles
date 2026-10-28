@@ -30,12 +30,12 @@ See also: `rules/behavioral.md` rule 3 (touch only what you must).
 - Subagents: reach for an Explore agent only when scope is genuinely uncertain or would span 4+ search tool calls; at most 2 in parallel; prefer sequential in plan mode. Never spawn an agent for file listing, a single-file read, or a targeted search (measured: a single broad Explore agent read 36 files for 58.7k tokens; 3 parallel Explore agents burned 24% of a weekly session before implementation began).
 
 ### CLI output discipline
-`rtk` is installed and wired via a PreToolUse Bash hook. It auto-intercepts routine commands (git, gh, ls, grep, find, ruff, uv, gcloud, etc.) and reduces output by 60-80%. No action needed for supported commands; the hook runs transparently.
+Commands run as typed and print their full output. Limit the output yourself.
 
-- **Routine commands** (status, list, build success): rtk handles automatically. Do not pipe through head/tail/grep to trim output.
-- **Diagnostic output** (compile errors, test failures, stack traces): call raw. The hook passes these through; do not add extra filtering that could drop error lines.
-- **Structured output** (--json flags): jq projection already efficient; rtk is redundant.
-- **Arbitrary noisy commands** not in the built-in list: pipe through `<cmd> 2>&1 | rtk pipe -f <filter>`. Available pipe filters: `grep`, `rg`, `find`, `fd`, `git-log`, `git-diff`, `git-status`, `ruff-check`, `ruff-format`, `pytest`, `mypy`, `tsc`, `prettier`. For tools with no matching filter (e.g., dbt), run raw and rely on compaction hygiene.
+- **Routine commands** (status, list, build success): limit a long result with `head`, `tail`, or a narrow flag. Do not limit a short result.
+- **Diagnostic output** (compile errors, test failures, stack traces): read all of it. Do not add a filter that could drop an error line.
+- **Structured output** (`--json` flags): select the fields you need with `jq`.
+- **Noisy commands** (dbt runs, long test suites): run them raw and rely on compaction hygiene.
 
 ## Session discipline
 - One deliverable per session. If scope shifts (e.g., planning to implementation), ask whether to continue or start fresh.

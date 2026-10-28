@@ -40,8 +40,7 @@ anaiis-dotfiles/
 ├── evals/
 │   └── ponytail/                   `claude plugin eval` suite for the ponytail plugin: run.sh, build-rules-prompt.sh, loc.sh, cases under evals/
 ├── claude/
-│   ├── CLAUDE.md                   → ~/.claude/CLAUDE.md   Short index; rules live in rules/; imports RTK.md
-│   ├── RTK.md                      rtk (token-saving CLI proxy) usage notes, imported by CLAUDE.md
+│   ├── CLAUDE.md                   → ~/.claude/CLAUDE.md   Short index; rules live in rules/
 │   ├── settings.json               → ~/.claude/settings.json   Permissions, hooks, model, status line
 │   ├── keybindings.json            → ~/.claude/keybindings.json   shift+enter / alt+enter = newline
 │   ├── rules/                      → ~/.claude/rules/   Behavioral constraints (auto-loaded)
@@ -259,7 +258,6 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 | `PreToolUse` | `Write\|Edit\|MultiEdit\|NotebookEdit` | `block-edit-on-main.sh` | Blocks all edits when the current branch is `main` or `master` |
 | `PreToolUse` | `Read\|Write\|Edit` | `block-sensitive-writes.sh` | Read: block `*.env`/`*.env.*`; Write/Edit: block `*.lock`, `*.env`/`*.env.*`, `*credentials*`, `*secret*`, `*.pem`, `*.key`; both allow `*.env.example`/`*.env.template` |
 | `PreToolUse` | `Bash` | `bash-guard.sh` | Single guard: blocks destructive commands (`bq rm`, `gcloud delete*`, `uv cache clean`/`pip uninstall`), reads/writes to `.env`, credential paths (`.key`, `.pem`, `~/.aws/**`, `~/.config/gcloud/**`), shell rc files, and environment dumps (`printenv`/`echo $SECRET`); blocks Python for pure JSON parsing (jq's job); emits a non-blocking `[deps]` notice for `uv add`/`uv pip install`; recursive `rm` gets a scoped `allow`/`ask` decision (safe-list paths silently allowed, everything else asks, catastrophic operands like bare `/` or `~` hard-deny) instead of settings.json's old blanket deny |
-| `PreToolUse` | `Bash` | `rtk hook claude` | Rewrites routine commands (git, gh, ls, ruff, uv, gcloud, ...) through `rtk` to trim output; see `claude/RTK.md` |
 | `PreToolUse` | `Agent\|WebFetch` | `cost-guard.sh` | Cost tiering MEDIUM/HIGH/VERY HIGH; hard-blocks (exit 2) general-purpose agents above per-session cap (default 5, override via `COST_GUARD_GP_LIMIT`); blocks logged to `~/.claude/logs/cost-guard-blocks.log` |
 | `Stop` |, | `stop-hook-git-check.sh` | Exits 2 (continues agent loop) on uncommitted changes, untracked files, or unpushed commits; exits 0 when clean |
 | `PreCompact` | `*` | `pre-compact.sh` | Writes a structured handoff to project memory |
