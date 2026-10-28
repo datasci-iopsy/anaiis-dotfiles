@@ -62,7 +62,7 @@ Exception: when Claude edits or drafts text in the voice of a user-owned documen
 - Format all SQL files to sqlfmt style: all keywords lowercase, 4-space indentation, line_length=120.
 - Do not use jinja formatting. sqlfmt is jinja-aware and preserves jinja expressions as-is; this applies to both dbt and non-dbt SQL.
 - In dbt projects, sqlfmt config lives in `[tool.sqlfmt]` in `pyproject.toml`. Write SQL that passes sqlfmt without modification.
-- The post-edit hook auto-applies sqlfmt when found in the project venv (`.venv/bin/sqlfmt`) or on PATH.
+- The post-edit hook auto-applies sqlfmt when found in the project venv (`.venv/bin/sqlfmt`) or on PATH. It reads `[tool.sqlfmt]` from the nearest `pyproject.toml` above the file, not from the working directory.
 - `sqlfmt --check` runs at pre-commit via `sqlfmt-lint-staged.sh` and blocks commits with format drift (`SKIP_SQLFMT=1 git commit` to bypass).
 
 ## Shell formatting

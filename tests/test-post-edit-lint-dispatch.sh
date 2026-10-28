@@ -171,6 +171,59 @@ stderr=$(HOME="$FAKE_HOME" PATH="$SAFE_PATH" run_hook "$json" 2>&1)
 assert_exit "9.1 exit=0 when sqlfmt missing" "0" "$?"
 assert_contains "9.2 prints not found notice" "not found" "$stderr"
 
+# ── 10. sqlfmt config comes from the file's own project ──────────────────────
+# sqlfmt itself reads the nearest pyproject.toml above the file. The hook used to look in the
+# working directory, so a 60-column project was formatted at 120 and a scratch file in a project's
+# working directory at 88 (2026-09-30 incident). The query below is 93 characters: it fits on one
+# line at 120 and does not fit at 88 (the sqlfmt default) or at 60.
+echo "# 10. sqlfmt config comes from the file's own project"
+
+# assert_layout <name> <single|multi> <file>: the query is on one line, or split across lines.
+assert_layout() {
+	local name="$1" expected="$2" file="$3" lines actual
+	lines=$(wc -l <"$file" | tr -d ' ')
+	if [ "$lines" -gt 1 ]; then actual=multi; else actual=single; fi
+	assert_exit "$name" "$expected" "$actual"
+}
+
+if [[ -n "$SQLFMT" ]]; then
+	QUERY='select aaaaaaaaaa, bbbbbbbbbb, cccccccccc, dddddddddd, eeeeeeeeee, ffffffffff from some_table'
+	CONF60="$TMPDIR_WORK/proj60"
+	NOCONF="$TMPDIR_WORK/noconf"
+	OUTER="$TMPDIR_WORK/outer"
+	mkdir -p "$CONF60" "$NOCONF" "$OUTER/inner"
+	printf '[tool.sqlfmt]\nline_length = 60\n' >"$CONF60/pyproject.toml"
+	printf '[tool.sqlfmt]\nline_length = 60\n' >"$OUTER/pyproject.toml"
+	printf '[project]\nname = "inner"\n' >"$OUTER/inner/pyproject.toml"
+
+	# format_in <cwd> <file>: run the hook for <file> with <cwd> as the working directory.
+	format_in() {
+		(cd "$1" && printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$2" | bash "$HOOK" >/dev/null 2>&1)
+	}
+
+	printf '%s\n' "$QUERY" >"$CONF60/a.sql"
+	format_in "$NOCONF" "$CONF60/a.sql"
+	assert_layout "10.1 file in a 60-column project, cwd elsewhere: project config applies" multi "$CONF60/a.sql"
+
+	printf '%s\n' "$QUERY" >"$NOCONF/b.sql"
+	format_in "$CONF60" "$NOCONF/b.sql"
+	assert_layout "10.2 cwd is a 60-column project, file elsewhere: default 120 applies" single "$NOCONF/b.sql"
+
+	printf '%s\n' "$QUERY" >"$CONF60/c.sql"
+	format_in "$CONF60" "$CONF60/c.sql"
+	assert_layout "10.3 pin: file and cwd in the same 60-column project" multi "$CONF60/c.sql"
+
+	printf '%s\n' "$QUERY" >"$NOCONF/d.sql"
+	format_in "$NOCONF" "$NOCONF/d.sql"
+	assert_layout "10.4 pin: no config anywhere uses 120" single "$NOCONF/d.sql"
+
+	printf '%s\n' "$QUERY" >"$OUTER/inner/e.sql"
+	format_in "$OUTER" "$OUTER/inner/e.sql"
+	assert_layout "10.5 pin: the nearest pyproject without a sqlfmt section shadows an outer one" single "$OUTER/inner/e.sql"
+else
+	echo "  SKIP  10.x sqlfmt not installed"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

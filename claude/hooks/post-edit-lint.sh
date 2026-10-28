@@ -12,6 +12,23 @@ FILE=$(jq -r '.tool_input.file_path // empty' 2>/dev/null <<<"$INPUT")
 
 [ -z "$FILE" ] && exit 0
 
+# True when the file's own project sets [tool.sqlfmt]. sqlfmt reads the nearest pyproject.toml above
+# the file (sqlfmt/config.py), with no .git stop; mirror that so the hook and sqlfmt agree on which
+# config applies. A nearest pyproject without a [tool.sqlfmt] section has no sqlfmt config.
+has_sqlfmt_config() {
+	local dir
+	dir=$(cd "$(dirname "$1")" 2>/dev/null && pwd) || return 1
+	while [ -n "$dir" ]; do
+		if [ -f "$dir/pyproject.toml" ]; then
+			grep -qs '\[tool\.sqlfmt\]' "$dir/pyproject.toml"
+			return
+		fi
+		[ "$dir" = / ] && break
+		dir=$(dirname "$dir")
+	done
+	return 1
+}
+
 case "$FILE" in
 
 	*.py)
@@ -59,10 +76,10 @@ case "$FILE" in
 			SQLFMT="$HOME/.local/bin/sqlfmt"
 		fi
 		if [[ -n "$SQLFMT" ]]; then
-			# Use project pyproject.toml config if present; otherwise default to line_length=120.
+			# Use the file's own project config if it has one; otherwise default to line_length=120.
 			# Installed without [jinjafmt] extra: sqlfmt is jinja-aware but does not reformat
 			# jinja expressions -- correct for both dbt and non-dbt SQL.
-			if grep -qs '\[tool\.sqlfmt\]' pyproject.toml 2>/dev/null; then
+			if has_sqlfmt_config "$FILE"; then
 				echo "[lint] sqlfmt: $FILE (using project config)" >&2
 				$SQLFMT "$FILE" 2>&1
 			else
