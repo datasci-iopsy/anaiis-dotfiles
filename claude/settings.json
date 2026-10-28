@@ -230,10 +230,6 @@
                     {
                         "type": "command",
                         "command": "bash $HOME/.claude/hooks/bash-guard.sh"
-                    },
-                    {
-                        "type": "command",
-                        "command": "rtk hook claude"
                     }
                 ]
             },

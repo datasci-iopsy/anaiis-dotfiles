@@ -9,6 +9,8 @@
 #   E2E=1 bash tests/e2e-nested-session.sh
 # Fail-to-fail check: also run every case against the hooks at a git ref and expect the defect:
 #   E2E=1 E2E_OLD_REF=<ref> bash tests/e2e-nested-session.sh
+# Run a subset of cases (names are the case_* functions without the prefix):
+#   E2E=1 E2E_ONLY="rtk_absent guard_words" bash tests/e2e-nested-session.sh
 #
 # Result per case: PASS, FAIL, or NOT RUN. NOT RUN means the model did not make the expected tool
 # call or claude could not run; it is never counted as a pass. WEAK means the old hooks passed a
@@ -225,12 +227,13 @@ case_keeps_import() {
 }
 
 run_variant() {
+	local c
 	echo "== hooks: $1"
-	case_rtk_absent "$1"
-	case_guard_words "$1"
-	case_guard_paths "$1"
-	case_sqlfmt_project "$1"
-	case_keeps_import "$1"
+	for c in rtk_absent guard_words guard_paths sqlfmt_project keeps_import; do
+		case " ${E2E_ONLY:-$c} " in
+			*" $c "*) "case_$c" "$1" ;;
+		esac
+	done
 }
 
 run_variant new
