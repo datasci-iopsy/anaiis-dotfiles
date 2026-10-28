@@ -204,6 +204,7 @@ alias wipe_pip='pip freeze | cut -d "@" -f1 | xargs pip uninstall -y'
 # ── Google Cloud ──────────────────────────────────────────────────────────────
 alias gc-update='gcloud components update'
 alias gc-auth='gcloud auth login; gcloud auth application-default login'
+alias gc-authMobile='gcloud auth login --no-launch-browser; gcloud auth application-default login --no-launch-browser'
 alias gc-authList='gcloud auth list'
 
 # ── Claude ────────────────────────────────────────────────────────────────────
