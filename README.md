@@ -59,6 +59,7 @@ anaiis-dotfiles/
 │   └── playwright-static/          Static HTML smoke test scaffold (package.json, playwright.config.ts)
 ├── tests/
 │   ├── fixtures/                   Test fixture files
+│   ├── e2e-nested-session.sh       Opt-in (`E2E=1`) hook checks in real nested `claude -p` sessions; `E2E_OLD_REF=<ref>` replays them against older hooks
 │   ├── measure-memory-injection.sh  Memory injection overhead measurement
 │   ├── measure-userpromptsubmit.sh  Hook-latency measurement (run when chain grows)
 │   ├── run-all.sh                  Runs the full test suite
