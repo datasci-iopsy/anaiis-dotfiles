@@ -326,6 +326,32 @@ assert_allow "2n.1 .env under tests/fixtures/ is scaffolding" "touch tests/fixtu
 assert_allow "2n.2 .env.local under tests/fixtures/ is scaffolding" "cat tests/fixtures/dotenv/.env.local"
 assert_block "2n.4 path traversal escaping tests/fixtures/ still blocks" "cat tests/fixtures/../../.env" "BLOCK"
 
+echo "# 2o. Secrets: words and code idioms are not paths (2026-10 transcripts: 16 false-positive blocks)"
+assert_allow "2o.1 process.env.NAME is a code idiom" 'echo process.env.FOO'
+assert_allow "2o.2 process.env[...] in node code is a code idiom" "node -e \"console.log(process.env['FOO'])\""
+assert_allow "2o.3 import.meta.env is a code idiom" 'echo import.meta.env.MODE'
+assert_allow "2o.4 Deno.env.get is a code idiom" 'echo Deno.env.get'
+assert_allow "2o.5 bare word credentials in a grep pattern" 'grep -c credentials notes.md'
+assert_allow "2o.6 bare word credentials in a SQL LIKE" "duckdb x.db -c \"select 1 where c like '%credentials%'\""
+assert_allow "2o.7 a service-account domain is not a path" 'echo gserviceaccount.com'
+assert_block "2o.8 bare prod.env still blocks" 'cat prod.env' "BLOCK"
+assert_block "2o.9 credentials.json still blocks" 'cat credentials.json' "BLOCK"
+assert_block "2o.10 service-account-credentials.json still blocks" 'cat service-account-credentials.json' "BLOCK"
+assert_block "2o.11 a file named credentials in a directory still blocks" 'cat /srv/app/credentials' "BLOCK"
+assert_block "2o.12 lowercase process.env.local is a file, still blocks" 'cat process.env.local' "BLOCK"
+assert_block "2o.13 command substitution reading .env still blocks" 'echo $(<.env)' "BLOCK"
+assert_block "2o.14 an idiom next to a real .env path still blocks" "node -e 'console.log(process.env.FOO)' && cat .env" "BLOCK"
+assert_block "2o.15 block message names the matched .env token" 'cat .env' "matched: .env"
+assert_block "2o.16 block message names the matched credentials file" 'cat credentials.json' "matched: credentials.json"
+run_guard 'echo SECRETVALUE123 && cat .env'
+if [ "$RC" -eq 2 ] && ! printf '%s' "$STDERR" | grep -qF SECRETVALUE123; then
+	printf '  PASS  %s\n' "2o.17 block message does not echo the rest of the command"
+	PASS=$((PASS + 1))
+else
+	printf '  FAIL  %s\n        exit=%s stderr=%s\n' "2o.17 block message does not echo the rest of the command" "$RC" "$STDERR"
+	FAIL=$((FAIL + 1))
+fi
+
 echo "# 3. Allowed commands pass"
 assert_allow "3.1 git status" "git status"
 assert_allow "3.2 bq query" "bq query --use_legacy_sql=false 'select 1'"

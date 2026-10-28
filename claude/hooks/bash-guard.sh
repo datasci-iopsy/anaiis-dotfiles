@@ -179,12 +179,24 @@ JQ_DOTENV_SED="s/(jq([[:space:]]+--?[A-Za-z][A-Za-z-]*)*[[:space:]]+)(['\"])\.en
 if grep -qE '\bjq\b[^|;&]*[[:space:]]-(-?f\b|[A-Za-z]*f\b|-file\b|-from-file\b|-rawfile\b|-slurpfile\b|-argfile\b)' <<<"$GUARD_STR"; then
 	JQ_DOTENV_SED='s/&/&/'
 fi
+# Code idioms that read the process environment are not file paths. Each form needs a non-name
+# character before it (a file named myprocess.env still matches below) and, for process.env, an
+# upper-case variable name or "[" after it (a file named process.env.local still matches below).
+CODE_ENV_SED='s/(^|[^A-Za-z0-9_.-])(process\.env\.[A-Z_][A-Z0-9_]*|process\.env\[|import\.meta\.env|Deno\.env\.(get|set|has|delete|toObject))/\1/g'
 SCRUBBED=$(sed -E -e 's/\.env\.(example|template)//g' \
 	-e "$JQ_DOTENV_SED" \
+	-e "$CODE_ENV_SED" \
 	-e 's#tests/fixtures/([^./[:space:]][^/[:space:]]*/)*\.env(\.[A-Za-z0-9_]+)*#tests/fixtures/FIXTURE#g' <<<"$GUARD_STR")
-if grep -qE '(\.env\b|\.ssh\b|\.bashrc(\.local)?|\.bash_profile|\.zshrc(\.local)?|\.profile\b|secrets/|\.pem\b|(^|[/[:space:]])\.?\w*\.key\b|credentials|\.aws\b|\.config/(gcloud|secrets|gh)\b|\.netrc\b|\.gnupg\b|\.docker/config|\.kube/config|\.npmrc\b|\.pypirc\b)' <<<"$SCRUBBED"; then
+# "credentials" matches only as a file name (credentials.json) or a path component (/credentials),
+# not as a word in prose, a grep pattern, or SQL text.
+# shortcut: `.key` also matches attribute access such as a.key, because text cannot tell it from
+# server.key; the guard fails closed. Upgrade when the guard parses shell instead of matching text.
+SECRET_RE='(\.env\b|\.ssh\b|\.bashrc(\.local)?|\.bash_profile|\.zshrc(\.local)?|\.profile\b|secrets/|\.pem\b|(^|[/[:space:]])\.?\w*\.key\b|[A-Za-z0-9_.-]*credentials[A-Za-z0-9_-]*\.(json|db|ya?ml|ini|toml|txt|csv|conf|cfg)\b|/credentials([^A-Za-z0-9_.-]|$)|\.aws\b|\.config/(gcloud|secrets|gh)\b|\.netrc\b|\.gnupg\b|\.docker/config|\.kube/config|\.npmrc\b|\.pypirc\b)'
+if grep -qE "$SECRET_RE" <<<"$SCRUBBED"; then
+	# Name only the matched token, never the rest of the command, so the message cannot leak a value.
+	MATCHED=$(grep -oE "$SECRET_RE" <<<"$SCRUBBED" | head -n 1 | sed -E 's#^[[:space:]/]+##; s#[[:space:]]+$##')
 	log_secret_block "bash-guard:protected-path" "$CMD"
-	printf 'BLOCK: command references a protected secrets path. If a value is needed, ask the user to provide or load it.\n' >&2
+	printf 'BLOCK: command references a protected secrets path (matched: %s). If a value is needed, ask the user to provide or load it.\n' "$MATCHED" >&2
 	exit 2
 fi
 
