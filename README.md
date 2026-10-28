@@ -223,7 +223,7 @@ All custom skills are served by the `datasci-iopsy/anaiis-plugins` marketplace, 
 
 | File | Covers |
 |---|---|
-| `rules/behavioral.md` | The 7 imperatives: authorization before action, model judgment scope, surface conflicts, fail loud, plan and checkpoint, hook output is not user input, investigate is read-only. Build scope (how much code to write) is the ponytail plugin's, see Skills |
+| `rules/behavioral.md` | The 8 imperatives: authorization before action, model judgment scope, surface conflicts, fail loud, plan and checkpoint, hook output is not user input, investigate is read-only, check before you ask or hedge. Build scope (how much code to write) is the ponytail plugin's, see Skills |
 | `rules/environment.md` | macOS, Bash, direnv, uv, worktree safety, rm -rf splitting |
 | `rules/tools.md` | gh, jq, gcloud, make, structured CLI output flags |
 | `rules/code-style.md` | ASD-STE100 default writing register, shell formatting, no emojis, convention conformance |

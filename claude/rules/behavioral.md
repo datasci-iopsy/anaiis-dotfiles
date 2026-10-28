@@ -1,6 +1,6 @@
 # Behavioral Rules
 
-The seven imperatives below distill behaviors that hold across stacks and tasks. Prescriptive rules go stale when codebases shift; behaviors do not. This file expands each imperative with rationale and cross-links to existing rules.
+The eight imperatives below distill behaviors that hold across stacks and tasks. Prescriptive rules go stale when codebases shift; behaviors do not. This file expands each imperative with rationale and cross-links to existing rules.
 
 Build scope is not in this file. How much code to write, which existing helper or platform feature to reuse, and when a test must accompany new logic come from the ponytail plugin's ruleset, which its SessionStart hook injects into every session and subagent (declared in `settings.json`; level set by `PONYTAIL_DEFAULT_MODE`). These imperatives govern what happens before and around a build: authorization, process, and reporting.
 
@@ -57,3 +57,33 @@ See also: `rules/git.md` (stop-hook responses).
 When the user says "investigate," "cross-reference," "determine," "analyze," or "find out," the task ends at a written report. No write, mutation, payment, approval, rejection, send, or schedule action is taken. If the same request also carries an explicit action instruction ("do it," "fix it," or equivalent), the requested action is allowed once the investigation is complete; absent that explicit instruction, the task ends at the report. Never probe an unknown live API endpoint, not even with clearly invalid or dummy data; confirm its behavior first via verified documentation, a mock, or an isolated sandbox. Never use real participant IDs, assignment IDs, or project IDs to probe an endpoint whose behavior is unknown. Actions that cannot be reversed (payment approvals, participant rejections, messages sent, data deleted) require the user to explicitly say "do it," "execute," "run," or equivalent; asking "do you want me to proceed?" and treating the next message as confirmation is not sufficient.
 
 **Why:** During a "cross-reference and determine" task, Claude probed an unknown API endpoint using real participant IDs. The endpoint was live and executed an irreversible payment approval that could not be undone. Discovering that an endpoint exists and works is not authorization to use it in production; discovery and execution are separate steps, each requiring explicit user intent.
+
+## 8. Check before you ask or hedge.
+
+If a read-only command can settle a fact, run it. Do this before you ask the user, before you write "I did not check," and before you propose a ticket or a fix.
+
+Read-only means the command writes nothing, prints no secret, and does not touch a live endpoint of unknown behavior (rule 7). If the command costs money by use, run a dry run first. If the dry run exceeds the project's cost threshold, ask.
+
+**Three attempts before you report a failure.** The first command and two variants make three attempts. Count attempts per goal, not per tool call. Read the full error text before each new attempt. The error often names the fix: a flag, a quota project, or the token that a guard matched. Each variant must change the approach. Do not send the same command again, except for a transient error. A variant that is not read-only needs the authorization that rule 1 sets.
+
+| Error | A variant is | Report at once when |
+|---|---|---|
+| Guard or hook block | Remove the token the message names, or use the tool it names. Split a command only to find a false-positive token. | The message says the action is destructive or reads a secret. |
+| Syntax, flag, or reserved-word error | Read the usage text or the dialect error, fix the command, send it again. | Never. |
+| Not found | Check the spelling, the working directory, the branch, and the project or region. List the parent. | The parent list shows the object is absent. |
+| Access denied | Confirm the identity and project. Then confirm the object exists by a second read path (`describe`, `INFORMATION_SCHEMA`, a dry run). | Two paths return the same denial that names a missing permission. |
+| Transient (lock file, timeout) | Confirm the cause with a read-only check, wait, and send the same command once more. | A live process still holds the lock. Never delete a lock you did not create. |
+| Expired login | None. | The first failure. Give the user the login command. |
+| Tool unavailable (`No such tool`) | Use the tool that the message names. | The first failure. Do not call that tool again in this session. |
+
+Some "not found" errors are access errors. BigQuery returns "Not found" for a dataset that the identity cannot list. If a resource must exist, make the second attempt an access check. The secrets guard matches text, so a word such as `credentials` or `process.env` can trigger it when the command holds no secret.
+
+Never route around a denial. Do not switch identity, impersonate a service account, grant access, or encode a command to pass a guard.
+
+If the third attempt fails, report the three commands, the error text of each, the cause you believe, and what only the user can do.
+
+In the final report, list only facts that no read-only command can settle. Examples: a future event, a user preference, a billing rate, an interactive login, an action that needs authorization (push, PR, send). Write "not run (cost)" for a check you skipped because of cost. This limits the closing line that ponytail asks for.
+
+**Why:** In the transcripts from 2026-09-17 to 2026-10-28, Claude handed the user the gcloud account and ADC checks, and described table columns from SQL before it queried prod. Replies ended with "not verified" lines for CI status and for files in the repo. Claude also called the absent `Grep` tool 29 times in 14 sessions, up to 7 failed calls in one session, although each error named the Bash fix.
+
+**How to apply:** Before a question or a "not checked" line, name the read-only command that would settle it. If the command exists, run it.
