@@ -117,6 +117,19 @@ if [ -f "$BEHAV_MD" ]; then
 	else
 		fail "C.3 H2 imperatives" "expected at least 8, found ${H2_CT:-0}"
 	fi
+	# C.4: a "behavioral.md rule N" reference must name a rule that exists; renumbering strands them silently.
+	BAD_RULE_REFS=""
+	for f in "$RULES_DIR"/*.md "$CLAUDE_MD"; do
+		[ -f "$f" ] || continue
+		while IFS= read -r n; do
+			[ "$n" -le "${H2_CT:-0}" ] || BAD_RULE_REFS="$BAD_RULE_REFS $(basename "$f"):rule-$n"
+		done < <(grep -oE 'behavioral\.md`? rule [0-9]+' "$f" | grep -oE '[0-9]+$')
+	done
+	if [ -z "$BAD_RULE_REFS" ]; then
+		ok "C.4 every behavioral.md rule reference points at an existing rule (1 to ${H2_CT:-0})"
+	else
+		fail "C.4 behavioral.md rule references" "no such rule:$BAD_RULE_REFS"
+	fi
 else
 	fail "C.1 rules/behavioral.md" "missing: $BEHAV_MD"
 fi

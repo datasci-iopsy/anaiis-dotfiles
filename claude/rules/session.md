@@ -16,7 +16,7 @@ Check whether that file path already appears in a prior Read result in this sess
 ### Before writing in a file
 Read the file's current exports, the immediate caller of the function or section you are adding to, and any shared utilities referenced nearby. If the existing structure has no obvious rationale, ask before adding alongside it. "Looks orthogonal to me" is a dangerous assumption; the conflict may exist 30 lines away.
 
-See also: `rules/behavioral.md` rule 3 (touch only what you must).
+See also: `rules/behavioral.md` rule 3 (surface conflicts; do not blend patterns).
 
 ### Read scope
 - **Config and settings files:** read only the section relevant to the current task. Use offset/limit to target it. Read the full file only when understanding the file's full structure is the explicit task.

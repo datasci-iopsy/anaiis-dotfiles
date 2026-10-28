@@ -72,7 +72,7 @@ chore(deps): upgrade dbt-utils
 - `[git] uncommitted changes`: commit the pending work per the staging/commit rules above, then reply `Ok`.
 - Any other `[git] ...` line: take no autonomous action, just reply `Ok`.
 - Never push in response to an unpushed-commits report, no matter the count.
-- If a question to the user is still open when this hook fires, it remains open; the hook firing is not the user answering it (see behavioral.md rule 9).
+- If a question to the user is still open when this hook fires, it remains open; the hook firing is not the user answering it (see behavioral.md rule 6).
 
 ## Pull requests
 - Claude never opens a PR on its own initiative: not as a "helpful" follow-on after committing, not auto-chained after another skill, not because the diff looks PR-ready. Opening a PR is visible to others and triggers CI, so it always needs the user's explicit trigger for that specific PR.

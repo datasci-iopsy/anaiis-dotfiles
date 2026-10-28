@@ -101,6 +101,20 @@ else
 	echo "  SKIP  2.4-2.6 jq not available"
 fi
 
+# ── 3. A dangling behavioral.md rule reference (C.4) ──────────────────────
+# Seeded on its own fresh copy: section 2 deletes every numbered heading, which would fail C.4 for
+# the wrong reason. A reference to a rule that does not exist goes stale silently when rules are renumbered.
+echo "# 3. Dangling behavioral.md rule reference"
+REPO3="$WORK/repo3"
+mkdir -p "$REPO3"
+cp -RP "$REPO_DIR/claude" "$REPO3/claude"
+printf '\nSee also: `rules/behavioral.md` rule 99 (does not exist).\n' >>"$REPO3/claude/rules/git.md"
+RULES_DOCTOR_REPO_DIR="$REPO3" bash "$DOCTOR" >"$WORK/dangling.out" 2>&1
+assert "3.1 doctor exits non-zero on a dangling rule reference" "1" "$?"
+OUT3=$(cat "$WORK/dangling.out")
+assert_contains "3.2 doctor names the check (C.4)" "C.4 behavioral.md rule references" "$OUT3"
+assert_contains "3.3 doctor names the file and the missing rule" "git.md:rule-99" "$OUT3"
+
 # ── Summary ───────────────────────────────────────────────────────────────
 echo
 echo "──────────────────────────────────────────────"

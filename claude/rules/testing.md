@@ -49,4 +49,4 @@ def test_compute_score(items, expected):
     assert compute_score(items) == pytest.approx(expected, abs=1e-3)
 ```
 
-See also: `rules/behavioral.md` rule 4 (define success criteria, loop until verified).
+See also: `rules/behavioral.md` rule 4 (fail loud: a skipped test is not a pass).
