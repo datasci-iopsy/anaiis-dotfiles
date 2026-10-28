@@ -39,8 +39,10 @@ case "$FILE" in
 			RUFF="$HOME/.local/bin/ruff"
 		fi
 		if [[ -n "$RUFF" ]]; then
-			echo "[lint] ruff check --fix: $FILE" >&2
-			$RUFF check --fix --quiet "$FILE" 2>&1 | head -5
+			# F401 is reported, never auto-removed: an import added before the code that uses it is
+			# unused for one edit, and removing it breaks the module. Pre-commit still flags it.
+			echo "[lint] ruff check --fix (F401 reported only): $FILE" >&2
+			$RUFF check --fix --unfixable F401 --quiet "$FILE" 2>&1 | head -5
 			echo "[lint] ruff format: $FILE" >&2
 			$RUFF format --quiet "$FILE" 2>&1
 		fi

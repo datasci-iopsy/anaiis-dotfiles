@@ -276,7 +276,7 @@ Hook latency on this machine (measured 2026-07-15, 3-hook chain after the memory
 | **Shell** | `post-edit-lint.sh` auto-applies `shfmt -w -i 0 -bn -ci` | `shfmt-lint-staged.sh` blocks | `SKIP_SHFMT=1 git commit …` |
 | **R** | `post-edit-lint.sh` runs `lintr` and reports | `r-lint-staged.sh` blocks if violations | `SKIP_R_LINT=1 git commit …` |
 | **SQL** | `post-edit-lint.sh` auto-applies `sqlfmt` (the file's own project `[tool.sqlfmt]` config, else line_length=120; jinja-aware) | `sqlfmt-lint-staged.sh` blocks | `SKIP_SQLFMT=1 git commit …` |
-| **Python** | `post-edit-lint.sh` runs `ruff check` (reported) + `ruff format` (auto-applied) | `ruff-lint-staged.sh` blocks | `SKIP_RUFF=1 git commit …` |
+| **Python** | `post-edit-lint.sh` runs `ruff check --fix` (safe fixes applied; unused imports, F401, are reported and kept) + `ruff format` (auto-applied) | `ruff-lint-staged.sh` blocks | `SKIP_RUFF=1 git commit …` |
 | **JSON** | `post-edit-lint.sh` enforces `jq --indent 4` | `json-lint-staged.sh` checks indent | n/a |
 
 `~/.lintr` is symlinked from this repo (`.lintr`). Per-project `.lintr` overrides are honored, lintr walks up from the project root.

@@ -224,6 +224,24 @@ else
 	echo "  SKIP  10.x sqlfmt not installed"
 fi
 
+# ── 11. ruff keeps an unused import that the next edit will use ──────────────
+# A Write that adds "import re" before the code that uses it leaves the import unused for one edit.
+# ruff check --fix removed it in between, so the module failed on import (2026-10-06 incident).
+echo "# 11. ruff does not auto-remove unused imports (F401)"
+if [[ -n "$RUFF" ]]; then
+	tmp="$TMPDIR_WORK/keep_import.py"
+	printf 'import re\n\nx = 1\n' >"$tmp"
+	run_hook "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$tmp\"}}" >/dev/null 2>&1
+	assert_contains "11.1 an unused import survives the hook" "import re" "$(cat "$tmp")"
+
+	tmp="$TMPDIR_WORK/other_fix.py"
+	printf 'print(f"hello")\n' >"$tmp"
+	run_hook "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$tmp\"}}" >/dev/null 2>&1
+	assert_contains "11.2 pin: other safe fixes still apply (f-string without placeholders)" 'print("hello")' "$(cat "$tmp")"
+else
+	echo "  SKIP  11.x ruff not installed"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
