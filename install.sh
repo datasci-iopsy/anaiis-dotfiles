@@ -4,6 +4,7 @@
 #   1. Create ~/anaiis-dotfiles as a canonical symlink to wherever this repo lives
 #   2. Symlink the Claude policy stack into ~/.claude/
 #   3. Wire PATH and source shared.bash into ~/.bashrc
+#   4. Add the GitHub host keys to ~/.ssh/known_hosts (SSH git protocol only)
 # Safe to re-run: idempotent.
 
 set -euo pipefail
@@ -17,11 +18,16 @@ set -euo pipefail
 #                                     $HOME/.bash_profile) and exit (what
 #                                     tests/test-install-bashrc.sh runs against
 #                                     a throwaway HOME)
+#   bash install.sh --hostkeys-only   step 4 only: add the GitHub host keys to
+#                                     $HOME/.ssh/known_hosts and exit. It acts only
+#                                     when gh is installed, its git protocol is ssh,
+#                                     and the file has no github.com entry. Run it
+#                                     again after gh auth login.
 MODE="${1:-}"
 case "$MODE" in
-	--symlinks-only | --bashrc-only | "") ;;
+	--symlinks-only | --bashrc-only | --hostkeys-only | "") ;;
 	*)
-		echo "usage: bash install.sh [--symlinks-only|--bashrc-only]" >&2
+		echo "usage: bash install.sh [--symlinks-only|--bashrc-only|--hostkeys-only]" >&2
 		exit 2
 		;;
 esac
@@ -120,8 +126,70 @@ source "$HOME/anaiis-dotfiles/bash/shared.bash"
 	fi
 }
 
+# Step 4: add the GitHub host keys to $HOME/.ssh/known_hosts (decision D-012).
+# Plugin clones over SSH fail without them. The function never aborts the installer:
+# every refusal prints one reason and returns 0. It writes only when the fingerprints
+# of the keys that gh api meta lists equal the fingerprints in the same response.
+# ssh-keygen reads the passwd home and ignores $HOME, so each call passes -f.
+wire_github_hostkeys() {
+	echo ""
+	echo "=== GitHub host keys (~/.ssh/known_hosts) ==="
+	local known="$HOME/.ssh/known_hosts" proto keys prints want got tmp count
+	if ! command -v gh >/dev/null 2>&1; then
+		echo "  skip  gh not found. Install it and run gh auth login, then: bash install.sh --hostkeys-only"
+		return 0
+	fi
+	proto="$(gh config get git_protocol 2>/dev/null)" || proto=""
+	if [ "$proto" != "ssh" ]; then
+		echo "  skip  gh git protocol is \"${proto:-unset}\", not ssh. No host key is needed."
+		return 0
+	fi
+	if ssh-keygen -F github.com -f "$known" >/dev/null 2>&1; then
+		echo "  ok   github.com host key already in $known"
+		return 0
+	fi
+	keys="$(gh api meta --jq '.ssh_keys[]' 2>/dev/null)" || keys=""
+	prints="$(gh api meta --jq '.ssh_key_fingerprints[]' 2>/dev/null)" || prints=""
+	if [ -z "$keys" ] || [ -z "$prints" ]; then
+		echo "  skip  gh could not read the GitHub host keys. Run gh auth status, then: bash install.sh --hostkeys-only"
+		return 0
+	fi
+	tmp="$(mktemp "${TMPDIR:-/tmp}/github_hostkeys.XXXXXX")" || return 0
+	printf '%s\n' "$keys" | sed -e '/^$/d' -e 's/^/github.com /' >"$tmp"
+	# The API lists fingerprints without the SHA256: prefix that ssh-keygen prints. Compare both bare.
+	want="$(printf '%s\n' "$prints" | sed 's/^SHA256://' | LC_ALL=C sort -u)"
+	got="$(ssh-keygen -lf "$tmp" 2>/dev/null | awk '{print $2}' | sed 's/^SHA256://' | LC_ALL=C sort -u)" || got=""
+	if [ -z "$got" ] || [ "$want" != "$got" ]; then
+		rm -f "$tmp"
+		echo "  skip  fingerprints of the fetched keys differ from the GitHub list. Nothing written."
+		return 0
+	fi
+	# The group runs inside a condition, so a failed write prints one reason and does not abort the installer.
+	if ! {
+		[ -d "$HOME/.ssh" ] || mkdir -m 700 "$HOME/.ssh"
+		# A known_hosts file without a final newline would join its last line to the first new line.
+		if [ -s "$known" ] && [ -n "$(tail -c 1 "$known")" ]; then
+			echo >>"$known"
+		fi
+		cat "$tmp" >>"$known"
+	} 2>/dev/null; then
+		rm -f "$tmp"
+		echo "  skip  could not write $known. Check the permissions of ~/.ssh, then: bash install.sh --hostkeys-only"
+		return 0
+	fi
+	count="$(grep -c . "$tmp")"
+	echo "  add  github.com host keys ($count keys) -> $known"
+	echo "       ED25519 fingerprint: $(ssh-keygen -lf "$tmp" | awk '/\(ED25519\)/ {print $2}')"
+	rm -f "$tmp"
+}
+
 if [ "$MODE" = "--bashrc-only" ]; then
 	wire_bashrc
+	exit 0
+fi
+
+if [ "$MODE" = "--hostkeys-only" ]; then
+	wire_github_hostkeys
 	exit 0
 fi
 
@@ -160,6 +228,7 @@ if [ "$MODE" = "--symlinks-only" ]; then
 fi
 
 wire_bashrc
+wire_github_hostkeys
 
 echo ""
 echo "=== Claude Code: CLI tools ==="
