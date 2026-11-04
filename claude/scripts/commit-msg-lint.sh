@@ -116,44 +116,32 @@ if [ -n "$type" ] && [ "$type" != "$type_lc" ]; then
 fi
 
 # R3 and R2 (scope)
-case "$rest" in
-	'('*)
-		case "$rest" in
-			*')'*)
-				scope="${rest#\(}"
-				scope="${scope%%)*}"
-				rest="${rest#*)}"
-				scope_lc=$(lower "$scope")
-				if [ "$scope" != "$scope_lc" ]; then
-					fail R2 "scope '$scope' must be lowercase"
-				fi
-				if ! [[ $scope_lc =~ $RE_SCOPE ]]; then
-					fail R3 "scope '$scope' must match [a-z0-9][a-z0-9._/-]*"
-				fi
-				;;
-			*)
-				fail R3 "the scope has no closing parenthesis"
-				parse_ok=0
-				;;
-		esac
-		;;
-esac
+if [[ $rest == '('* ]]; then
+	if [[ $rest == *')'* ]]; then
+		scope="${rest#\(}"
+		scope="${scope%%)*}"
+		rest="${rest#*)}"
+		scope_lc=$(lower "$scope")
+		if [ "$scope" != "$scope_lc" ]; then
+			fail R2 "scope '$scope' must be lowercase"
+		fi
+		if ! [[ $scope_lc =~ $RE_SCOPE ]]; then
+			fail R3 "scope '$scope' must match [a-z0-9][a-z0-9._/-]*"
+		fi
+	else
+		fail R3 "the scope has no closing parenthesis"
+		parse_ok=0
+	fi
+fi
 
 # R4
-if [ "$parse_ok" -eq 1 ]; then
-	case "$rest" in
-		'!'*)
-			bang=1
-			rest="${rest#!}"
-			case "$rest" in
-				':'*) ;;
-				*)
-					fail R4 "write one ! immediately before the colon"
-					parse_ok=0
-					;;
-			esac
-			;;
-	esac
+if [ "$parse_ok" -eq 1 ] && [[ $rest == '!'* ]]; then
+	bang=1
+	rest="${rest#!}"
+	if [[ $rest != ':'* ]]; then
+		fail R4 "write one ! immediately before the colon"
+		parse_ok=0
+	fi
 fi
 
 # R5
@@ -167,9 +155,9 @@ if [ "${#first}" -gt 72 ]; then
 fi
 
 # R7
-case "$first" in
-	*.) fail R7 "the first line must not end with a period" ;;
-esac
+if [[ $first == *. ]]; then
+	fail R7 "the first line must not end with a period"
+fi
 
 # R8
 if [[ $first =~ $RE_WIP ]]; then
@@ -183,6 +171,27 @@ fi
 
 # R10 and R11: footers sit in the last paragraph, which must follow a blank line.
 breaking=0
+
+# check_footer_token <label>: apply R10 to one footer label; note a breaking footer for R11.
+check_footer_token() {
+	local token="$1" token_lc
+	case "$token" in
+		'BREAKING CHANGE' | 'BREAKING-CHANGE')
+			breaking=1
+			return
+			;;
+	esac
+	token_lc=$(lower "$token")
+	case "$token_lc" in
+		'breaking change' | 'breaking-change')
+			fail R10 "write the footer token '$token' as BREAKING CHANGE or BREAKING-CHANGE, in uppercase"
+			;;
+		*' '*)
+			fail R10 "footer token '$token' has a space; use hyphens, as in '${token// /-}:'"
+			;;
+	esac
+}
+
 last=$((count - 1))
 start=$last
 while [ "$start" -gt 0 ] && [ -n "${lines[start - 1]}" ]; do
@@ -192,21 +201,7 @@ if [ "$start" -gt 0 ]; then
 	i=$start
 	while [ "$i" -le "$last" ]; do
 		if [[ ${lines[i]} =~ $RE_LABEL ]]; then
-			token="${BASH_REMATCH[1]}"
-			case "$token" in
-				'BREAKING CHANGE' | 'BREAKING-CHANGE') breaking=1 ;;
-				*)
-					token_lc=$(lower "$token")
-					case "$token_lc" in
-						'breaking change' | 'breaking-change')
-							fail R10 "write the footer token '$token' as BREAKING CHANGE or BREAKING-CHANGE, in uppercase"
-							;;
-						*' '*)
-							fail R10 "footer token '$token' has a space; use hyphens, as in '${token// /-}:'"
-							;;
-					esac
-					;;
-			esac
+			check_footer_token "${BASH_REMATCH[1]}"
 		fi
 		i=$((i + 1))
 	done

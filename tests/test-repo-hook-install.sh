@@ -17,6 +17,8 @@
 #
 # Exit 0 on full pass; non-zero on any failure.
 
+# SC2016: single quotes hold literal "$HOME" and "$1" hook text on purpose.
+# shellcheck disable=SC2016
 set -u
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

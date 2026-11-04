@@ -17,6 +17,8 @@
 #   cd /path/to/repo
 #   bash ~/.claude/scripts/install-repo-hooks.sh
 
+# SC2016: the dispatcher lines hold literal "$HOME" and "$1" on purpose; each hook expands them.
+# shellcheck disable=SC2016
 set -euo pipefail
 
 # Ask git where hooks live. In a linked worktree this is the common hooks
