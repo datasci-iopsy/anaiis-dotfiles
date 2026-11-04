@@ -896,8 +896,12 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 				# loads safe-rm.sh and exits 97, with a message, unless rm and mkdir are then both functions (an
 				# empty, partial, or foreign file loads with status 0 and defines nothing). declare -F ignores
 				# aliases. type -t does not: with an alias for mkdir it prints alias and would exit 97 on every run.
+				# The prefix and the command are two lines, so the shell parses the command after the prefix ran.
+				# An alias is expanded before the function is looked up. An alias whose value does not start with
+				# its own name (command rm, /bin/rm) would run the real program. The loop removes such an alias.
+				# An alias that starts with its own name (rm -i, mkdir -pv) stays: it reaches the function.
 				# shellcheck disable=SC2016
-				RM_WRAP_PREFIX=$(printf '__SAFE_RM_CWD=%q; __SAFE_RM_SCRATCH=%q; . "$HOME/.claude/hooks/safe-rm.sh" && declare -F rm mkdir >/dev/null 2>&1 || { echo '\''safe-rm: guard did not load'\'' >&2; exit 97; }' "$RM_WRAP_CWD" "$RM_WRAP_SCRATCH")
+				RM_WRAP_PREFIX=$(printf '__SAFE_RM_CWD=%q; __SAFE_RM_SCRATCH=%q; for __sr_n in rm mkdir; do case "$(alias $__sr_n 2>/dev/null)" in "" | "alias $__sr_n='\''$__sr_n "* | "alias $__sr_n='\''$__sr_n'\''") ;; *) unalias $__sr_n ;; esac; done; unset __sr_n; . "$HOME/.claude/hooks/safe-rm.sh" && declare -F rm mkdir >/dev/null 2>&1 || { echo '\''safe-rm: guard did not load'\'' >&2; exit 97; }' "$RM_WRAP_CWD" "$RM_WRAP_SCRATCH")
 				if [ -f "$HOME/.claude/state/safe-rm-canary-$RM_WRAP_KEY" ]; then
 					RM_WRAP_DECISION="allow"
 					RM_WRAP_WHY="every statement is vetted; rm is replaced by a run-time guard that checks each expanded path (stream e-bash-guard-rm)"

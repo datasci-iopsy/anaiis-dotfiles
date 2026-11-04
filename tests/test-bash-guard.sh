@@ -1026,6 +1026,41 @@ E_PRE="${E_PRE}alias rm='rm -i'
 run_rewritten "S=$E_SCRATCH"'; rm -rf $S/al-keep; mkdir -p $S/al-new'
 assert_state "7n.11 an rm alias that adds -i: the guard loads, refuses by naming the flag, and nothing is deleted or created" "kept=yes made=no rc_nonzero=yes named_flag=yes" \
 	"kept=$([ -e "$E_SCRATCH/al-keep/f" ] && echo yes || echo no) made=$([ -e "$E_SCRATCH/al-new" ] && echo yes || echo no) rc_nonzero=$([ "$RC" -ne 0 ] && echo yes || echo no) named_flag=$(printf '%s' "$ERR" | grep -qF "refused flag '-i'" && echo yes || echo no)"
+
+# An alias word is expanded before the function is looked up. An alias whose value does not start with
+# its own name (command rm, /bin/rm) therefore runs the real program and skips the guard. The prefix
+# removes such an alias. An alias that starts with its own name (rm -i, mkdir -pv) stays: it reaches
+# the function, which checks the path (7n.11) or passes the flag on (7n.15).
+mkdir -p "$E_OUT/al-bypass-rm"
+touch "$E_OUT/al-bypass-rm/f"
+E_PRE="shopt -s expand_aliases
+alias rm='command rm'
+"
+run_rewritten "S=$E_SCRATCH; U=$E_OUT/al-bypass-rm"'; rm -rf $U'
+assert_state "7n.12 an rm alias that skips the function (command rm): the guard still refuses the outside path" "kept=yes rc_nonzero=yes refused=yes" \
+	"kept=$([ -e "$E_OUT/al-bypass-rm/f" ] && echo yes || echo no) rc_nonzero=$([ "$RC" -ne 0 ] && echo yes || echo no) refused=$(printf '%s' "$ERR" | grep -qF 'outside the deletion roots' && echo yes || echo no)"
+
+touch "$E_OUT/al-bypass-rm/f"
+E_PRE="shopt -s expand_aliases
+alias rm='/bin/rm'
+"
+run_rewritten "S=$E_SCRATCH; U=$E_OUT/al-bypass-rm"'; rm -rf $U'
+assert_state "7n.13 an rm alias with the program path (/bin/rm): the guard still refuses the outside path" "kept=yes rc_nonzero=yes refused=yes" \
+	"kept=$([ -e "$E_OUT/al-bypass-rm/f" ] && echo yes || echo no) rc_nonzero=$([ "$RC" -ne 0 ] && echo yes || echo no) refused=$(printf '%s' "$ERR" | grep -qF 'outside the deletion roots' && echo yes || echo no)"
+
+E_PRE="shopt -s expand_aliases
+alias mkdir='command mkdir -p'
+"
+run_rewritten "S=$E_SCRATCH; U=$E_OUT/al-bypass-made"'; rm -rf $S/nothing; mkdir $U'
+assert_state "7n.14 a mkdir alias that skips the function (command mkdir): the guard still refuses the outside path" "made=no rc_nonzero=yes refused=yes" \
+	"made=$([ -e "$E_OUT/al-bypass-made" ] && echo yes || echo no) rc_nonzero=$([ "$RC" -ne 0 ] && echo yes || echo no) refused=$(printf '%s' "$ERR" | grep -qF 'outside the deletion roots' && echo yes || echo no)"
+
+E_PRE="shopt -s expand_aliases
+alias mkdir='mkdir -pv'
+"
+run_rewritten "S=$E_SCRATCH"'; rm -rf $S/nothing; mkdir $S/al-deep/x/y'
+assert_state "7n.15 a mkdir alias that starts with its own name stays: -p from the alias creates the parents" "rc=0 made=yes" \
+	"rc=$RC made=$([ -d "$E_SCRATCH/al-deep/x/y" ] && echo yes || echo no)"
 E_PRE=""
 
 if [ -n "${COV:-}" ]; then
