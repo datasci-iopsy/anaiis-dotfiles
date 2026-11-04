@@ -67,9 +67,11 @@ __safe_rm_say() {
 }
 
 # __safe_rm_phys <folder>: print the physical path of an existing folder, or print nothing.
+# The helpers call the builtins cd and pwd. A cd or pwd function from the profile can print extra
+# lines, and the caller would capture them as part of the path.
 __safe_rm_phys() {
 	[ -n "$1" ] || return 1
-	(cd "$1" 2>/dev/null && pwd -P)
+	(builtin cd "$1" 2>/dev/null && builtin pwd -P)
 }
 
 # __safe_rm_resolve <path>: print the absolute path with every symlink in the PARENT path resolved.
@@ -81,7 +83,7 @@ __safe_rm_resolve() {
 	case "$p" in
 		/*) ;;
 		*)
-			here="$(pwd -P)" || return 1
+			here="$(builtin pwd -P)" || return 1
 			p="$here/$p"
 			;;
 	esac

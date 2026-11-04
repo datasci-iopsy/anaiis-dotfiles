@@ -72,6 +72,8 @@ chmod +x "$STUB/mkdir"
 #   mode "notmpdir": like stub, but TMPDIR is not set, so the tmp.* root is /tmp.
 #   mode "aliases": like stub, but the shell has expand_aliases on and the aliases of the owner's profile
 #   (mkdir='mkdir -pv', pwd='pwd -P', ls='ls -GFhp', rm='rm -i') are defined BEFORE the file is sourced.
+#   mode "userfuncs": like stub, but the profile defines a cd function and a pwd function that each print an
+#   extra line, BEFORE the file is sourced (the common cd() { builtin cd "$@" && ls; } idiom).
 # Sets RC, ERR (stderr text), CALLED (yes when the stub or real rm was reached), and MKCALLED (the same for mkdir).
 child() {
 	local mode="$1" snippet="$2" path_dir="$STUB:/usr/bin:/bin" run_dir="$CWD" home_dir="$HOMEF"
@@ -82,6 +84,10 @@ alias mkdir='mkdir -pv'
 alias pwd='pwd -P'
 alias ls='ls -GFhp'
 alias rm='rm -i'
+. \"\$SAFE_RM\"
+"
+	[ "$mode" = userfuncs ] && pre="cd() { builtin cd \"\$@\" && echo cd-noise; }
+pwd() { builtin pwd \"\$@\" && echo pwd-noise; }
 . \"\$SAFE_RM\"
 "
 	[ "$mode" = real ] && path_dir="/usr/bin:/bin"
@@ -449,6 +455,16 @@ expect_mk_log "16.9 -vp is an allowed cluster" 'mkdir -vp "$SCRATCH/vp"' "-vp --
 expect_refuse "16.10 rm -i names the flag" 'rm -i "$SCRATCH/a"' "'-i'"
 expect_refuse "16.11 a cluster with one bad letter names the whole word" 'rm -rfi "$SCRATCH/a"' "'-rfi'"
 expect_mk_refuse "16.12 mkdir -m names the flag" 'mkdir -m 755 "$SCRATCH/a"' "'-m'"
+# A cd or pwd function from the profile can print to stdout. The path helpers capture that output, so they
+# call the builtins. Each case fails when the helper runs the profile function.
+expect_log "16.14 a profile cd and pwd that print: an absolute operand is still the physical path" \
+	'rm -rf "$SCRATCH/a"' "-rf -- $PSCRATCH/a" userfuncs
+expect_log "16.15 a profile cd and pwd that print: a relative operand still starts at the real directory" \
+	'cd "$SCRATCH" && rm -rf thing' "-rf -- $PSCRATCH/thing" userfuncs
+expect_mk_log "16.16 a profile cd and pwd that print: a mkdir operand is still the physical path" \
+	'mkdir -p "$SCRATCH/m"' "-p -- $PSCRATCH/m" userfuncs
+expect_refuse "16.17 a profile cd and pwd that print: an operand outside every root is still refused" \
+	'rm -rf "$OUT/x"' "refused" userfuncs
 
 echo "--- 17. every root name, near-miss names, TMPDIR unset, and the -d flag (T-E4f, review 2 N4)"
 for disposable in .pytest_cache .tox .ruff_cache .mypy_cache __pycache__ .next build coverage; do
