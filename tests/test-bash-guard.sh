@@ -632,7 +632,7 @@ assert_wrapped() {
 	new=$(printf '%s' "$STDOUT" | jq -r '.hookSpecificOutput.updatedInput.command // empty' 2>/dev/null)
 	[ "$got" = "allow" ] || ok=no
 	case "$new" in
-		*"__SAFE_RM_CWD="*"safe-rm.sh"*'[ "$(type -t rm)" = function ]'*"exit 97"*) ;;
+		*"__SAFE_RM_CWD="*"safe-rm.sh"*"declare -F rm mkdir"*"guard did not load"*"exit 97"*) ;;
 		*) ok=no ;;
 	esac
 	case "${new%%$nl*}" in
@@ -954,16 +954,24 @@ H6="$(canary_home copy)"
 run_canary "$H6" "$CAN_CMD"
 run_in_home "$H6" "$CAN_NEW"
 assert_state "7o.6a an empty safe-rm.sh: the rewritten command exits 97, runs nothing, writes no sentinel" \
-	"rc=97 ran=no sentinel=no" \
-	"rc=$RC ran=$(printf '%s' "$ERR" | grep -q '^ran$' && echo yes || echo no) sentinel=$([ -e "$H6/.claude/state" ] && echo yes || echo no)"
+	"rc=97 ran=no sentinel=no message=yes" \
+	"rc=$RC ran=$(printf '%s' "$ERR" | grep -q '^ran$' && echo yes || echo no) sentinel=$([ -e "$H6/.claude/state" ] && echo yes || echo no) message=$(printf '%s' "$ERR" | grep -q '^safe-rm: guard did not load$' && echo yes || echo no)"
 
 H7="$(canary_home copy)"
 printf ':\n' >"$H7/.claude/hooks/safe-rm.sh"
 run_canary "$H7" "$CAN_CMD"
 run_in_home "$H7" "$CAN_NEW"
 assert_state "7o.6b a safe-rm.sh that defines no rm: the same result" \
-	"rc=97 ran=no sentinel=no" \
-	"rc=$RC ran=$(printf '%s' "$ERR" | grep -q '^ran$' && echo yes || echo no) sentinel=$([ -e "$H7/.claude/state" ] && echo yes || echo no)"
+	"rc=97 ran=no sentinel=no message=yes" \
+	"rc=$RC ran=$(printf '%s' "$ERR" | grep -q '^ran$' && echo yes || echo no) sentinel=$([ -e "$H7/.claude/state" ] && echo yes || echo no) message=$(printf '%s' "$ERR" | grep -q '^safe-rm: guard did not load$' && echo yes || echo no)"
+
+H7C="$(canary_home copy)"
+printf 'rm() { :; }\n' >"$H7C/.claude/hooks/safe-rm.sh"
+run_canary "$H7C" "$CAN_CMD"
+run_in_home "$H7C" "$CAN_NEW"
+assert_state "7o.6c a safe-rm.sh that defines rm but not mkdir: the same result" \
+	"rc=97 ran=no sentinel=no message=yes" \
+	"rc=$RC ran=$(printf '%s' "$ERR" | grep -q '^ran$' && echo yes || echo no) sentinel=$([ -e "$H7C/.claude/state" ] && echo yes || echo no) message=$(printf '%s' "$ERR" | grep -q '^safe-rm: guard did not load$' && echo yes || echo no)"
 
 H8="$(canary_home)"
 mkdir -p "$E_SCRATCH/canary-x"
@@ -1009,8 +1017,8 @@ touch "$E_SCRATCH/al-keep/f"
 E_PRE="${E_PRE}alias rm='rm -i'
 "
 run_rewritten "S=$E_SCRATCH"'; rm -rf $S/al-keep; mkdir -p $S/al-new'
-assert_state "7n.11 an rm alias makes the guard fail closed: nothing is deleted or created" "kept=yes made=no rc_nonzero=yes" \
-	"kept=$([ -e "$E_SCRATCH/al-keep/f" ] && echo yes || echo no) made=$([ -e "$E_SCRATCH/al-new" ] && echo yes || echo no) rc_nonzero=$([ "$RC" -ne 0 ] && echo yes || echo no)"
+assert_state "7n.11 an rm alias that adds -i: the guard loads, refuses by naming the flag, and nothing is deleted or created" "kept=yes made=no rc_nonzero=yes named_flag=yes" \
+	"kept=$([ -e "$E_SCRATCH/al-keep/f" ] && echo yes || echo no) made=$([ -e "$E_SCRATCH/al-new" ] && echo yes || echo no) rc_nonzero=$([ "$RC" -ne 0 ] && echo yes || echo no) named_flag=$(printf '%s' "$ERR" | grep -qF "refused flag '-i'" && echo yes || echo no)"
 E_PRE=""
 
 if [ -n "${COV:-}" ]; then

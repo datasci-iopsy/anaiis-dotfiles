@@ -883,10 +883,11 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 			fi
 			if [ -n "$RM_WRAP_CWD" ] && [ -n "$RM_WRAP_KEY" ]; then
 				# $HOME stays literal here on purpose: the shell that runs the command expands it. The prefix
-				# loads safe-rm.sh and exits 97 unless rm is then a function (an empty or foreign file loads
-				# with status 0 and defines nothing).
+				# loads safe-rm.sh and exits 97, with a message, unless rm and mkdir are then both functions (an
+				# empty, partial, or foreign file loads with status 0 and defines nothing). declare -F ignores
+				# aliases. type -t does not: with an alias for mkdir it prints alias and would exit 97 on every run.
 				# shellcheck disable=SC2016
-				RM_WRAP_PREFIX=$(printf '__SAFE_RM_CWD=%q; __SAFE_RM_SCRATCH=%q; . "$HOME/.claude/hooks/safe-rm.sh" && [ "$(type -t rm)" = function ] || exit 97' "$RM_WRAP_CWD" "$RM_WRAP_SCRATCH")
+				RM_WRAP_PREFIX=$(printf '__SAFE_RM_CWD=%q; __SAFE_RM_SCRATCH=%q; . "$HOME/.claude/hooks/safe-rm.sh" && declare -F rm mkdir >/dev/null 2>&1 || { echo '\''safe-rm: guard did not load'\'' >&2; exit 97; }' "$RM_WRAP_CWD" "$RM_WRAP_SCRATCH")
 				if [ -f "$HOME/.claude/state/safe-rm-canary-$RM_WRAP_KEY" ]; then
 					RM_WRAP_DECISION="allow"
 					RM_WRAP_WHY="every statement is vetted; rm is replaced by a run-time guard that checks each expanded path (stream e-bash-guard-rm)"
