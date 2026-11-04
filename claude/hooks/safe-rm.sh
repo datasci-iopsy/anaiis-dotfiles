@@ -43,6 +43,22 @@
 # delete as its own call with a literal path. bash-guard.sh then asks the user. The real program gets
 # the vetted flags, then --, then the resolved physical paths: the list that is checked is the list
 # that is deleted (or created).
+#
+# Aliases: the shell that sources this file can have expand_aliases on and the owner's aliases defined
+# (the harness shell does, for example alias mkdir='mkdir -pv'). The shell expands an alias word while
+# it parses a line, so "mkdir() {" is a syntax error and the load fails. The file therefore saves the
+# option with `shopt -p`, switches expansion off for the parse of every definition below, and restores
+# the saved state before it returns, on the failure paths too. The aliases stay defined, so the next
+# statement of the command still sees them. An alias that adds a flag outside the allowed set, such as
+# alias rm='rm -i', reaches the function as an extra word, and the function refuses it by name.
+__sr_ea="$(shopt -p expand_aliases)"
+shopt -u expand_aliases
+
+# __safe_rm_restore: put the saved alias-expansion state back and drop the helper variable.
+__safe_rm_restore() {
+	eval "$__sr_ea"
+	unset __sr_ea
+}
 
 __safe_rm_say() {
 	printf 'safe-rm: %s\n' "$1" >&2
@@ -242,9 +258,15 @@ __safe_rm_vet() {
 # Source-time capture. This runs once, before the functions exist, and the values never change.
 # The roots are computed here and not for each operand (one fork each, not one per operand).
 __SAFE_RM_REAL="$(type -P rm)"
-[ -n "$__SAFE_RM_REAL" ] || return 1
+[ -n "$__SAFE_RM_REAL" ] || {
+	__safe_rm_restore
+	return 1
+}
 __SAFE_RM_REALMKDIR="$(type -P mkdir)"
-[ -n "$__SAFE_RM_REALMKDIR" ] || return 1
+[ -n "$__SAFE_RM_REALMKDIR" ] || {
+	__safe_rm_restore
+	return 1
+}
 __SAFE_RM_CWDP="$(__safe_rm_phys "${__SAFE_RM_CWD:-}")"
 __SAFE_RM_SCRATCHP="$(__safe_rm_phys "${__SAFE_RM_SCRATCH:-}")"
 __SAFE_RM_HOMEP="$(__safe_rm_phys "${HOME:-}")"
@@ -288,3 +310,5 @@ mkdir() {
 	__safe_rm_vet "${ops[@]}"
 	"$__SAFE_RM_REALMKDIR" ${flags[@]+"${flags[@]}"} -- "${paths[@]}"
 }
+
+__safe_rm_restore

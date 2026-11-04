@@ -69,9 +69,19 @@ chmod +x "$STUB/mkdir"
 #   mode "homeintmp": like stub, but HOME is a tmp.* folder under TMPDIR (a home inside a root).
 #   mode "cwdhome": like stub, but the working directory is HOME. "cwdabovehome": the cwd is a parent of
 #   HOME. "cwdroot": the cwd is the root folder.
+#   mode "aliases": like stub, but the shell has expand_aliases on and the aliases of the owner's profile
+#   (mkdir='mkdir -pv', pwd='pwd -P', ls='ls -GFhp', rm='rm -i') are defined BEFORE the file is sourced.
 # Sets RC, ERR (stderr text), CALLED (yes when the stub or real rm was reached), and MKCALLED (the same for mkdir).
 child() {
 	local mode="$1" snippet="$2" path_dir="$STUB:/usr/bin:/bin" run_dir="$CWD" home_dir="$HOMEF"
+	local pre='. "$SAFE_RM"; '
+	[ "$mode" = aliases ] && pre="shopt -s expand_aliases
+alias mkdir='mkdir -pv'
+alias pwd='pwd -P'
+alias ls='ls -GFhp'
+alias rm='rm -i'
+. \"\$SAFE_RM\"
+"
 	[ "$mode" = real ] && path_dir="/usr/bin:/bin"
 	: >"$RMLOG"
 	: >"$MKLOG"
@@ -99,7 +109,7 @@ child() {
 	ERR="$(cd "$run_dir" && env -i PATH="$path_dir" HOME="$home_dir" TMPDIR="$TMPR" "$scratch_arg" "$cwd_arg" \
 		BASH_ENV="${BASH_ENV:-}" BASH_XTRACEFD="${BASH_XTRACEFD:-}" PS4="${PS4:-+ }" \
 		SCRATCH="$SCRATCH" CWD="$CWD" OUT="$OUT" TMPR="$TMPR" HOMEF="$HOMEF" ALIAS="$TREE/alias" TREE="$TREE" SAFE_RM="$SAFE_RM" \
-		"$BASH" -c '. "$SAFE_RM"; '"$snippet" 2>&1 >/dev/null)"
+		"$BASH" -c "$pre$snippet" 2>&1 >/dev/null)"
 	RC=$?
 	CALLED=no
 	[ -s "$RMLOG" ] && CALLED=yes
@@ -395,6 +405,40 @@ cp "$STUB/rm" "$NOMKDIR_DIR/rm"
 NOMKDIR_OUT="$(env -i PATH="$NOMKDIR_DIR" HOME="$HOMEF" TMPDIR="$TMPR" __SAFE_RM_CWD="$CWD" SAFE_RM="$SAFE_RM" \
 	"$BASH" -c '. "$SAFE_RM"; echo "src=$? rm=$(type -t rm) mkdir=$(type -t mkdir)"' 2>/dev/null)"
 assert_eq "15.33 sourcing fails and defines no function (rm stays the plain program) when no mkdir program exists on PATH" "src=1 rm=file mkdir=" "$NOMKDIR_OUT"
+
+echo "--- 16. aliases of the harness shell and clustered flags (T-E4e)"
+# The harness shell loads the owner's aliases and has expand_aliases on. An alias word such as mkdir is
+# expanded while the file is parsed, so "mkdir() {" is a syntax error unless alias expansion is off during
+# the parse. The tests above run under bash -c with no aliases, which hid the defect.
+child aliases 'echo "fn=$(declare -F rm mkdir | tr "\n" ,) alias_mkdir=$(alias mkdir) ea=$(shopt -p expand_aliases) left=${__sr_ea+set}" >&2'
+assert_eq "16.1 with aliases defined: both functions exist, the alias is still defined, expansion is on, no helper variable is left" \
+	"fn=rm,mkdir, alias_mkdir=alias mkdir='mkdir -pv' ea=shopt -s expand_aliases left=" "$ERR"
+expect_mk_log "16.2 the alias still reaches the owner's command: -pv from the alias is an allowed cluster" \
+	'cd "$SCRATCH" && mkdir ali' "-pv -- $PSCRATCH/ali" aliases
+expect_mk_refuse "16.3 with the alias on, an operand outside every root is refused" 'mkdir "$OUT/ali-out"' "refused" aliases
+expect_refuse "16.4 an rm alias that adds -i makes the guard refuse and name the flag (fail closed)" \
+	'rm -rf "$SCRATCH/a"' "'-i'" aliases
+child stub 'echo "ea=$(shopt -p expand_aliases) left=${__sr_ea+set}" >&2'
+assert_eq "16.5 with alias expansion off, it is off again after sourcing (the file restores the saved state)" \
+	"ea=shopt -u expand_aliases left=" "$ERR"
+ALIAS_FAIL_OUT="$(env -i PATH="$TREE/onlyrm" HOME="$HOMEF" TMPDIR="$TMPR" __SAFE_RM_CWD="$CWD" SAFE_RM="$SAFE_RM" \
+	"$BASH" -c 'shopt -s expand_aliases
+. "$SAFE_RM"
+echo "src=$? ea=$(shopt -p expand_aliases) left=${__sr_ea+set}"' 2>/dev/null)"
+assert_eq "16.6 a failed load restores the state too (expansion on stays on, no helper variable is left)" \
+	"src=1 ea=shopt -s expand_aliases left=" "$ALIAS_FAIL_OUT"
+ALIAS_FAIL2_OUT="$(env -i PATH="$TREE/onlymkdir" HOME="$HOMEF" TMPDIR="$TMPR" __SAFE_RM_CWD="$CWD" SAFE_RM="$SAFE_RM" \
+	"$BASH" -c 'shopt -s expand_aliases
+. "$SAFE_RM"
+echo "src=$? ea=$(shopt -p expand_aliases) left=${__sr_ea+set}"' 2>/dev/null)"
+assert_eq "16.6b the same when no rm program exists (the other failure path)" \
+	"src=1 ea=shopt -s expand_aliases left=" "$ALIAS_FAIL2_OUT"
+expect_log "16.7 -rfv is an allowed cluster" 'rm -rfv "$SCRATCH/a"' "-rfv -- $PSCRATCH/a"
+expect_log "16.8 -fr is an allowed cluster" 'rm -fr "$SCRATCH/a"' "-fr -- $PSCRATCH/a"
+expect_mk_log "16.9 -vp is an allowed cluster" 'mkdir -vp "$SCRATCH/vp"' "-vp -- $PSCRATCH/vp"
+expect_refuse "16.10 rm -i names the flag" 'rm -i "$SCRATCH/a"' "'-i'"
+expect_refuse "16.11 a cluster with one bad letter names the whole word" 'rm -rfi "$SCRATCH/a"' "'-rfi'"
+expect_mk_refuse "16.12 mkdir -m names the flag" 'mkdir -m 755 "$SCRATCH/a"' "'-m'"
 
 if [ -n "${COV:-}" ]; then
 	cov_end
