@@ -110,7 +110,8 @@ source "$HOME/anaiis-dotfiles/bash/shared.bash"
 	# shellcheck disable=SC2016 # $HOME stays literal: the line is written into ~/.bash_profile as text
 	local PROFILE_LINE='[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"'
 	if [ -f "$PROFILE" ]; then
-		if grep -qE '^[[:space:]]*([^[:space:]#].*)?[.]bashrc' "$PROFILE"; then
+		# The name must end at .bashrc: a line that sources only .bashrc.local does not load .bashrc.
+		if grep -qE '^[[:space:]]*([^[:space:]#].*)?[.]bashrc([^[:alnum:]_.-]|$)' "$PROFILE"; then
 			echo "  ok   $PROFILE mentions .bashrc"
 		else
 			echo "  note  $PROFILE never sources ~/.bashrc. Add this line to it: $PROFILE_LINE"

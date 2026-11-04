@@ -13,6 +13,7 @@
 #   3. each ~/.claude link resolves to its own target in ~/anaiis-dotfiles/claude/
 #
 # In checks 1 and 2 a line that starts with # does not count: the shell never reads it.
+# In check 2 the name must end at .bashrc: a line that sources only .bashrc.local does not count.
 #   4. each enabled plugin has a folder in ~/.claude/plugins/cache/
 #   5. when gh uses the ssh protocol, known_hosts holds a github.com key
 #
@@ -83,7 +84,7 @@ for f in .bash_profile .bash_login .profile; do
 done
 if [ -z "$login" ]; then
 	missing "login shell file (no ~/.bash_profile, ~/.bash_login, or ~/.profile)" "$FIX_BASHRC"
-elif active "$HOME/$login" '[.]bashrc'; then
+elif active "$HOME/$login" '[.]bashrc([^[:alnum:]_.-]|$)'; then
 	ok "~/$login mentions ~/.bashrc"
 else
 	missing "~/$login (never mentions ~/.bashrc)" "$FIX_LOGIN"
