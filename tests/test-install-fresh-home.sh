@@ -61,6 +61,18 @@ echo https
 EOF
 chmod +x "$TMPD/stub/gh"
 
+# Stub claude: accepts exactly `--version` and answers a version above the doctor minimum. Without it,
+# the doctor would run the real claude, and an old install on the test machine would add a MISSING line.
+cat >"$TMPD/stub/claude" <<'EOF'
+#!/bin/sh
+[ "$*" = "--version" ] || {
+	echo "stub claude: unexpected arguments: $*" >&2
+	exit 64
+}
+echo "2.1.318 (Claude Code)"
+EOF
+chmod +x "$TMPD/stub/claude"
+
 # snapshot <home>: one checksum over the sorted paths, each regular file with its checksum, and each
 # link with its target. find does not follow links, so the repo behind a link is not read.
 snapshot() {
@@ -134,6 +146,7 @@ assert_eq "4.7 the host key is not needed for https" 1 "$(okl '^ok github.com ho
 assert_eq "4.8 summary counts the missing plugins" "doctor: $ENABLED missing" "$(printf '%s\n' "$OUT" | tail -n 1)"
 if [ "$ENABLED" -gt 0 ]; then WANT_RC=1; else WANT_RC=0; fi
 assert_eq "4.9 exit code follows the missing count" "$WANT_RC" "$RC"
+assert_eq "4.10 the claude version check passes against the stub" 1 "$(okl '^ok claude version 2.1.318$')"
 
 echo "--- 5. the CI step runs this stream's suites on bash 3.2"
 STEP_SUITES="test-brew-sync test-maintenance-check test-install-bashrc test-install-hostkeys test-bootstrap-doctor test-no-stale-refs test-install-fresh-home"

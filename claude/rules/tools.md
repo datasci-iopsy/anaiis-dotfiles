@@ -11,5 +11,5 @@ description: Preferred CLIs (gh, jq, duckdb, gcloud, make, tmux) and the always-
 - Use `gcloud` for GCP operations (read-only unless user confirms).
 - Prefer `make` targets over raw commands when a Makefile exists.
 - Use `tmux` for processes that are projected to take longer than 5 minutes
-- Check for project and subdirectory CLAUDE.md files before starting work.
+- Check for project and subdirectory AGENTS.md files before starting work.
 - When invoking CLIs that support structured output, always use their JSON or machine-readable flag. Never parse tabular stdout. Known flags: `gh` (`--json`), `gcloud` (`--format=json`), `bq` (`--format=json`), `dbt` (`--output json`), `duckdb` (`-json`). For any other CLI, check for a `--format`, `--output`, or `--json` flag before running and use it if available.

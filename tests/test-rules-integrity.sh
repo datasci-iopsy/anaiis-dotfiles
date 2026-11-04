@@ -90,6 +90,13 @@ assert "1.3 context.md is tracked" "claude/rules/context.md" \
 	"$(git -C "$REPO_DIR" ls-files claude/rules/context.md)"
 assert "1.4 context.md has a description line in its front matter" 1 \
 	"$(sed -n '2,6p' "$REPO_DIR/claude/rules/context.md" | grep -c '^description: .')"
+assert "1.5 tools.md tells Claude to check AGENTS.md files" 1 \
+	"$(grep -c '^- Check for project and subdirectory AGENTS\.md files before starting work\.$' "$REPO_DIR/claude/rules/tools.md")"
+# The context rule sends machine-local Claude instructions to claude/rules/<name>.local.md.
+git -C "$REPO_DIR" check-ignore -q claude/rules/x.local.md
+assert "1.6 .gitignore ignores a machine-local rule file" 0 "$?"
+git -C "$REPO_DIR" check-ignore -q claude/rules/context.md
+assert "1.7 .gitignore does not ignore a shared rule file" 1 "$?"
 
 # ── 2. Every drift mutation at once ───────────────────────────────────────
 echo "# 2. Every drift mutation applied at once"

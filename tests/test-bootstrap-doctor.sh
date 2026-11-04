@@ -45,8 +45,8 @@ if [ -n "${COV:-}" ]; then
 fi
 
 # ---- Tools on PATH ----------------------------------------------------------
-# The doctor may call only: dirname basename readlink grep jq gh ssh-keygen. Each PATH folder below
-# links just those that a case needs. Without gh or jq on PATH, the doctor sees them as absent.
+# The doctor may call only: dirname basename readlink grep jq gh ssh-keygen claude. Each PATH folder
+# below links just those that a case needs. Without gh, jq, or claude on PATH, the doctor sees them as absent.
 mkdir -p "$TMPD/stub"
 cat >"$TMPD/stub/gh" <<'EOF'
 #!/bin/sh
@@ -60,24 +60,36 @@ cat >"$TMPD/stub/gh" <<'EOF'
 echo "$STUB_PROTOCOL"
 EOF
 chmod +x "$TMPD/stub/gh"
+cat >"$TMPD/stub/claude" <<'EOF'
+#!/bin/sh
+# POSIX sh, for the same reason as the stub gh. Accepts exactly: --version.
+# STUB_CLAUDE_VERSION is the whole line to print. It may be empty. The doctor always sets it.
+[ "$*" = "--version" ] || {
+	echo "stub claude: unexpected arguments: $*" >&2
+	exit 64
+}
+echo "$STUB_CLAUDE_VERSION"
+EOF
+chmod +x "$TMPD/stub/claude"
 
-# make_bin <dir> <tool>...: a PATH folder that links the named real tools. The stub gh is "gh".
+# make_bin <dir> <tool>...: a PATH folder that links the named real tools. The stubs are "gh" and "claude".
 make_bin() {
 	local dir="$1" tool real
 	shift
 	mkdir -p "$dir"
 	for tool in "$@"; do
-		if [ "$tool" = gh ]; then
-			real="$TMPD/stub/gh"
+		if [ "$tool" = gh ] || [ "$tool" = claude ]; then
+			real="$TMPD/stub/$tool"
 		else
 			real="$(command -v "$tool")"
 		fi
 		ln -s "$real" "$dir/$tool"
 	done
 }
-make_bin "$TMPD/bin" dirname basename readlink grep jq ssh-keygen gh
-make_bin "$TMPD/bin-nogh" dirname basename readlink grep jq ssh-keygen
-make_bin "$TMPD/bin-nojq" dirname basename readlink grep ssh-keygen gh
+make_bin "$TMPD/bin" dirname basename readlink grep jq ssh-keygen gh claude
+make_bin "$TMPD/bin-nogh" dirname basename readlink grep jq ssh-keygen claude
+make_bin "$TMPD/bin-nojq" dirname basename readlink grep ssh-keygen gh claude
+make_bin "$TMPD/bin-noclaude" dirname basename readlink grep jq ssh-keygen gh
 
 # ---- Fixture HOME -----------------------------------------------------------
 ssh-keygen -q -t ed25519 -N '' -C '' -f "$TMPD/hostkey" >/dev/null
@@ -112,8 +124,10 @@ build_home() {
 
 # doctor <home>: run the script. OUT holds stdout and stderr, RC the exit code.
 # PROTO (default ssh) sets the stub gh answer; BIN_DIR (default $TMPD/bin) sets PATH.
+# CLAUDE_V (default: a new version) sets the line that the stub claude prints for --version.
 doctor() {
-	OUT="$(HOME="$1" PATH="${BIN_DIR:-$TMPD/bin}" STUB_PROTOCOL="${PROTO-ssh}" "$BASH" "$DOCTOR" 2>&1)"
+	OUT="$(HOME="$1" PATH="${BIN_DIR:-$TMPD/bin}" STUB_PROTOCOL="${PROTO-ssh}" \
+		STUB_CLAUDE_VERSION="${CLAUDE_V-2.1.318 (Claude Code)}" "$BASH" "$DOCTOR" 2>&1)"
 	RC=$?
 }
 
@@ -155,8 +169,9 @@ doctor "$H0"
 assert_eq "0.1 exit code 0" 0 "$RC"
 assert_eq "0.2 no MISSING line" 0 "$(miss_count)"
 assert_eq "0.3 summary line" "doctor: 0 missing" "$(printf '%s\n' "$OUT" | tail -n 1)"
-# 2 bashrc + 1 login + 9 links + 2 enabled plugins + 1 host key. The disabled plugin is not listed.
-assert_eq "0.4 fifteen ok lines" 15 "$(ok_count)"
+# 2 bashrc + 1 login + 9 links + 2 enabled plugins + 1 host key + 1 claude version.
+# The disabled plugin is not listed.
+assert_eq "0.4 sixteen ok lines" 16 "$(ok_count)"
 assert_eq "0.5 the disabled plugin is not checked" 0 "$(printf '%s\n' "$OUT" | grep -c 'off@mk3' || true)"
 assert_eq "0.6 the HOME is unchanged" "$SNAP0" "$(snapshot "$H0")"
 
@@ -272,16 +287,37 @@ BIN_DIR="$TMPD/bin-nogh" doctor "$H"
 assert_eq "5.7 no gh: exit 0 without a host key" 0 "$RC"
 assert_eq "5.8 no gh: the ok line says so" 1 "$(printf '%s\n' "$OUT" | grep -c '^ok github.com host key (not needed: gh not found)')"
 
-echo "--- 6. a fresh HOME reports every gap and changes nothing"
+echo "--- 6. Claude Code version"
+# AGENTS.md support starts at 2.1.277. Each case below fails a different wrong comparison: a lexical
+# compare of the patch (1000 against 277), a compare of the patch alone, or a compare of the minor alone.
+FIX_CLAUDE='update Claude Code'
+H="$(build_home)"
+CLAUDE_V="2.1.276 (Claude Code)" expect_one "6.1 one patch below the minimum" "$H" "MISSING claude version: $FIX_CLAUDE"
+CLAUDE_V="2.0.999 (Claude Code)" expect_one "6.2 an older minor with a high patch" "$H" "MISSING claude version: $FIX_CLAUDE"
+CLAUDE_V="1.9.9999 (Claude Code)" expect_one "6.3 an older major" "$H" "MISSING claude version: $FIX_CLAUDE"
+CLAUDE_V="" expect_one "6.4 the output is empty" "$H" "MISSING claude version: $FIX_CLAUDE"
+CLAUDE_V="not a version" expect_one "6.5 the output is not a version" "$H" "MISSING claude version: $FIX_CLAUDE"
+CLAUDE_V="2.1 (Claude Code)" expect_one "6.6 the version has two parts" "$H" "MISSING claude version: $FIX_CLAUDE"
+CLAUDE_V="2.1.277.1 (Claude Code)" expect_one "6.7 the version has four parts" "$H" "MISSING claude version: $FIX_CLAUDE"
+for v in 2.1.277 2.1.1000 2.2.0 3.0.0 2.1.318; do
+	CLAUDE_V="$v (Claude Code)" doctor "$H"
+	assert_eq "6.8 $v is accepted: exit 0" 0 "$RC"
+	assert_eq "6.8 $v is accepted: the ok line names it" 1 "$(printf '%s\n' "$OUT" | grep -c "^ok claude version $v\$")"
+done
+BIN_DIR="$TMPD/bin-noclaude" doctor "$H"
+assert_eq "6.9 no claude: exit 0" 0 "$RC"
+assert_eq "6.10 no claude: the ok line says so" 1 "$(printf '%s\n' "$OUT" | grep -c '^ok claude version (not needed: claude not found)')"
+
+echo "--- 7. a fresh HOME reports every gap and changes nothing"
 HF="$(mktemp -d "$TMPD/home.XXXXXX")"
 mkdir -p "$HF/.claude"
 SNAPF="$(snapshot "$HF")"
 doctor "$HF"
-assert_eq "6.1 exit code 1" 1 "$RC"
+assert_eq "7.1 exit code 1" 1 "$RC"
 # 1 bashrc + 1 login + 9 links + 1 plugin list + 1 host key
-assert_eq "6.2 thirteen MISSING lines" 13 "$(miss_count)"
-assert_eq "6.3 summary counts the same gaps" "doctor: 13 missing" "$(printf '%s\n' "$OUT" | tail -n 1)"
-assert_eq "6.4 the HOME is unchanged" "$SNAPF" "$(snapshot "$HF")"
+assert_eq "7.2 thirteen MISSING lines" 13 "$(miss_count)"
+assert_eq "7.3 summary counts the same gaps" "doctor: 13 missing" "$(printf '%s\n' "$OUT" | tail -n 1)"
+assert_eq "7.4 the HOME is unchanged" "$SNAPF" "$(snapshot "$HF")"
 
 if [ -n "${COV:-}" ]; then
 	cov_end
