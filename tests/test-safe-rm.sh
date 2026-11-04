@@ -318,13 +318,13 @@ done
 true'
 assert_eq "10.9b every captured variable refuses a write" "rc=0 writable=" "rc=$RC writable=$(printf '%s' "$ERR" | grep -o 'WRITABLE [A-Z_]*' | tr '\n' ' ')"
 
-NOPATH_OUT="$(env -i PATH=/nonexistent HOME="$HOMEF" TMPDIR="$TMPR" __SAFE_RM_CWD="$CWD" SAFE_RM="$SAFE_RM" \
+NOPATH_OUT="$(env -i PATH=/nonexistent HOME="$HOMEF" TMPDIR="$TMPR" __SAFE_RM_CWD="$CWD" SAFE_RM="$SAFE_RM" BASH_ENV="${BASH_ENV:-}" BASH_XTRACEFD="${BASH_XTRACEFD:-}" PS4="${PS4:-+ }" \
 	"$BASH" -c '. "$SAFE_RM"; echo "src=$? fn=$(type -t rm)"' 2>/dev/null)"
 assert_eq "10.10 sourcing fails and defines no rm when no rm program exists on PATH" "src=1 fn=" "$NOPATH_OUT"
 ONLYMK_DIR="$TREE/onlymkdir"
 mkdir -p "$ONLYMK_DIR"
 cp /bin/mkdir "$ONLYMK_DIR/mkdir"
-ONLYMK_OUT="$(env -i PATH="$ONLYMK_DIR" HOME="$HOMEF" TMPDIR="$TMPR" __SAFE_RM_CWD="$CWD" SAFE_RM="$SAFE_RM" \
+ONLYMK_OUT="$(env -i PATH="$ONLYMK_DIR" HOME="$HOMEF" TMPDIR="$TMPR" __SAFE_RM_CWD="$CWD" SAFE_RM="$SAFE_RM" BASH_ENV="${BASH_ENV:-}" BASH_XTRACEFD="${BASH_XTRACEFD:-}" PS4="${PS4:-+ }" \
 	"$BASH" -c '. "$SAFE_RM"; echo "src=$? rm=$(type -t rm) mkdir=$(type -t mkdir)"' 2>/dev/null)"
 assert_eq "10.10b sourcing fails and defines no function when only mkdir exists on PATH" "src=1 rm= mkdir=file" "$ONLYMK_OUT"
 
@@ -402,7 +402,7 @@ assert_eq "15.32 an operand outside every root is not created" "rc=1 victim_made
 NOMKDIR_DIR="$TREE/onlyrm"
 mkdir -p "$NOMKDIR_DIR"
 cp "$STUB/rm" "$NOMKDIR_DIR/rm"
-NOMKDIR_OUT="$(env -i PATH="$NOMKDIR_DIR" HOME="$HOMEF" TMPDIR="$TMPR" __SAFE_RM_CWD="$CWD" SAFE_RM="$SAFE_RM" \
+NOMKDIR_OUT="$(env -i PATH="$NOMKDIR_DIR" HOME="$HOMEF" TMPDIR="$TMPR" __SAFE_RM_CWD="$CWD" SAFE_RM="$SAFE_RM" BASH_ENV="${BASH_ENV:-}" BASH_XTRACEFD="${BASH_XTRACEFD:-}" PS4="${PS4:-+ }" \
 	"$BASH" -c '. "$SAFE_RM"; echo "src=$? rm=$(type -t rm) mkdir=$(type -t mkdir)"' 2>/dev/null)"
 assert_eq "15.33 sourcing fails and defines no function (rm stays the plain program) when no mkdir program exists on PATH" "src=1 rm=file mkdir=" "$NOMKDIR_OUT"
 
@@ -421,13 +421,13 @@ expect_refuse "16.4 an rm alias that adds -i makes the guard refuse and name the
 child stub 'echo "ea=$(shopt -p expand_aliases) left=${__sr_ea+set}" >&2'
 assert_eq "16.5 with alias expansion off, it is off again after sourcing (the file restores the saved state)" \
 	"ea=shopt -u expand_aliases left=" "$ERR"
-ALIAS_FAIL_OUT="$(env -i PATH="$TREE/onlyrm" HOME="$HOMEF" TMPDIR="$TMPR" __SAFE_RM_CWD="$CWD" SAFE_RM="$SAFE_RM" \
+ALIAS_FAIL_OUT="$(env -i PATH="$TREE/onlyrm" HOME="$HOMEF" TMPDIR="$TMPR" __SAFE_RM_CWD="$CWD" SAFE_RM="$SAFE_RM" BASH_ENV="${BASH_ENV:-}" BASH_XTRACEFD="${BASH_XTRACEFD:-}" PS4="${PS4:-+ }" \
 	"$BASH" -c 'shopt -s expand_aliases
 . "$SAFE_RM"
 echo "src=$? ea=$(shopt -p expand_aliases) left=${__sr_ea+set}"' 2>/dev/null)"
 assert_eq "16.6 a failed load restores the state too (expansion on stays on, no helper variable is left)" \
 	"src=1 ea=shopt -s expand_aliases left=" "$ALIAS_FAIL_OUT"
-ALIAS_FAIL2_OUT="$(env -i PATH="$TREE/onlymkdir" HOME="$HOMEF" TMPDIR="$TMPR" __SAFE_RM_CWD="$CWD" SAFE_RM="$SAFE_RM" \
+ALIAS_FAIL2_OUT="$(env -i PATH="$TREE/onlymkdir" HOME="$HOMEF" TMPDIR="$TMPR" __SAFE_RM_CWD="$CWD" SAFE_RM="$SAFE_RM" BASH_ENV="${BASH_ENV:-}" BASH_XTRACEFD="${BASH_XTRACEFD:-}" PS4="${PS4:-+ }" \
 	"$BASH" -c 'shopt -s expand_aliases
 . "$SAFE_RM"
 echo "src=$? ea=$(shopt -p expand_aliases) left=${__sr_ea+set}"' 2>/dev/null)"
