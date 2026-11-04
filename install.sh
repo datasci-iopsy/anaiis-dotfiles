@@ -4,7 +4,7 @@
 #   1. Create ~/anaiis-dotfiles as a canonical symlink to wherever this repo lives
 #   2. Symlink the Claude policy stack into ~/.claude/
 #   3. Wire PATH and source shared.bash into ~/.bashrc
-# Safe to re-run — idempotent.
+# Safe to re-run: idempotent.
 
 set -euo pipefail
 
@@ -13,9 +13,10 @@ set -euo pipefail
 #   bash install.sh --symlinks-only   steps 1 and 2 only; stops before ~/.bashrc,
 #                                     graphify, CLI tools, R style, and Homebrew
 #                                     (what CI runs to build the ~/.claude tree)
-#   bash install.sh --bashrc-only     step 3 only: wire $HOME/.bashrc and exit
-#                                     (what tests/test-install-bashrc.sh runs
-#                                     against a throwaway HOME)
+#   bash install.sh --bashrc-only     step 3 only: wire $HOME/.bashrc (and check
+#                                     $HOME/.bash_profile) and exit (what
+#                                     tests/test-install-bashrc.sh runs against
+#                                     a throwaway HOME)
 MODE="${1:-}"
 case "$MODE" in
 	--symlinks-only | --bashrc-only | "") ;;
@@ -26,7 +27,7 @@ case "$MODE" in
 esac
 
 DOTFILES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Always resolve to the main worktree — never let a linked worktree become canonical
+# Always resolve to the main worktree. Never let a linked worktree become canonical.
 if git -C "$DOTFILES" rev-parse --git-dir >/dev/null 2>&1; then
 	DOTFILES="$(git -C "$DOTFILES" worktree list --porcelain | awk '/^worktree/{sub(/^worktree /, ""); print; exit}')"
 	if [ -z "$DOTFILES" ]; then
@@ -56,34 +57,66 @@ wire_bashrc() {
 	echo ""
 	echo "=== Shell config (~/.bashrc) ==="
 	local BASHRC="$HOME/.bashrc"
+	# shellcheck disable=SC2016 # $HOME stays literal: the line is written into ~/.bashrc as text
+	local PATH_LINE='export PATH="$HOME/anaiis-dotfiles/bin:$PATH"'
 	local tmp_bashrc
-	tmp_bashrc="$(mktemp "${TMPDIR:-/tmp}/bashrc_path_fix.XXXXXX")" || return 1
-	# Strip any prior form (bare export, indented export inside an if-guard, or
-	# duplicates), then append the single canonical line. Idempotent by design.
-	awk '
+	# A fresh machine has no ~/.bashrc, and awk below fails on a missing file.
+	[ -f "$BASHRC" ] || touch "$BASHRC"
+	if [ "$(grep -c 'anaiis-dotfiles/bin' "$BASHRC")" = 1 ] && grep -qxF "$PATH_LINE" "$BASHRC"; then
+		# One canonical line is in place. Leave the file alone so a re-run changes nothing.
+		:
+	else
+		tmp_bashrc="$(mktemp "${TMPDIR:-/tmp}/bashrc_path_fix.XXXXXX")" || return 1
+		# Strip any prior form (bare export, indented export inside an if-guard, or
+		# duplicates), then append the single canonical line. Idempotent by design.
+		# shellcheck disable=SC2015 # the || branch removes the temp file when awk or mv fails
+		awk '
 	/if.*anaiis-dotfiles\/bin/  { in_guard=1; next }
 	in_guard && /^[[:space:]]*fi[[:space:]]*$/ { in_guard=0; next }
 	/anaiis-dotfiles\/bin/      { next }
 	{ print }
 ' "$BASHRC" >"$tmp_bashrc" \
-		&& mv "$tmp_bashrc" "$BASHRC" \
-		|| {
-			rm -f "$tmp_bashrc"
-			return 1
-		}
-	printf '\nexport PATH="$HOME/anaiis-dotfiles/bin:$PATH"\n' >>"$BASHRC"
+			&& mv "$tmp_bashrc" "$BASHRC" \
+			|| {
+				rm -f "$tmp_bashrc"
+				return 1
+			}
+		printf '\n%s\n' "$PATH_LINE" >>"$BASHRC"
+	fi
 	echo "  ok   PATH line (canonical)"
 	if grep -qF 'anaiis-dotfiles/bash/shared.bash' "$BASHRC" 2>/dev/null; then
 		echo "  ok   shared.bash source line"
 	else
 		if grep -qF '.bashrc.local' "$BASHRC" 2>/dev/null; then
+			# shellcheck disable=SC2016 # $HOME stays literal in the inserted line
 			sed -i '' '/\.bashrc\.local/i\
 source "$HOME/anaiis-dotfiles/bash/shared.bash"
 ' "$BASHRC"
 		else
+			# shellcheck disable=SC2016 # $HOME stays literal in the appended line
 			printf '\nsource "$HOME/anaiis-dotfiles/bash/shared.bash"\n' >>"$BASHRC"
 		fi
 		echo "  add  source shared.bash -> $BASHRC"
+	fi
+
+	# A login shell (Terminal.app starts one) reads ~/.bash_profile, not ~/.bashrc. Make sure
+	# something sources ~/.bashrc, without editing a file the user wrote.
+	local PROFILE="$HOME/.bash_profile"
+	# shellcheck disable=SC2016 # $HOME stays literal: the line is written into ~/.bash_profile as text
+	local PROFILE_LINE='[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"'
+	if [ -f "$PROFILE" ]; then
+		if grep -qF '.bashrc' "$PROFILE"; then
+			echo "  ok   $PROFILE mentions .bashrc"
+		else
+			echo "  note  $PROFILE never sources ~/.bashrc. Add this line to it: $PROFILE_LINE"
+		fi
+	elif [ -f "$HOME/.bash_login" ] || [ -f "$HOME/.profile" ]; then
+		# bash reads only the first of .bash_profile, .bash_login, .profile. A new
+		# .bash_profile would hide the others.
+		echo "  note  no ~/.bash_profile created: bash would then ignore ~/.bash_login and ~/.profile. Add this line to the one you use: $PROFILE_LINE"
+	else
+		printf '%s\n' "$PROFILE_LINE" >"$PROFILE"
+		echo "  add  $PROFILE (sources ~/.bashrc)"
 	fi
 }
 
@@ -95,7 +128,7 @@ fi
 echo "=== Canonical path ==="
 if [ "$DOTFILES" != "$CANONICAL" ]; then
 	if [ -e "$CANONICAL" ] && [ ! -L "$CANONICAL" ]; then
-		echo "  SKIP $CANONICAL (real directory exists — move or remove it first)"
+		echo "  SKIP $CANONICAL (real directory exists, move or remove it first)"
 	else
 		ln -sfn "$DOTFILES" "$CANONICAL"
 		echo "  link $CANONICAL -> $DOTFILES"
