@@ -31,7 +31,7 @@ FAIL=0
 run_guard() {
 	local cmd="$1"
 	STDERR=$(jq -n --arg c "$cmd" '{"session_id":"test","tool_input":{"command":$c}}' \
-		| HOME="$TEST_HOME" bash "$GUARD" 2>&1 >/dev/null)
+		| HOME="$TEST_HOME" "$BASH" "$GUARD" 2>&1 >/dev/null)
 	RC=$?
 }
 
@@ -93,7 +93,7 @@ assert_no_notice() {
 run_guard_json() {
 	local cmd="$1"
 	STDOUT=$(jq -n --arg c "$cmd" '{"session_id":"test","tool_input":{"command":$c}}' \
-		| HOME="$TEST_HOME" bash "$GUARD" 2>"$STDERR_TMP")
+		| HOME="$TEST_HOME" "$BASH" "$GUARD" 2>"$STDERR_TMP")
 	RC=$?
 	STDERR=$(cat "$STDERR_TMP")
 }
@@ -616,7 +616,7 @@ run_guard_ctx() {
 	local cmd="$1" cwd="${2-$CTX_CWD}" scratch="${3-$CTX_SCRATCH}"
 	STDOUT=$(jq -n --arg c "$cmd" --arg cwd "$cwd" --arg sp "$scratch" \
 		'{"session_id":"test","cwd":$cwd,"scratchpad_dir":$sp,"tool_input":{"command":$c,"description":"d","timeout":5000}}' \
-		| HOME="${CTX_HOME:-$TEST_HOME}" bash "$GUARD" 2>"$STDERR_TMP")
+		| HOME="${CTX_HOME:-$TEST_HOME}" "$BASH" "$GUARD" 2>"$STDERR_TMP")
 	RC=$?
 	STDERR=$(cat "$STDERR_TMP")
 }
@@ -679,6 +679,9 @@ assert_wrapped "7m.11 if with a test command" 'S=/tmp/s; if [ -d "$S/x" ]; then 
 assert_wrapped "7m.12 rm after a for-loop do with a literal word list (was 7b.0, ask before D-026)" 'for f in a b; do rm -rf .venv; done'
 assert_wrapped "7m.13 -- before a variable operand" 'S=/tmp/s; rm -rf -- "$S/x"; ls'
 assert_wrapped "7m.14 a for loop with do on its own line" $'S=/tmp/s\nfor m in a b\ndo\nrm -rf "$S/$m"\ndone'
+assert_wrapped "7m.16 || as a separator" 'S=/tmp/s; ls "$S" || rm -rf "$S/x"'
+assert_wrapped "7m.17 else with a command on the same line" 'S=/tmp/s; if [ -d "$S" ]; then ls; else rm -rf "$S/x"; fi'
+assert_wrapped "7m.18 a tab after a redirect" $'S=/tmp/s; rm -rf "$S/x" 2>/dev/null\t; echo done'
 assert_wrapped "7m.15 an if with then and else on their own lines" $'S=/tmp/s\nif [ -d "$S" ]\nthen\nrm -rf "$S/x"\nelse\nls\nfi'
 
 echo "# 7m-b. One statement or character that cannot be vetted: ask, no rewrite"
@@ -715,6 +718,11 @@ assert_ctx_ask "7m.46 a negation" 'S=/tmp/s; rm -rf "$S/x"; ! false'
 
 echo "# 7m-c. Review fixes (T-E4a, D-E-14, D-E-24, D-E-25): each case asks and does not rewrite, unless it says allow"
 # F1: statements on the list must not assign the guard's own variables.
+# One concrete name for each of the 20 patterns of the name deny list. A pattern that is missing from the
+# hook turns its case into an allow.
+for denied_name in PATH IFS HOME TMPDIR ENV SHELLOPTS PS1 PROMPT_COMMAND CDPATH GLOBIGNORE SHELL USER LOGNAME PWD OLDPWD TERM LD_PRELOAD DYLD_LIBRARY_PATH BASH_ENV __SAFE_RM_CWD; do
+	assert_ctx_ask "7m.83 denied name in an assignment: $denied_name" "S=/tmp/s; $denied_name=x; rm -rf \"\$S/x\""
+done
 assert_ctx_ask "7m.50 a for loop variable that names a guard variable" 'S=/tmp/s; for __SAFE_RM_SCRATCH in /; do rm -rf "$S/x"; done'
 assert_ctx_ask "7m.51 a for loop variable named PATH" 'S=/tmp/s; for PATH in /evil; do rm -rf "$S/x"; done'
 assert_ctx_ask "7m.52b printf -v with the name attached to the flag" 'S=/tmp/s; rm -rf "$S/x"; printf -vPATH %s /tmp/s'
@@ -986,11 +994,10 @@ assert_state "7o.7b end to end: the next run of the same version is allowed" \
 
 H9="$(canary_home)"
 run_in_home "$H9" "$CAN_CMD"
-assert_state "7o.8 the ORIGINAL command (updatedInput not applied) writes no sentinel, so the next run still asks" \
-	"sentinel=no" "sentinel=$([ -e "$H9/.claude/state" ] && echo yes || echo no)"
+H9_STATE=$([ -e "$H9/.claude/state" ] && echo yes || echo no)
 run_canary "$H9" "$CAN_CMD"
-assert_state "7o.8b and the hook still asks" \
-	"decision=ask rewritten=yes sentinel_write=yes first_use_reason=yes" "$(can_state)"
+assert_state "7o.8 the ORIGINAL command (updatedInput not applied) writes no sentinel, so the hook still asks next time" \
+	"sentinel=no decision=ask rewritten=yes sentinel_write=yes first_use_reason=yes" "sentinel=$H9_STATE $(can_state)"
 
 # T-E4e: the harness shell loads the owner's aliases and has expand_aliases on. An alias word is expanded
 # while safe-rm.sh is parsed, so "mkdir() {" failed to load and the prefix exited 97. The cases above run
