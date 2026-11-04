@@ -254,6 +254,14 @@ doctor "$H"
 assert_eq "3.13 a relative link into the repo is accepted: exit 0" 0 "$RC"
 assert_eq "3.14 a relative link into the repo is reported ok" 1 "$(printf '%s\n' "$OUT" | grep -c '^ok ~/.claude/commands ')"
 
+# A link must reach its own target. The installer gives each name one target, so a link to another
+# folder of the same repo is wrong even though it sits inside the repo.
+H="$(build_home)"
+rm "$H/.claude/rules"
+ln -s "$H/anaiis-dotfiles/claude/hooks" "$H/.claude/rules"
+expect_one "3.15 a link to another folder of the repo" "$H" \
+	"MISSING ~/.claude/rules (points to the wrong place, expected ~/anaiis-dotfiles/claude/rules): $FIX_LINKS"
+
 echo "--- 4. plugins"
 H="$(build_home)"
 rm -r "$H/.claude/plugins/cache/mk1/alpha"

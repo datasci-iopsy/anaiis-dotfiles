@@ -10,7 +10,7 @@
 # Checks:
 #   1. ~/.bashrc exists and holds the PATH line and the shared.bash source line
 #   2. the login shell file (the first of ~/.bash_profile, ~/.bash_login, ~/.profile) mentions ~/.bashrc
-#   3. each ~/.claude link resolves into ~/anaiis-dotfiles/claude/
+#   3. each ~/.claude link resolves to its own target in ~/anaiis-dotfiles/claude/
 #
 # In checks 1 and 2 a line that starts with # does not count: the shell never reads it.
 #   4. each enabled plugin has a folder in ~/.claude/plugins/cache/
@@ -103,7 +103,8 @@ for name in settings.json keybindings.json rules commands skills agents hooks sc
 		resolved="$(phys "$link")"
 		if [ -n "$root" ]; then
 			case "$resolved" in
-				"$root"/*) why="" ;;
+				"$root/$name") why="" ;;
+				"$root"/*) why="points to the wrong place, expected ~/anaiis-dotfiles/claude/$name" ;;
 			esac
 		fi
 	fi
