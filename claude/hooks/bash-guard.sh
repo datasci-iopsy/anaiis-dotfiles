@@ -647,11 +647,12 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 	#     that holds $HOME make the command ask. A fully literal operand must pass
 	#     the safe-list. An operand with a variable inside double quotes ("$S/x")
 	#     is checked at run time only, by the rm function.
-	#   - these heads: cd ls echo printf pwd true false test [ basename dirname.
-	#     mkdir is vetted too, but only for plain literal operands that pass the
-	#     safe-list. Runners (uv, make, python, and so on), cat, touch, and the
-	#     filter words are not statement heads: a child program runs the real rm,
-	#     outside the function.
+	#   - these heads: mkdir cd ls echo printf pwd true false test [ basename
+	#     dirname. The operands of mkdir are not checked here: the mkdir function
+	#     in safe-rm.sh checks each expanded path at run time against the same
+	#     roots as rm (D-E-28). Runners (uv, make, python, and so on), cat, touch,
+	#     and the filter words are not statement heads: a child program runs the
+	#     real rm or creates a path outside the function.
 	#   - after a pipe, only grep head tail wc cut tr basename dirname. The left
 	#     side of a pipe must not be an rm statement or a loop.
 	#   - a literal assignment of one word, never to a name on the deny list
@@ -854,31 +855,7 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 					done
 					[ "$operands" -ge 1 ] || return 1
 					;;
-				mkdir)
-					# mkdir stays only for plain literal operands on the static safe-list (no $, no glob).
-					# A runner or another program could create a path outside every root, so no operand
-					# is left to the run-time guard here.
-					dd=0
-					for ((i = 1; i < ${#words[@]}; i++)); do
-						tok="${words[$i]}"
-						if [ "$dd" -eq 0 ]; then
-							case "$tok" in
-								--)
-									dd=1
-									continue
-									;;
-								-*) continue ;;
-							esac
-						fi
-						# shellcheck disable=SC2295
-						tok_s="${tok#$dq}"
-						# shellcheck disable=SC2295
-						tok_s="${tok_s%$dq}"
-						[[ "$tok_s" =~ $literal_re ]] || return 1
-						grep -qE "$RM_SAFE_ANY" <<<"$tok_s" || return 1
-					done
-					;;
-				cd | ls | echo | printf | pwd | true | false | test | '[' | basename | dirname) ;;
+				mkdir | cd | ls | echo | printf | pwd | true | false | test | '[' | basename | dirname) ;;
 				*) return 1 ;;
 			esac
 		done

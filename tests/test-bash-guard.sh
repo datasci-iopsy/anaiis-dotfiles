@@ -728,14 +728,19 @@ assert_ctx_ask "7m.55c a deletion word in the arguments of a runner" 'S=/tmp/s; 
 for runner_head in uv ruff pytest python python3 npm npx pnpm yarn make Rscript quarto dbt sqlfmt shfmt shellcheck; do
 	assert_ctx_ask "7m.55d runner as a statement head: $runner_head" "S=/tmp/s; rm -rf \"\$S/x\"; $runner_head x"
 done
-# mkdir stays only for plain literal operands that pass the safe-list. The first two cases are the
-# shapes of the owner's example command, which asks now (D-E-25).
-assert_ctx_ask "7m.1b mkdir with a variable operand" 'S=/tmp/s; rm -rf "$S/x" && mkdir -p "$S/x"'
-assert_ctx_ask "7m.2b mkdir inside a loop with a variable operand" 'S=/tmp/s; for m in a b; do rm -rf "$S/ft-$m"; mkdir -p "$S/ft-$m"; done'
-assert_ctx_ask "7m.55e mkdir with a literal operand off the safe-list" 'rm -rf dist && mkdir -p out/x'
-assert_ctx_ask "7m.55f mkdir with a glob operand" 'rm -rf dist && mkdir -p dist/*'
-assert_ctx_ask "7m.55g mkdir with a safe-list operand and one off-list operand" 'rm -rf dist && mkdir -p dist /tmp/zzz'
-assert_wrapped "7m.55h mkdir with -- and a safe-list operand" 'rm -rf dist && mkdir -p -- dist'
+# mkdir is a statement head again, and its operands are checked at run time by the mkdir function in
+# safe-rm.sh (D-E-28, replaces the literal-operand rule of D-E-25). The first three cases are the shapes of
+# the owner's example command. 7m.1b to 7m.55g asked under D-E-25.
+assert_wrapped "7m.1b mkdir with a variable operand, checked at run time" 'S=/tmp/s; rm -rf "$S/x" && mkdir -p "$S/x"'
+assert_wrapped "7m.2b mkdir inside a loop with a variable operand" 'S=/tmp/s; for m in a b; do rm -rf "$S/ft-$m"; mkdir -p "$S/ft-$m"; done'
+assert_wrapped "7m.2c the owner's loop with unquoted variables" 'S=/tmp/s; for m in a b; do rm -rf $S/x-$m; mkdir -p $S/x-$m; done'
+assert_wrapped "7m.55e mkdir with a literal operand off the old safe-list" 'rm -rf dist && mkdir -p out/x'
+assert_wrapped "7m.55f mkdir with a glob operand" 'rm -rf dist && mkdir -p dist/*'
+assert_wrapped "7m.55g mkdir with one operand that the run-time guard will refuse" 'rm -rf dist && mkdir -p dist /tmp/zzz'
+assert_wrapped "7m.55h mkdir with -- and an operand" 'rm -rf dist && mkdir -p -- dist'
+assert_wrapped "7m.55i mkdir -p of a literal tmp folder" 'rm -rf dist && mkdir -p tmp/x'
+assert_ctx_ask "7m.55j mkdir then a runner still asks" 'mkdir -p tmp/x && make x && rm -rf dist'
+assert_ctx_ask "7m.55k a deny word as a mkdir argument still asks" 'rm -rf dist && mkdir -p find'
 assert_ctx_ask "7m.56 a pipe into a head word that is not a filter" 'S=/tmp/s; rm -rf "$S/x"; ls | mkdir y'
 assert_ctx_ask "7m.57 a pipe after an rm statement (a refusal would stop only the pipe)" 'S=/tmp/s; rm -rf "$S/x" | grep y'
 assert_ctx_ask "7m.58b a keyword on the right side of a pipe" 'S=/tmp/s; ls | if grep x; then rm -rf "$S/x"; fi'
@@ -847,6 +852,20 @@ mkdir -p "$E_CWD/dist/x"
 run_rewritten "rm -rf dist && ls"
 assert_state "7n.5 a disposable literal folder in the working directory is deleted (dist is not a cache name, so only the new path rewrites it)" "rc=0 gone=yes" \
 	"rc=$RC gone=$([ -e "$E_CWD/dist" ] && echo no || echo yes)"
+
+# The owner's example (T-E4d): rm then mkdir with unquoted variables in a loop. The hook allows it (the
+# canary file of TEST_HOME exists), and the rewritten command creates the folders inside the roots.
+run_rewritten "S=$E_SCRATCH"'; for m in a b; do rm -rf $S/x-$m; mkdir -p $S/x-$m; done'
+assert_state "7n.6 the owner's loop: allowed, rewritten, and both folders are created" "decision=allow rc=0 a_made=yes b_made=yes" \
+	"decision=$(printf '%s' "$STDOUT" | jq -r '.hookSpecificOutput.permissionDecision') rc=$RC a_made=$([ -d "$E_SCRATCH/x-a" ] && echo yes || echo no) b_made=$([ -d "$E_SCRATCH/x-b" ] && echo yes || echo no)"
+
+run_rewritten "S=$E_SCRATCH; U=$E_OUT/mk-victim"'; rm -rf $S/nothing; mkdir -p $U'
+assert_state "7n.7 mkdir of a path outside every root is refused and nothing is created" "refused=yes made=no rc_nonzero=yes" \
+	"refused=$(printf '%s' "$ERR" | grep -q 'safe-rm: refused' && echo yes || echo no) made=$([ -e "$E_OUT/mk-victim" ] && echo yes || echo no) rc_nonzero=$([ "$RC" -ne 0 ] && echo yes || echo no)"
+
+run_rewritten "S=$E_SCRATCH; U=$E_OUT/mk-victim2"'; mkdir -p $S/ok-x $U'
+assert_state "7n.8 one refused mkdir operand creates nothing, not even the safe one" "safe_made=no victim_made=no" \
+	"safe_made=$([ -e "$E_SCRATCH/ok-x" ] && echo yes || echo no) victim_made=$([ -e "$E_OUT/mk-victim2" ] && echo yes || echo no)"
 
 echo "# 7o. First-use canary (D-E-15): allow only after a proven rewrite"
 CAN_CMD="S=$E_SCRATCH"'; echo ran >&2; rm -rf "$S/canary-x"; ls "$S"'
