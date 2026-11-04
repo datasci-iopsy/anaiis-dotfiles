@@ -804,12 +804,14 @@ mkdir -p "$E_CWD" "$E_SCRATCH" "$E_OUT" "$E_HOME/.claude" "$E2E/emptyhome"
 ln -s "$REPO_DIR/claude/hooks" "$E_HOME/.claude/hooks"
 
 # run_rewritten <command> [home]: ask the hook, then run the rewritten command in a clean shell with
-# the real rm. Sets RC and ERR.
+# the real rm. Sets RC and ERR. E_PRE (default empty) is shell text that runs before the command, for
+# example alias definitions.
+E_PRE=""
 run_rewritten() {
 	local cmd="$1" home="${2-$E_HOME}" new
 	run_guard_ctx "$cmd" "$E_CWD" "$E_SCRATCH"
 	new=$(printf '%s' "$STDOUT" | jq -r '.hookSpecificOutput.updatedInput.command // empty')
-	ERR=$(cd "$E_CWD" && env -i PATH=/usr/bin:/bin HOME="$home" TMPDIR="$E2E" bash -c "$new" 2>&1 >/dev/null)
+	ERR=$(cd "$E_CWD" && env -i PATH=/usr/bin:/bin HOME="$home" TMPDIR="$E2E" bash -c "$E_PRE$new" 2>&1 >/dev/null)
 	RC=$?
 }
 
@@ -975,6 +977,35 @@ assert_state "7o.8 the ORIGINAL command (updatedInput not applied) writes no sen
 run_canary "$H9" "$CAN_CMD"
 assert_state "7o.8b and the hook still asks" \
 	"decision=ask rewritten=yes sentinel_write=yes first_use_reason=yes" "$(can_state)"
+
+# T-E4e: the harness shell loads the owner's aliases and has expand_aliases on. An alias word is expanded
+# while safe-rm.sh is parsed, so "mkdir() {" failed to load and the prefix exited 97. The cases above run
+# under bash -c with no aliases, which hid the defect.
+E_PRE="shopt -s expand_aliases
+alias mkdir='mkdir -pv'
+alias pwd='pwd -P'
+alias cp='cp -i'
+alias mv='mv -i'
+alias ls='ls -GFhp'
+alias rsync='rsync -avh'
+alias du='du -h'
+"
+run_rewritten "S=$E_SCRATCH"'; for m in a b; do rm -rf $S/al-$m; mkdir -p $S/al-$m; done'
+assert_state "7n.9 the owner's loop under the harness aliases: allowed, loaded, and both folders are created" "decision=allow rc=0 a_made=yes b_made=yes" \
+	"decision=$(printf '%s' "$STDOUT" | jq -r '.hookSpecificOutput.permissionDecision') rc=$RC a_made=$([ -d "$E_SCRATCH/al-a" ] && echo yes || echo no) b_made=$([ -d "$E_SCRATCH/al-b" ] && echo yes || echo no)"
+
+run_rewritten "S=$E_SCRATCH; U=$E_OUT/al-victim"'; rm -rf $S/nothing; mkdir -p $S/al-c $U'
+assert_state "7n.10 under the aliases, an outside path is refused and nothing is created" "victim_made=no safe_made=no rc_nonzero=yes" \
+	"victim_made=$([ -e "$E_OUT/al-victim" ] && echo yes || echo no) safe_made=$([ -e "$E_SCRATCH/al-c" ] && echo yes || echo no) rc_nonzero=$([ "$RC" -ne 0 ] && echo yes || echo no)"
+
+mkdir -p "$E_SCRATCH/al-keep"
+touch "$E_SCRATCH/al-keep/f"
+E_PRE="${E_PRE}alias rm='rm -i'
+"
+run_rewritten "S=$E_SCRATCH"'; rm -rf $S/al-keep; mkdir -p $S/al-new'
+assert_state "7n.11 an rm alias makes the guard fail closed: nothing is deleted or created" "kept=yes made=no rc_nonzero=yes" \
+	"kept=$([ -e "$E_SCRATCH/al-keep/f" ] && echo yes || echo no) made=$([ -e "$E_SCRATCH/al-new" ] && echo yes || echo no) rc_nonzero=$([ "$RC" -ne 0 ] && echo yes || echo no)"
+E_PRE=""
 
 if [ -n "${COV:-}" ]; then
 	cov_end
