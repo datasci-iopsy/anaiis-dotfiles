@@ -678,6 +678,8 @@ assert_wrapped "7m.10 newline-separated statements" $'S=/tmp/s\nrm -rf "$S/x"\nl
 assert_wrapped "7m.11 if with a test command" 'S=/tmp/s; if [ -d "$S/x" ]; then rm -rf "$S/x"; fi'
 assert_wrapped "7m.12 rm after a for-loop do with a literal word list (was 7b.0, ask before D-026)" 'for f in a b; do rm -rf .venv; done'
 assert_wrapped "7m.13 -- before a variable operand" 'S=/tmp/s; rm -rf -- "$S/x"; ls'
+assert_wrapped "7m.14 a for loop with do on its own line" $'S=/tmp/s\nfor m in a b\ndo\nrm -rf "$S/$m"\ndone'
+assert_wrapped "7m.15 an if with then and else on their own lines" $'S=/tmp/s\nif [ -d "$S" ]\nthen\nrm -rf "$S/x"\nelse\nls\nfi'
 
 echo "# 7m-b. One statement or character that cannot be vetted: ask, no rewrite"
 assert_ctx_ask "7m.20 a nested shell" 'S=/tmp/s; rm -rf "$S/x" && bash -c "echo hi"'
@@ -778,6 +780,14 @@ assert_wrapped "7m.75 a redirect at the very end of the command" 'S=/tmp/s; rm -
 assert_ctx_ask "7m.76 an assignment with a command after it, a name that is not denied" 'FOO=bar ls; rm -rf "$S/x"'
 assert_ctx_ask "7m.77 a plain parenthesis in echo text next to an rm statement (D-E-17)" 'S=/tmp/s; rm -rf "$S/x"; echo "done (ok)"'
 assert_ctx_ask "7m.78 a command with the text rm -rf but no rm statement (rm_seen)" 'echo x-rm -rf; ls'
+# Each forbidden character, alone in an argument of a listed command, makes the command ask. The head
+# rules would also stop most of these in a head word, so each one sits in an echo argument.
+# shellcheck disable=SC1003
+for forbidden in '`' '\' '<' '>' '(' ')' '{' '}' '!' '&'; do
+	assert_ctx_ask "7m.80 forbidden character in an argument: $forbidden" "S=/tmp/s; rm -rf \"\$S/x\"; echo a${forbidden}b"
+done
+assert_ctx_ask "7m.81 a dollar sign that does not start a name" 'S=/tmp/s; rm -rf "$S/x"; echo $1'
+assert_ctx_ask "7m.82 a dollar sign at the end of a word" 'S=/tmp/s; rm -rf "$S/x"; echo cost$'
 
 echo "# 7n. End to end: run the rewritten command with a real rm in a throwaway tree"
 E2E="$TEST_HOME/e2e"
