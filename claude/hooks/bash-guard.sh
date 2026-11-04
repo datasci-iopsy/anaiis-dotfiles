@@ -908,10 +908,11 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 				else
 					# No sentinel: ask, and let the prefix write the sentinel after the guard loaded. If the harness
 					# does not apply updatedInput, nothing writes it and every later run asks again.
+					# The prefix calls the captured real mkdir, because the mkdir function would refuse $HOME/.claude/state.
 					RM_WRAP_DECISION="ask"
 					RM_WRAP_WHY="first use of this guard version: every statement is vetted and rm is replaced by a run-time guard. Confirm once. This run writes a marker after the guard loads, and later runs of this version do not prompt (stream e-bash-guard-rm)"
 					# shellcheck disable=SC2016
-					RM_WRAP_PREFIX="$RM_WRAP_PREFIX; "'mkdir -p "$HOME/.claude/state" && : >"$HOME/.claude/state/safe-rm-canary-'"$RM_WRAP_KEY"'"'
+					RM_WRAP_PREFIX="$RM_WRAP_PREFIX; "'"$__SAFE_RM_REALMKDIR" -p "$HOME/.claude/state" && : >"$HOME/.claude/state/safe-rm-canary-'"$RM_WRAP_KEY"'"'
 				fi
 				jq -n --argjson ti "$(jq -c '.tool_input' <<<"$INPUT")" \
 					--arg c "${RM_WRAP_PREFIX}"$'\n'"${CMD}" \

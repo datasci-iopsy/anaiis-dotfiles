@@ -54,10 +54,13 @@ TMPR="$TREE/tmpdir"
 HOMEF="$TREE/home"
 STUB="$TREE/stub"
 RMLOG="$TREE/rm.log"
+MKLOG="$TREE/mkdir.log"
 mkdir -p "$SCRATCH" "$CWD/tests/fixtures" "$CWD/tmp/worktrees/wt" "$CWD/node_modules" "$CWD/src" \
 	"$CWD/.git" "$OUT" "$TMPR" "$HOMEF" "$STUB"
 printf '#!/bin/sh\nprintf "%%s\\n" "$*" >>"%s"\n' "$RMLOG" >"$STUB/rm"
 chmod +x "$STUB/rm"
+printf '#!/bin/sh\nprintf "%%s\\n" "$*" >>"%s"\n' "$MKLOG" >"$STUB/mkdir"
+chmod +x "$STUB/mkdir"
 
 # child <mode> <snippet>: run the snippet in a clean child shell, in the fake project folder.
 #   mode "stub": PATH has the logging stub first. mode "real": PATH has the real rm only.
@@ -66,11 +69,12 @@ chmod +x "$STUB/rm"
 #   mode "homeintmp": like stub, but HOME is a tmp.* folder under TMPDIR (a home inside a root).
 #   mode "cwdhome": like stub, but the working directory is HOME. "cwdabovehome": the cwd is a parent of
 #   HOME. "cwdroot": the cwd is the root folder.
-# Sets RC, ERR (stderr text), and CALLED (yes when the stub or real rm was reached).
+# Sets RC, ERR (stderr text), CALLED (yes when the stub or real rm was reached), and MKCALLED (the same for mkdir).
 child() {
 	local mode="$1" snippet="$2" path_dir="$STUB:/usr/bin:/bin" run_dir="$CWD" home_dir="$HOMEF"
 	[ "$mode" = real ] && path_dir="/usr/bin:/bin"
 	: >"$RMLOG"
+	: >"$MKLOG"
 	local scratch_arg="__SAFE_RM_SCRATCH=$SCRATCH" cwd_arg="__SAFE_RM_CWD=$CWD"
 	[ "$mode" = noscratch ] && scratch_arg="UNUSED_A=1"
 	[ "$mode" = nocwd ] && cwd_arg="UNUSED_B=1"
@@ -99,6 +103,8 @@ child() {
 	RC=$?
 	CALLED=no
 	[ -s "$RMLOG" ] && CALLED=yes
+	MKCALLED=no
+	[ -s "$MKLOG" ] && MKCALLED=yes
 	return 0
 }
 
@@ -133,11 +139,29 @@ expect_log() {
 	assert_eq "$1" "rc=0 log=$3" "rc=$RC log=$(cat "$RMLOG")"
 }
 
+# expect_mk_log <name> <snippet> <expected-log-line> [mode]: the guard lets mkdir run and the stub (or
+# real) mkdir receives exactly this argument line.
+expect_mk_log() {
+	child "${4:-stub}" "$2"
+	assert_eq "$1" "rc=0 log=$3" "rc=$RC log=$(cat "$MKLOG")"
+}
+
+# expect_mk_refuse <name> <snippet> <needle> [mode]: the guard stops mkdir (RC 1, mkdir not reached, reason shown).
+expect_mk_refuse() {
+	child "${4:-stub}" "$2"
+	local seen=no
+	printf '%s' "$ERR" | grep -qF -- "$3" && seen=yes
+	assert_eq "$1" "rc=1 mkdir_called=no reason=yes" "rc=$RC mkdir_called=$MKCALLED reason=$seen"
+}
+
 echo "--- 0. loading"
 child stub '[ "$(type -t rm)" = function ]'
 assert_eq "0.1 sourcing the file defines rm as a function" "rc=0" "rc=$RC"
 child stub 'rm -rf "$OUT/f"'
 assert_eq "0.2 the function, not the stub, handles the first call" "rc=1 called=no" "rc=$RC called=$CALLED"
+
+child stub '[ "$(type -t mkdir)" = function ]'
+assert_eq "0.3 sourcing the file defines mkdir as a function" "rc=0" "rc=$RC"
 
 echo "--- 1. allowed: the scratchpad"
 expect_pass "1.1 file inside the scratchpad" 'rm -rf "$SCRATCH/a"'
@@ -146,7 +170,8 @@ ln -s "$TREE" "$TREE/alias"
 expect_pass "1.3 scratchpad reached through a symlinked spelling" 'rm -rf "$ALIAS/session/scratchpad/z"'
 expect_pass "1.4 a path that does not exist yet (the delete is a no-op)" 'rm -rf "$SCRATCH/not-there"'
 expect_pass "1.5 several operands, all inside" 'rm -rf "$SCRATCH/a" "$SCRATCH/b" "$SCRATCH/c"'
-expect_pass "1.6 a trailing slash on an ordinary folder" 'mkdir -p "$SCRATCH/dir" && rm -rf "$SCRATCH/dir/"'
+mkdir -p "$SCRATCH/dir"
+expect_pass "1.6 a trailing slash on an ordinary folder" 'rm -rf "$SCRATCH/dir/"'
 
 echo "--- 2. allowed: disposable folders in the working directory"
 expect_pass "2.1 node_modules" 'rm -rf "$CWD/node_modules"'
@@ -171,7 +196,7 @@ expect_pass "4.4 long flags" 'rm --recursive --force --verbose "$SCRATCH/a"'
 expect_pass "4.5 -- before an operand that looks like a flag" 'rm -rf -- "$SCRATCH/-weird"'
 expect_pass "4.6 a variable inside a loop" 'for m in a b; do rm -rf "$SCRATCH/ft-$m"; done'
 expect_pass "4.7 a glob that expands inside the scratchpad" 'touch "$SCRATCH/g1" "$SCRATCH/g2"; rm -rf "$SCRATCH"/g*'
-expect_pass "4.8 no operand: passed on so rm prints its own usage error" 'rm -rf'
+expect_log "4.8 flags and no operand: passed on unchanged so rm prints its own usage error" 'rm -rf' "-rf"
 
 echo "--- 5. refused: outside every root"
 expect_refuse "5.1 a file outside the roots" 'rm -rf "$OUT/f"' "refused"
@@ -277,7 +302,7 @@ expect_pass "10.9 a relative operand resolves against the real directory after c
 
 # Every copy the function reads must refuse a write. A name that stays writable lets a later statement
 # move a root. The subshell isolates the write; a refused write fails, so only a writable name prints.
-child stub 'for v in __SAFE_RM_CWD __SAFE_RM_SCRATCH __SAFE_RM_REAL __SAFE_RM_CWDP __SAFE_RM_SCRATCHP __SAFE_RM_HOMEP __SAFE_RM_TMPP __SAFE_RM_CWDROOTS; do
+child stub 'for v in __SAFE_RM_CWD __SAFE_RM_SCRATCH __SAFE_RM_REAL __SAFE_RM_REALMKDIR __SAFE_RM_CWDP __SAFE_RM_SCRATCHP __SAFE_RM_HOMEP __SAFE_RM_TMPP __SAFE_RM_CWDROOTS; do
 (eval "$v=x") 2>/dev/null && echo "WRITABLE $v" >&2
 done
 true'
@@ -286,6 +311,12 @@ assert_eq "10.9b every captured variable refuses a write" "rc=0 writable=" "rc=$
 NOPATH_OUT="$(env -i PATH=/nonexistent HOME="$HOMEF" TMPDIR="$TMPR" __SAFE_RM_CWD="$CWD" SAFE_RM="$SAFE_RM" \
 	"$BASH" -c '. "$SAFE_RM"; echo "src=$? fn=$(type -t rm)"' 2>/dev/null)"
 assert_eq "10.10 sourcing fails and defines no rm when no rm program exists on PATH" "src=1 fn=" "$NOPATH_OUT"
+ONLYMK_DIR="$TREE/onlymkdir"
+mkdir -p "$ONLYMK_DIR"
+cp /bin/mkdir "$ONLYMK_DIR/mkdir"
+ONLYMK_OUT="$(env -i PATH="$ONLYMK_DIR" HOME="$HOMEF" TMPDIR="$TMPR" __SAFE_RM_CWD="$CWD" SAFE_RM="$SAFE_RM" \
+	"$BASH" -c '. "$SAFE_RM"; echo "src=$? rm=$(type -t rm) mkdir=$(type -t mkdir)"' 2>/dev/null)"
+assert_eq "10.10b sourcing fails and defines no function when only mkdir exists on PATH" "src=1 rm= mkdir=file" "$ONLYMK_OUT"
 
 echo "--- 11. the checked list is the deleted list (F8)"
 PSCRATCH="$(cd "$SCRATCH" && pwd -P)"
@@ -316,6 +347,54 @@ expect_refuse "13.5 cwd is the root folder: every operand is refused" 'rm -rf "$
 
 echo "--- 14. HOME inside a root"
 expect_refuse "14.1 HOME below TMPDIR is still never deleted" 'rm -rf "$HOME"' "home folder" homeintmp
+
+echo "--- 15. mkdir is guarded with the same roots as rm (T-E4d)"
+expect_mk_log "15.1 inside the scratchpad: flags, --, and the resolved path reach mkdir" \
+	'mkdir -p "$SCRATCH/mk/a"' "-p -- $PSCRATCH/mk/a"
+expect_mk_log "15.2 a disposable folder in the working directory" 'mkdir -p "$CWD/node_modules/x"' "-p -- $(cd "$CWD" && pwd -P)/node_modules/x"
+expect_mk_log "15.3 below tests/fixtures" 'mkdir "$CWD/tests/fixtures/sub"' "-- $(cd "$CWD" && pwd -P)/tests/fixtures/sub"
+expect_mk_log "15.4 below tmp" 'mkdir -p "$CWD/tmp/x"' "-p -- $(cd "$CWD" && pwd -P)/tmp/x"
+expect_mk_log "15.5 a tmp.* folder under TMPDIR" 'mkdir -p "$TMPR/tmp.abc/x"' "-p -- $(cd "$TMPR" && pwd -P)/tmp.abc/x"
+expect_mk_log "15.6 nested -p below folders that do not exist yet" 'mkdir -p "$SCRATCH/n1/n2/n3/n4"' "-p -- $PSCRATCH/n1/n2/n3/n4"
+expect_mk_log "15.7 several operands, all inside" 'mkdir -p "$SCRATCH/s1" "$SCRATCH/s2"' "-p -- $PSCRATCH/s1 $PSCRATCH/s2"
+expect_mk_log "15.8 -pv in one word, and -- before an operand that looks like a flag" 'mkdir -pv -- "$SCRATCH/-weird"' "-pv -- $PSCRATCH/-weird"
+expect_mk_log "15.9 a symlinked spelling is replaced by the physical path" 'mkdir -p "$ALIAS/session/scratchpad/z"' "-p -- $PSCRATCH/z"
+expect_mk_log "15.10 a relative operand starts at the real directory after cd" 'cd "$SCRATCH" && mkdir -p thing' "-p -- $PSCRATCH/thing"
+expect_mk_refuse "15.11 a relative operand after cd to a folder outside every root" 'cd "$OUT" && mkdir -p thing' "refused"
+expect_mk_refuse "15.12 outside every root" 'mkdir -p "$OUT/new"' "refused"
+expect_mk_refuse "15.13 a symlinked parent that leads outside" 'ln -s "$OUT" "$SCRATCH/mkl" && mkdir -p "$SCRATCH/mkl/new"' "refused"
+expect_mk_refuse "15.14 a .. component" 'mkdir -p "$SCRATCH/../x"' "refused"
+expect_mk_refuse "15.15 a .git folder" 'mkdir -p "$CWD/node_modules/.git/x"' "refused"
+expect_mk_refuse "15.16 the root folder" 'mkdir -p /' "refused"
+expect_mk_refuse "15.17 the home folder" 'mkdir -p "$HOMEF"' "home folder"
+expect_mk_refuse "15.18 the working directory itself" 'mkdir -p "$CWD"' "refused"
+expect_mk_refuse "15.19 a parent of the working directory" 'mkdir -p "$TREE"' "refused"
+expect_mk_refuse "15.20 the scratchpad itself" 'mkdir -p "$SCRATCH"' "refused"
+expect_mk_refuse "15.21 an empty operand names the reason" 'mkdir -p ""' "the operand is empty"
+expect_mk_refuse "15.22 -m is not an allowed flag" 'mkdir -m 755 "$SCRATCH/a"' "flag"
+expect_mk_refuse "15.23 a long flag is not allowed" 'mkdir --parents "$SCRATCH/a"' "flag"
+expect_mk_refuse "15.24 a flag word after the first operand is an operand" 'mkdir "$SCRATCH/a" -p' "refused"
+expect_mk_refuse "15.25 one refused operand among two" 'mkdir "$SCRATCH/a" "$OUT/b"' "refused"
+expect_stop "15.26 a refused mkdir stops the whole command" 'mkdir -p "$OUT/new"; echo AFTER >&2'
+expect_mk_log "15.27 a changed PATH does not change which mkdir runs" 'PATH=/nonexistent
+mkdir -p "$SCRATCH/pp"' "-p -- $PSCRATCH/pp"
+expect_mk_log "15.28 flags and no operand: passed on unchanged so mkdir prints its own usage error" 'mkdir -p' "-p"
+
+# Real mkdir in the throwaway tree. A victim path outside every root must not appear.
+child real 'mkdir -p "$SCRATCH/real-mk/a/b"'
+assert_eq "15.30 a safe nested operand is really created" "rc=0 made=yes" "rc=$RC made=$([ -d "$SCRATCH/real-mk/a/b" ] && echo yes || echo no)"
+child real 'mkdir "$SCRATCH/mk-ok" "$OUT/mk-bad"'
+assert_eq "15.31 a mixed call creates nothing, not even the safe operand" "rc=1 safe_made=no unsafe_made=no" \
+	"rc=$RC safe_made=$([ -e "$SCRATCH/mk-ok" ] && echo yes || echo no) unsafe_made=$([ -e "$OUT/mk-bad" ] && echo yes || echo no)"
+child real 'mkdir -p "$OUT/mk-victim/deep"'
+assert_eq "15.32 an operand outside every root is not created" "rc=1 victim_made=no" "rc=$RC victim_made=$([ -e "$OUT/mk-victim" ] && echo yes || echo no)"
+
+NOMKDIR_DIR="$TREE/onlyrm"
+mkdir -p "$NOMKDIR_DIR"
+cp "$STUB/rm" "$NOMKDIR_DIR/rm"
+NOMKDIR_OUT="$(env -i PATH="$NOMKDIR_DIR" HOME="$HOMEF" TMPDIR="$TMPR" __SAFE_RM_CWD="$CWD" SAFE_RM="$SAFE_RM" \
+	"$BASH" -c '. "$SAFE_RM"; echo "src=$? rm=$(type -t rm) mkdir=$(type -t mkdir)"' 2>/dev/null)"
+assert_eq "15.33 sourcing fails and defines no function (rm stays the plain program) when no mkdir program exists on PATH" "src=1 rm=file mkdir=" "$NOMKDIR_OUT"
 
 if [ -n "${COV:-}" ]; then
 	cov_end
