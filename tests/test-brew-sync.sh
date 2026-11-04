@@ -184,6 +184,37 @@ assert_eq "4c.1 dump exits non-zero when brew fails" 1 "$?"
 assert_eq "4c.2 the file is unchanged" "$(cksum <"$ORIGINAL")" "$(cksum <"$BF")"
 mv "$STUB/brew.off" "$STUB/brew"
 
+echo "--- 4d. an empty Brewfile is filled"
+# With awk's NR == FNR test, an empty first file made every dump record look like a Brewfile record.
+: >"$BF"
+printf 'brew "newtool"\ncask "newapp"\n' >"$DUMP"
+out="$(sync_run dump 2>&1)"
+assert_eq "4d.1 dump exits 0 on an empty Brewfile" 0 "$?"
+assert_eq "4d.2 both entries were appended" 2 "$(grep -c . "$BF")"
+assert_eq "4d.3 the message counts the two entries" "Brewfile updated at $BF (2 added)" "$out"
+
+echo "--- 4e. a Brewfile that cannot be written fails loud"
+write_brewfile
+printf 'brew "newtool"\n' >"$DUMP"
+chmod 444 "$BF"
+if [ -w "$BF" ]; then
+	echo "  SKIP  4e (this user ignores file modes)"
+else
+	out="$(sync_run dump 2>&1)"
+	assert_eq "4e.1 dump exits 1 when the append fails" 1 "$?"
+	assert_eq "4e.2 dump does not claim success" 0 "$(printf '%s' "$out" | grep -c 'Brewfile updated')"
+	assert_eq "4e.3 the file is unchanged" "$(cksum <"$ORIGINAL")" "$(cksum <"$BF")"
+fi
+chmod 644 "$BF"
+
+echo "--- 4f. dump fails loud when the Brewfile is missing"
+mv "$BF" "$BF.off"
+out="$(sync_run dump 2>&1)"
+assert_eq "4f.1 dump exits 1 without a Brewfile" 1 "$?"
+assert_eq "4f.2 dump does not claim success" 0 "$(printf '%s' "$out" | grep -c 'Brewfile updated')"
+assert_eq "4f.3 no Brewfile was created" no "$([ -e "$BF" ] && echo yes || echo no)"
+mv "$BF.off" "$BF"
+
 echo "--- 5. refresh obeys the daily stamp"
 write_brewfile
 rm -f "$CALLS"
@@ -230,6 +261,21 @@ mv "$BF.off" "$BF"
 out="$(HOME="$H" HOMEBREW_PREFIX="$PREFIX" PATH="/usr/bin:/bin" "$BASH" "$BREW_SYNC" refresh 2>&1)"
 assert_eq "6.9 no brew on PATH: exit 0" 0 "$?"
 assert_eq "6.10 no brew on PATH: silent (a shell start must not print)" "" "$out"
+
+echo "--- 6c. refresh reports a failure once and still exits 0"
+write_brewfile
+rm -f "$CALLS" "$STAMP"
+printf 'brew "newtool"\n' >"$DUMP"
+chmod 444 "$BF"
+if [ -w "$BF" ]; then
+	echo "  SKIP  6c (this user ignores file modes)"
+else
+	out="$(sync_run refresh 2>&1)"
+	assert_eq "6c.1 a failed refresh exits 0 (a shell start must not fail)" 0 "$?"
+	assert_eq "6c.2 a failed refresh says so" 1 "$(printf '%s' "$out" | grep -c 'Brewfile refresh failed')"
+	assert_eq "6c.3 the stamp was written, so the next try waits a day" yes "$([ -f "$STAMP" ] && echo yes || echo no)"
+fi
+chmod 644 "$BF"
 
 echo "--- 6b. the other verbs"
 rm -f "$CALLS"
