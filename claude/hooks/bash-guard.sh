@@ -694,7 +694,7 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 	}
 
 	# rm_word_denied <word>: return 0 for a word that deletes, runs another program, or changes the
-	# shell. The scan checks every word of every statement, so a runner cannot carry one as an argument.
+	# shell. The scan checks every word of every statement, so no statement can carry one as an argument.
 	rm_word_denied() {
 		case "$1" in
 			rm | rmdir | unlink | shred | find | xargs | sudo | eval | exec | source | . | env | nohup | command | builtin | alias | unalias | unset | trap | bash | sh | zsh | dash | git | docker | mv | dd | truncate | rsync) return 0 ;;
