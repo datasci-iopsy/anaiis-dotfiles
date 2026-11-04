@@ -717,6 +717,8 @@ echo "# 7m-c. Review fixes (T-E4a, D-E-14, D-E-24, D-E-25): each case asks and d
 # F1: statements on the list must not assign the guard's own variables.
 assert_ctx_ask "7m.50 a for loop variable that names a guard variable" 'S=/tmp/s; for __SAFE_RM_SCRATCH in /; do rm -rf "$S/x"; done'
 assert_ctx_ask "7m.51 a for loop variable named PATH" 'S=/tmp/s; for PATH in /evil; do rm -rf "$S/x"; done'
+assert_ctx_ask "7m.52b printf -v with the name attached to the flag" 'S=/tmp/s; rm -rf "$S/x"; printf -vPATH %s /tmp/s'
+assert_ctx_ask "7m.52c printf -v with the name as a separate word" 'S=/tmp/s; rm -rf "$S/x"; printf -v FOO %s x'
 assert_ctx_ask "7m.52 printf -v that names a guard variable" 'S=/tmp/s; rm -rf "$S/x"; printf -v __SAFE_RM_SCRATCH %s /tmp/s'
 # F2: a deletion word in the arguments of a listed command, and a pipe into a runner.
 # The live run on the pre-fix code (D-E-25): a runner child process runs the real rm, outside the function.
@@ -743,6 +745,10 @@ assert_ctx_ask "7m.55j mkdir then a runner still asks" 'mkdir -p tmp/x && make x
 assert_ctx_ask "7m.55k a deny word as a mkdir argument still asks" 'rm -rf dist && mkdir -p find'
 assert_ctx_ask "7m.56 a pipe into a head word that is not a filter" 'S=/tmp/s; rm -rf "$S/x"; ls | mkdir y'
 assert_ctx_ask "7m.57 a pipe after an rm statement (a refusal would stop only the pipe)" 'S=/tmp/s; rm -rf "$S/x" | grep y'
+assert_ctx_ask "7m.57b a pipe after an mkdir statement (a refusal would stop only the pipe)" 'S=/tmp/s; rm -rf "$S/old"; mkdir -p "$S/x" | grep y'
+# The last statement before fi or done is ls, not rm, so only the fi or done word itself can mark the block.
+assert_ctx_ask "7m.58c a pipe after an if block (fi)" 'S=/tmp/s; if [ -d "$S" ]; then rm -rf "$S/x"; ls; fi | grep y'
+assert_ctx_ask "7m.58d a pipe after a loop whose last statement is ls (done)" 'S=/tmp/s; for m in a b; do rm -rf "$S/$m"; ls; done | grep y'
 assert_ctx_ask "7m.58b a keyword on the right side of a pipe" 'S=/tmp/s; ls | if grep x; then rm -rf "$S/x"; fi'
 assert_ctx_ask "7m.58 a pipe after a loop (a refusal would stop only the pipe)" 'S=/tmp/s; for m in a b; do rm -rf "$S/$m"; done | grep y'
 # Every word of the deny set, as an argument of a listed command. A word that is missing from the set

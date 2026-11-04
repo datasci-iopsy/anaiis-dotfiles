@@ -740,9 +740,10 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 		for stmt in "${stmts[@]}"; do
 			read -r stmt <<<"$stmt"
 			if [ "$stmt" = "|" ]; then
-				# The left side of a pipe runs in a subshell, where a refusal would not stop the command.
+				# The left side of a pipe runs in a subshell, where a refusal would not stop the command. That
+				# holds for rm and mkdir (the two guarded functions) and for a loop or an if block.
 				case "$prev" in
-					rm | close) return 1 ;;
+					guarded | close) return 1 ;;
 				esac
 				pipe_next=1
 				continue
@@ -782,8 +783,12 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 				ws="${w//$dq/}"
 				# shellcheck disable=SC2295
 				ws="${ws//$sq/}"
-				# printf -v writes a variable by name, so the guard's own variables are reachable.
-				[ "$first" = printf ] && [ "$ws" = "-v" ] && return 1
+				# printf -v writes a variable by name, as -v NAME or as -vNAME.
+				if [ "$first" = printf ]; then
+					case "$ws" in
+						-v*) return 1 ;;
+					esac
+				fi
 				if rm_word_denied "$ws"; then
 					[ "$i" -eq 0 ] && [ "$w" = rm ] || return 1
 				fi
@@ -820,7 +825,7 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 			prev=""
 			case "$first" in
 				rm)
-					prev="rm"
+					prev="guarded"
 					rm_seen=$((rm_seen + 1))
 					operands=0
 					dd=0
@@ -855,7 +860,10 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 					done
 					[ "$operands" -ge 1 ] || return 1
 					;;
-				mkdir | cd | ls | echo | printf | pwd | true | false | test | '[' | basename | dirname) ;;
+				mkdir)
+					prev="guarded"
+					;;
+				cd | ls | echo | printf | pwd | true | false | test | '[' | basename | dirname) ;;
 				*) return 1 ;;
 			esac
 		done
