@@ -165,12 +165,9 @@ run_links() {
 	OUT="$(HOME="$1" PATH="$TMPD/stub:$PATH" "$BASH" "$INSTALL" --symlinks-only 2>&1)"
 	RC=$?
 }
-new_home() {
-	mktemp -d "$TMPD/home.XXXXXX"
-}
 mentions() { printf '%s\n' "$OUT" | grep -c 'CLAUDE\.md'; }
 
-H6="$(new_home)"
+H6="$(mktemp -d "$TMPD/home.XXXXXX")"
 mkdir -p "$H6/.claude"
 ln -s "$H6/anaiis-dotfiles/claude/CLAUDE.md" "$H6/.claude/CLAUDE.md"
 run_links "$H6"
@@ -187,7 +184,7 @@ assert_eq "6.6 second run: no line mentions CLAUDE.md" 0 "$(mentions)"
 assert_eq "6.7 second run: no change line" 0 "$(printf '%s\n' "$OUT" | grep -cE "$CHANGE_RE")"
 assert_eq "6.8 second run: the HOME snapshot is identical" "$SNAP6" "$(snapshot "$H6")"
 
-H6="$(new_home)"
+H6="$(mktemp -d "$TMPD/home.XXXXXX")"
 mkdir -p "$H6/.claude"
 printf 'mine\n' >"$H6/.claude/CLAUDE.md"
 run_links "$H6"
@@ -195,7 +192,7 @@ assert_eq "6.9 real file: exit code is 0" 0 "$RC"
 assert_eq "6.10 real file: the file and its text stay" mine "$(cat "$H6/.claude/CLAUDE.md")"
 assert_eq "6.11 real file: the run prints one note about it" 1 "$(printf '%s\n' "$OUT" | grep -c '^  note  .*CLAUDE\.md is a real file')"
 
-H6="$(new_home)"
+H6="$(mktemp -d "$TMPD/home.XXXXXX")"
 mkdir -p "$H6/.claude" "$H6/elsewhere"
 printf 'other\n' >"$H6/elsewhere/CLAUDE.md"
 ln -s "$H6/elsewhere/CLAUDE.md" "$H6/.claude/CLAUDE.md"

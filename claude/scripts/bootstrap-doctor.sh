@@ -162,14 +162,10 @@ EOF
 		esac
 	done
 	[ -z "$ax" ] || return 1
-	[ "$a1" -eq "$b1" ] || {
-		[ "$a1" -gt "$b1" ]
-		return
-	}
-	[ "$a2" -eq "$b2" ] || {
-		[ "$a2" -gt "$b2" ]
-		return
-	}
+	[ "$a1" -gt "$b1" ] && return 0
+	[ "$a1" -lt "$b1" ] && return 1
+	[ "$a2" -gt "$b2" ] && return 0
+	[ "$a2" -lt "$b2" ] && return 1
 	[ "$a3" -ge "$b3" ]
 }
 
