@@ -2,11 +2,13 @@
 
 **What this is.** A personal Claude Code policy stack, rules, skills, hooks, agents, slash commands, plus the `web-verify` CLI. Tracked in git, shared across two machines (personal + work), installed via symlinks in `install.sh`. macOS today; portable to Linux.
 
-**Shell config.** `bash/shared.bash` is the tracked, portable shell config (PATH, aliases, tool inits, prompt). It is sourced by `~/.bashrc`, which is machine-local and not tracked. The wiring on each machine follows a three-file hierarchy: `~/.bash_profile` (entry point only, sources `~/.bashrc`) -> `~/.bashrc` (sources `shared.bash`, then `~/.bashrc.local`) -> `~/.bashrc.local` (secrets and machine overrides, gitignored). Never add config to `~/.bash_profile` directly; put portable things in `shared.bash` and machine-local secrets in `~/.bashrc.local`.
+**Shell config.** `bash/shared.bash` is the tracked, portable shell config (PATH, aliases, tool inits, prompt). It is sourced by `~/.bashrc`, which is machine-local and not tracked. The wiring on each machine follows a three-file hierarchy. The files load in this order: `~/.bash_profile` (entry point only, sources `~/.bashrc`) -> `~/.bashrc` (sources `shared.bash`, then `~/.bashrc.local`) -> `~/.bashrc.local` (secrets and machine overrides, gitignored). Never add config to `~/.bash_profile` directly; put portable things in `shared.bash` and machine-local secrets in `~/.bashrc.local`. `install.sh` writes the PATH line and the `shared.bash` source line into `~/.bashrc`. It does not add a line that sources `~/.bashrc.local`. Add that line yourself, after the `shared.bash` line, for example `[ -f "$HOME/.bashrc.local" ] && . "$HOME/.bashrc.local"`. Without it, nothing loads `~/.bashrc.local`.
+
+**Instruction files.** `AGENTS.md` is the only instruction file in this repo. No `CLAUDE.md` is tracked. The global instructions live in `claude/rules/context.md` and the other rule files, which Claude Code loads from `~/.claude/rules/`.
 
 **The "anaiis-" prefix** is the namespace for the custom skills, distinct from upstream Anthropic skills (which keep their unprefixed names). They are served by the `datasci-iopsy/anaiis-plugins` marketplace registered in `claude/settings.json`; `claude/skills/` holds no copies of them.
 
-**Two-machine model.** The same repo is checked out on personal and work machines. `claude/settings.json` (symlinked to `~/.claude/settings.json`) is the single tracked source of truth for Claude Code config on both; Claude Code reads no user-level `settings.local.json` or `CLAUDE.local.md`, so this repo ships neither. Machine-local shell config and secrets live in `~/.bashrc.local` (untracked); secrets are environment variables loaded per-project via direnv (see `rules/environment.md`). Machine-local Claude instructions, when needed, are files under `~/.claude/` imported explicitly from `claude/CLAUDE.md` with `@~/.claude/<name>.md`.
+**Two-machine model.** The same repo is checked out on personal and work machines. `claude/settings.json` (symlinked to `~/.claude/settings.json`) is the single tracked source of truth for Claude Code config on both. Claude Code reads no user-level `settings.local.json`, so this repo ships none. Machine-local shell config and secrets live in `~/.bashrc.local` (untracked); secrets are environment variables loaded per-project via direnv (see `rules/environment.md`). Machine-local Claude instructions, when needed, go in the file `claude/rules/<name>.local.md`. `.gitignore` ignores that file, and Claude Code loads it with the other rules (see `rules/context.md`).
 
 **Audit artifacts.** The current state of this repo is the result of a 5-advisor LLM Council audit on 2026-04-29. The full transcript, visual report, and remediation plan are archived in `_archive/`: `council-report-2026-04-29.html`, `council-transcript-2026-04-29.md` (gitignored; exists only on machines where the audit was originally run). They explain *why* the structure looks the way it does.
 
@@ -15,11 +17,9 @@
 ```bash
 git clone git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/anaiis-dotfiles
 bash ~/anaiis-dotfiles/install.sh
-# Then add to your shell config (~/.bashrc, ~/.zshrc, etc.):
-#   export PATH="$HOME/anaiis-dotfiles/bin:$PATH"
 ```
 
-That installs the Claude policy stack and prints a one-line snippet to add to your shell config. No bash takeover, no source files, no machine-specific overrides forced on you.
+That installs the Claude policy stack, wires `~/.bashrc`, and adds the GitHub host keys when `gh` uses SSH. Then follow steps 3 to 5 of "Setup on a new machine" below. Open a new terminal, start Claude Code once, run `/reload-plugins`, and run the doctor.
 
 ---
 
@@ -27,10 +27,12 @@ That installs the Claude policy stack and prints a one-line snippet to add to yo
 
 ```
 anaiis-dotfiles/
-├── install.sh                      Symlinks claude/* into ~/.claude/; prints PATH snippet
+├── install.sh                      Symlinks claude/* into ~/.claude/; wires the shell config; adds GitHub host keys
 ├── README.md                       This file
 ├── AGENTS.md                       Project instructions for Claude Code sessions in this repo
-├── Brewfile                        Homebrew formulae, casks, taps; refreshed daily by shared.bash
+├── Brewfile                        Homebrew formulae, casks, taps; the daily refresh in shared.bash only adds entries
+├── .conventional-commits           Opt-in marker: turns on the commit message lint in this repo
+├── .github/workflows/tests.yml     CI: the test suite on macOS, then the bootstrap suites on bash 3.2
 ├── .lintr                          → ~/.lintr   Global R style config
 ├── .env.example                    Structural template, this repo consumes nothing from .env
 ├── bash/
@@ -39,16 +41,16 @@ anaiis-dotfiles/
 │   └── web-verify                  CLI wrapper: serve + Playwright verify + teardown
 ├── evals/
 │   └── ponytail/                   `claude plugin eval` suite for the ponytail plugin: run.sh, build-rules-prompt.sh, loc.sh, cases under evals/
+├── reports/                        Measurement write-ups (the ponytail A/B report)
 ├── claude/
-│   ├── CLAUDE.md                   → ~/.claude/CLAUDE.md   Short index; rules live in rules/
 │   ├── settings.json               → ~/.claude/settings.json   Permissions, hooks, model, status line
 │   ├── keybindings.json            → ~/.claude/keybindings.json   shift+enter / alt+enter = newline
-│   ├── rules/                      → ~/.claude/rules/   Behavioral constraints (auto-loaded)
+│   ├── rules/                      → ~/.claude/rules/   Behavioral constraints and global context (auto-loaded; no index file)
 │   ├── commands/                   → ~/.claude/commands/   Custom slash commands
 │   ├── skills/                     → ~/.claude/skills/   Mount point for local and synced skills; anaiis-* skills come from the marketplace
 │   ├── agents/                     → ~/.claude/agents/   Intentionally empty; skill agents live in the plugin cache
 │   ├── hooks/                      → ~/.claude/hooks/   Hook scripts (referenced by settings.json)
-│   ├── scripts/                    → ~/.claude/scripts/   Utility scripts (brew-sync.sh, brew-share.sh, seed-memory.sh, usage-report.sh, lint-staged dispatchers)
+│   ├── scripts/                    → ~/.claude/scripts/   Utility scripts (bootstrap-doctor.sh, brew-sync.sh, brew-share.sh, commit-msg-lint.sh, install-repo-hooks.sh, rules-doctor.sh, seed-memory.sh, usage-report.sh, lint-staged dispatchers)
 │   ├── memory/                     → ~/.claude/memory/   Global memory tier (git-tracked, delivered at SessionStart)
 │   └── memory-templates/           Project-tier templates copied by seed-memory.sh (MEMORY.md, project_current_phase.md)
 ├── templates/
@@ -58,6 +60,7 @@ anaiis-dotfiles/
 │   └── playwright-static/          Static HTML smoke test scaffold (package.json, playwright.config.ts)
 ├── tests/
 │   ├── fixtures/                   Test fixture files
+│   ├── lib/                        Test helpers: fresh-home.sh (throwaway HOME), cov.sh (approximate line coverage from xtrace)
 │   ├── e2e-nested-session.sh       Opt-in (`E2E=1`) hook checks in real nested `claude -p` sessions; `E2E_OLD_REF=<ref>` replays them against older hooks
 │   ├── measure-memory-injection.sh  Memory injection overhead measurement
 │   ├── measure-userpromptsubmit.sh  Hook-latency measurement (run when chain grows)
@@ -65,19 +68,28 @@ anaiis-dotfiles/
 │   ├── SMOKE-TESTS.md              Manual smoke test scenarios
 │   ├── test-bash-guard.sh          bash-guard.sh deny/allow/ask assertions (destructive cmds, secrets path blocking, env-dump blocking, prefer-jq, recursive-rm scoping, uv add/pip install notice)
 │   ├── test-block-sensitive-writes.sh   block-sensitive-writes.sh deny/allow assertions
+│   ├── test-bootstrap-doctor.sh    bootstrap-doctor.sh: an ok line or a MISSING line for each check, and the exit code
 │   ├── test-branching.sh           Trivial-edit criteria and branch-reuse logic
-│   ├── test-claude-md-rules.sh     Validates CLAUDE.md rules index against rules/ on disk
+│   ├── test-brew-sync.sh           brew-sync.sh dump and refresh only add Brewfile entries; shared.bash calls refresh
+│   ├── test-commit-msg-lint.sh     commit-msg-lint.sh rules R0 to R11, exempt subjects, --types, and real commits through the hook
 │   ├── test-compact-hooks.sh       PreCompact handoff-writing end-to-end test
 │   ├── test-context-watch.sh       context-watch.sh 60% directive emit/one-shot assertions
 │   ├── test-cost-guard.sh          cost-guard.sh tiering, hard-block, and limit-override assertions
 │   ├── test-em-dash-guard.sh       Verifies block-em-dash.sh hook fires on U+2014 payloads
 │   ├── test-install-bashrc.sh      install.sh symlink and bashrc wiring assertions
+│   ├── test-install-fresh-home.sh  The real install.sh run twice on an empty HOME: no abort, no change the second time; the doctor agrees
+│   ├── test-install-hostkeys.sh    install.sh --hostkeys-only with a stub gh: writes only when the fingerprints match
+│   ├── test-lib-cov.sh             tests/lib/cov.sh counts executed lines on a known fixture
+│   ├── test-lib-fresh-home.sh      tests/lib/fresh-home.sh builds a throwaway HOME and never touches the real one
+│   ├── test-maintenance-check.sh   maintenance-check.sh on a HOME with no plans or projects folder
 │   ├── test-memory-doctor-guardrails.sh  Proves memory-doctor.sh checks I-M fail-then-pass
 │   ├── test-memory-hooks.sh        Memory seed hook and marker-pruning assertions
 │   ├── test-migrate-memory-guard.sh  migrate-memory.sh dry-run-default and template-stub-refusal assertions
+│   ├── test-no-stale-refs.sh       No tracked file names a removed thing; README.md and AGENTS.md name only tracked repo paths
 │   ├── test-post-edit-lint-dispatch.sh  PostToolUse lint hook dispatch tests
 │   ├── test-r-lint-staged.sh       r-lint-staged.sh assertions
-│   ├── test-repo-hook-install.sh   install-repo-hooks.sh and ensure-repo-hooks.sh assertions
+│   ├── test-repo-hook-install.sh   install-repo-hooks.sh and ensure-repo-hooks.sh: three hooks in a plain repo, a linked worktree, and a core.hooksPath repo
+│   ├── test-rules-integrity.sh     rules-doctor.sh passes a green tree and names each targeted check when every drift is applied at once
 │   ├── test-session-start-context.sh  session-start-context.sh additionalContext delivery assertions
 │   ├── test-staged-lint-dispatch.sh     Pre-commit staged-lint hook dispatch tests
 │   ├── test-statusline-context-bridge.sh  statusline pct-file write and 60% marker assertions
@@ -87,6 +99,8 @@ anaiis-dotfiles/
 ---
 
 ## Setup on a new machine
+
+Do the steps in this order. Steps 1 to 5 prepare the machine. Steps 6 and 7 apply to each project.
 
 ### 1. Clone
 
@@ -100,21 +114,69 @@ git clone git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/anaiis-dotfiles
 bash ~/anaiis-dotfiles/install.sh
 ```
 
-Each line prints `ok` (already linked), `link` (newly created), or `SKIP` (real file present, back up and remove first).
+The installer runs these phases in order:
 
-`bash install.sh --symlinks-only` creates only the `~/anaiis-dotfiles` and `~/.claude` symlinks and stops before the shell-config, graphify, CLI-tool, R-style, and Homebrew phases. CI uses this mode to build the `~/.claude` tree the test suite expects.
+1. It links `~/anaiis-dotfiles` to the repo when the repo lives elsewhere. Then it links `claude/settings.json`, `claude/keybindings.json`, and the `claude/` folders (`rules`, `commands`, `skills`, `agents`, `hooks`, `scripts`, `memory`) into `~/.claude/`.
+2. It wires the shell config.
+3. It adds the GitHub host keys.
+4. It links `claude-cleanup` into `~/.local/bin/` and `.lintr` to `~/.lintr`. It prints the Homebrew commands and does not run them.
 
-### 3. Add bin/ to PATH (required for web-verify)
+Each output line starts with a status word. `ok` means nothing changed. `link` and `add` mean the installer wrote something. `unlink` means it removed the old `CLAUDE.md` link. `note` and `skip` name a step that it left alone, with the reason. `SKIP` means a real file blocks a link: back it up and remove it first. A second run prints no `link` and no `add` line.
 
-The installer prints this line; copy it into your shell config (one of `~/.bashrc`, `~/.zshrc`, `~/.config/fish/config.fish`, whichever your shell reads):
+The installer removes the old `CLAUDE.md` link from `~/.claude/` when the link points into this repo. It leaves a real file or any other link in place and prints a `note`. Claude Code still reads such a file.
+
+**Shell config.** The installer creates `~/.bashrc` when the file is absent. It leaves the PATH line as it is when the file holds exactly one canonical PATH line. Otherwise it strips every older form of the line and appends the canonical one. It adds a `source` line for `shared.bash`, before the `~/.bashrc.local` line when the file has one. It creates `~/.bash_profile` with one line that sources `~/.bashrc` only when none of `~/.bash_profile`, `~/.bash_login`, and `~/.profile` exists. If `~/.bash_login` or `~/.profile` exists, it prints a `note` and creates nothing. It never edits an existing `~/.bash_profile`.
+
+**GitHub host keys.** A plugin clone over SSH fails when `~/.ssh/known_hosts` has no `github.com` key. The installer adds the keys only when all of these hold:
+
+- `gh` is installed, and `gh config get git_protocol` prints `ssh`.
+- `known_hosts` has no `github.com` entry.
+- The fingerprints of the keys from `gh api meta` equal the fingerprints that the same response lists.
+
+The installer computes the fingerprints of the fetched keys with `ssh-keygen` and requires the two sets to be equal. On any doubt it writes nothing, prints one `skip` line with the reason, and goes on. A doubt is an empty answer, a different fingerprint, a failed tool, or a folder that it cannot write. It creates `~/.ssh` (mode 700) only after the check passes. When it writes, it prints the ED25519 fingerprint. To run only this phase later (for example after `gh auth login`), use `--hostkeys-only`.
+
+Three flags run one part of the installer:
+
+- `--symlinks-only`: phase 1 only, with the removal of the old `CLAUDE.md` link. CI uses it to build the `~/.claude` tree that the test suite expects.
+- `--bashrc-only`: the shell config only.
+- `--hostkeys-only`: the host keys only.
+
+### 3. Open a new terminal
+
+The shell reads the new lines only when it starts. Open a new terminal. The PATH line puts `web-verify` on your PATH. For zsh or fish, the installer does not edit your config. Add the line by hand to the file that your shell reads:
 
 ```bash
 export PATH="$HOME/anaiis-dotfiles/bin:$PATH"
 ```
 
-This puts `web-verify` on your PATH. The old `bin/claude` CodeRabbit wrapper was removed in 2026-05-11; `which claude` now resolves to the real Homebrew-installed CLI.
+The old CodeRabbit wrapper for the `claude` command was removed on 2026-05-11. `which claude` now resolves to the real Homebrew-installed CLI.
 
-### 4. Per-project memory bootstrap
+### 4. Start Claude Code and reload the plugins
+
+Start Claude Code once in a trusted folder. Then run `/reload-plugins` inside Claude Code. The plugins and their marketplaces come from `claude/settings.json` (`enabledPlugins`, `extraKnownMarketplaces`). If a plugin does not load, read the Errors tab of `/plugin`. A GitHub clone over SSH needs the host key from step 2.
+
+### 5. Run the doctor
+
+```bash
+bash ~/.claude/scripts/bootstrap-doctor.sh
+```
+
+The doctor only reads. It prints `ok <what>` for each passing check and `MISSING <what>: <fix>` for each gap. The last line is `doctor: <n> missing`. The doctor exits 1 when `n` is above 0. A check that does not apply prints `ok` with the reason, for example `ok github.com host key (not needed: gh not found)`. The doctor runs six checks:
+
+| # | Check | The fix that the MISSING line names |
+|---|---|---|
+| 1 | `~/.bashrc` exists and holds the PATH line and the `shared.bash` source line | `bash ~/anaiis-dotfiles/install.sh --bashrc-only` |
+| 2 | The login shell file (the first of `~/.bash_profile`, `~/.bash_login`, `~/.profile`) mentions `~/.bashrc` | Add the line that the message prints (`install.sh --bashrc-only` when no login file exists) |
+| 3 | Each of nine `~/.claude` links resolves into `~/anaiis-dotfiles/claude` | `bash ~/anaiis-dotfiles/install.sh --symlinks-only` |
+| 4 | Each plugin that `enabledPlugins` sets to `true` has a folder in `~/.claude/plugins/cache/` | Start Claude Code once, run `/reload-plugins`, read the Errors tab of `/plugin` |
+| 5 | When `gh` uses the SSH protocol, `~/.ssh/known_hosts` holds a `github.com` key | `bash ~/anaiis-dotfiles/install.sh --hostkeys-only` |
+| 6 | When `claude` is on PATH, its version is at least 2.1.277 (the first version that reads `AGENTS.md`) | Update Claude Code |
+
+The nine links in check 3 are `settings.json`, `keybindings.json`, `rules`, `commands`, `skills`, `agents`, `hooks`, `scripts`, and `memory`. Check 4 needs `jq`. Without `jq` the doctor prints `MISSING jq (needed to read the plugin list): brew install jq`.
+
+Do not use `claude plugin list` as the check. The doctor reads the plugin cache folders (check 4). A plugin shows MISSING until Claude Code has fetched it, so run the doctor after step 4.
+
+### 6. Per-project memory bootstrap
 
 Run once from each project root you'll use Claude in:
 
@@ -123,15 +185,25 @@ cd /path/to/project
 bash ~/.claude/scripts/seed-memory.sh
 ```
 
-Then edit `~/.claude/projects/<encoded-path>/memory/project_current_phase.md`.
+In Claude Code, `/seed-project` runs the same script. Then edit `~/.claude/projects/<encoded-path>/memory/project_current_phase.md`.
 
-### 5. Repo hooks: pre-commit lint, pre-push tests
+### 7. Repo hooks: pre-commit lint, pre-push tests, commit-msg lint
 
-Two dispatcher hooks go into every repo. `pre-commit` runs the staged-file linters (R, Python, Shell, JSON, SQL) so commits stay fast. `pre-push` runs the repo's `tests/run-all.sh`, if it has one, so the full suite gates code leaving the machine rather than every commit (`SKIP_TESTS=1 git push` to bypass). A push with nothing to send, or one that only deletes remote branches, skips the suite and returns git's own `Everything up-to-date`. When working in Claude Code, both install automatically on the first prompt in any repo via `ensure-repo-hooks.sh`, which also adds `pre-push` to repos that only have `pre-commit`. For repos you commit to outside Claude (direct CLI commits, CI), run once from the project root:
+Three dispatcher hooks go into every repo:
+
+- `pre-commit` runs the staged-file linters (R, Python, Shell, JSON, SQL) so commits stay fast.
+- `pre-push` runs the repo's `tests/run-all.sh`, if it has one. The full suite then gates code that leaves the machine, not every commit (`SKIP_TESTS=1 git push` to bypass). A push with nothing to send, or one that only deletes remote branches, skips the suite and returns git's own `Everything up-to-date`.
+- `commit-msg` checks the message against the commit rubric in `rules/git.md` (section "Commit rubric"). It checks only in a repo that has a `.conventional-commits` file at its root. This repo tracks that file. Other repos accept any message. The hook rejects a message that breaks a rule. It prints one `commit-msg-lint: R<n> <reason>` line for each rule (`SKIP_COMMIT_LINT=1 git commit` to bypass).
+
+To check a draft before you commit, run `bash ~/.claude/scripts/commit-msg-lint.sh <message-file>`. The flag `--types` prints the allowed types.
+
+In Claude Code, `ensure-repo-hooks.sh` installs all three on the first prompt in any repo. It also adds the missing hooks to a repo that has only some of them. For repos you commit to outside Claude (direct CLI commits, CI), run once from the project root:
 
 ```bash
 bash ~/.claude/scripts/install-repo-hooks.sh
 ```
+
+The installer asks git where the hooks folder is (`git rev-parse --git-path hooks`). In a linked worktree that is the one folder that all worktrees share. When `core.hooksPath` is set, the installer writes the three dispatchers there and not into `.git/hooks`.
 
 ---
 
@@ -217,17 +289,20 @@ All custom skills are served by the `datasci-iopsy/anaiis-plugins` marketplace, 
 | Command | What it does |
 |---|---|
 | `/seed-project` | Init per-project memory files from templates |
-| `/install-hooks` | Install the pre-commit lint and pre-push test dispatchers in a repo |
+| `/install-hooks` | Install the pre-commit lint, pre-push test, and commit-msg lint dispatchers in a repo |
 
 ### Rules
 
+Claude Code loads every file in `~/.claude/rules/` by itself, so no index file exists. `rules-doctor.sh` checks that each rule file has a `description:` line and that each `rules/<name>.md` named in a rule file exists.
+
 | File | Covers |
 |---|---|
+| `rules/context.md` | Project context, build scope, rule precedence, author identity, machine-local rule files, memory tiers, Postman CLI note |
 | `rules/behavioral.md` | The 8 imperatives: authorization before action, model judgment scope, surface conflicts, fail loud, plan and checkpoint, hook output is not user input, investigate is read-only, check before you ask or hedge. Build scope (how much code to write) is the ponytail plugin's, see Skills |
 | `rules/environment.md` | macOS, Bash, direnv, uv, worktree safety, rm -rf splitting |
 | `rules/tools.md` | gh, jq, gcloud, make, structured CLI output flags |
 | `rules/code-style.md` | ASD-STE100 default writing register, shell formatting, no emojis, convention conformance |
-| `rules/git.md` | Typed branches (`claude-<type>/<ticket>-<desc>`), trivial-edit criteria, Conventional Commit subjects, PR title format, push, worktrees for parallel work only |
+| `rules/git.md` | Typed branches (`claude-<type>/<ticket>-<desc>`), trivial-edit criteria, the commit rubric (section "Commit rubric": types, subject grammar, footers, breaking changes, reverts, opt-in lint), PR title format, push, worktrees for parallel work only |
 | `rules/r-conventions.md` | Vectorization, lapply/vapply, lintr style |
 | `rules/python.md` | uv, direnv, ruff |
 | `rules/session.md` | Token efficiency, subagent limits, context thresholds, output preferences |
@@ -248,9 +323,9 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 
 | Event | Matcher | Script | Behavior |
 |---|---|---|---|
-| `UserPromptSubmit` |, | `maintenance-check.sh` | Weekly plan-file check; monthly session-storage check; weekly repo-hooks audit |
-| `UserPromptSubmit` |, | `ensure-repo-hooks.sh` | Silently installs the pre-commit and pre-push dispatchers in the current repo if either is missing |
-| `UserPromptSubmit` |, | `list-merged-claude-branches.sh` | Advisory: lists merged `claude/*` branches and shows the delete command |
+| `UserPromptSubmit` |, | `maintenance-check.sh` | Weekly plan-file check; monthly session-storage check; weekly repo-hooks audit (pre-commit and commit-msg dispatchers) |
+| `UserPromptSubmit` |, | `ensure-repo-hooks.sh` | Silently installs the pre-commit, pre-push, and commit-msg dispatchers in the current repo if any is missing. Works in a linked worktree |
+| `UserPromptSubmit` |, | `list-merged-claude-branches.sh` | Advisory: lists merged Claude branches (`claude-<type>/*`, and legacy `claude/*`) and shows the delete command |
 | `SessionStart` | `startup\|resume\|clear\|compact` | `session-start-context.sh` | Delivers the global memory tier via `additionalContext` (startup/clear/compact); restores the newest pre-compact handoff (compact); advises `/seed-project` when the current project has no memory dir; delivery-gated monthly staleness advisory |
 | `PostToolUse` | `Edit\|Write` | `post-edit-lint.sh` | `.py` ruff; `.sh` shfmt (auto-fix) + shellcheck; `.sql` sqlfmt; `.R` lintr; `.json` jq --indent 4 |
 | `PostToolUse` | `*` | `context-watch.sh` | At >=55% context (read from the statusline's per-session pct file), five points ahead of the 60% harness backstop, emits a one-shot directive to checkpoint and continue |
@@ -264,6 +339,7 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 | `StatusLine` | n/a | `statusline-command.sh` (in `scripts/`) | Custom status line display; also bridges the exact context percentage to `context-watch.sh` via a per-session `/tmp` file |
 | (in project repos) | n/a | `repo-pre-commit.sh` | Pre-commit dispatcher: staged-file linters only (R, Python, Shell, JSON, SQL); installed into repos by `install-repo-hooks.sh`; not a Claude Code hook |
 | (in project repos) | n/a | `repo-pre-push.sh` | Pre-push dispatcher: runs the repo's `tests/run-all.sh` when present and the push sends commits (skipped for no-op pushes and deletions; `SKIP_TESTS=1 git push` to bypass); installed alongside pre-commit; not a Claude Code hook |
+| (in project repos) | n/a | `repo-commit-msg.sh` | Commit-msg dispatcher: runs `commit-msg-lint.sh` only in a repo with a `.conventional-commits` file at its root (the opt-in marker); skipped when the marker or the validator is absent or `SKIP_COMMIT_LINT=1`; installed alongside the other two; not a Claude Code hook |
 
 Hook latency on this machine (measured 2026-07-15, 3-hook chain after the memory-delivery hooks moved to SessionStart): aggregate UserPromptSubmit chain median = **81 ms** (under 100 ms target). Re-measure with `bash tests/measure-userpromptsubmit.sh` if the chain grows.
 
@@ -289,10 +365,31 @@ Hook latency on this machine (measured 2026-07-15, 3-hook chain after the memory
 
 The `tests` GitHub Actions check (`.github/workflows/tests.yml`) runs the same command on `macos-latest` for every pull request and for pushes to `main`. The runner installs Homebrew `bash`, `shfmt`, and `shellcheck` only if the image lacks them, then runs `install.sh --symlinks-only` to build the `~/.claude` symlink tree the hooks expect. macOS on purpose: the hooks use BSD-only forms (`date -j`, `stat -f`) and only ever run on macOS.
 
+A last CI step runs seven bootstrap suites with `/bin/bash`, which is bash 3.2 on macOS, and stops at the first failure. A fresh Mac starts on bash 3.2, so the new scripts must run there. The seven suites are `test-brew-sync`, `test-maintenance-check`, `test-install-bashrc`, `test-install-hostkeys`, `test-bootstrap-doctor`, `test-no-stale-refs`, and `test-install-fresh-home`.
+
 ```bash
 bash tests/run-all.sh                       # full suite, the same command CI runs
 bash tests/test-bash-guard.sh               # one suite while iterating
+/bin/bash tests/test-no-stale-refs.sh       # one suite on bash 3.2
+COV=1 bash tests/test-brew-sync.sh          # adds approximate line coverage (bash 4.1 or later)
 ```
+
+The suites for the bootstrap and commit-lint scripts accept `COV=1`. The helper is `tests/lib/cov.sh`. On bash 3.2 it prints one `SKIP` line, and the suite still passes. The doc check in `tests/test-no-stale-refs.sh` fails when this README or `AGENTS.md` names a path that git does not track. Here a path is a backticked name that starts with `claude/`, `tests/`, `bash/`, or `bin/`.
+
+---
+
+## Worktrees
+
+Use a worktree only for parallel work (see `rules/git.md`). The default is a branch in place.
+
+- **Where.** Worktrees live under `tmp/worktrees/<id>` inside the main checkout. Git ignores `tmp/`, `tasks/`, and `spec/`. Those folders exist only in the main checkout, so edit them there by absolute path.
+- **Live config.** The `~/.claude/*` links point at `~/anaiis-dotfiles/claude/`, which is the main checkout. `install.sh` resolves the main worktree as the canonical path, even when you run it from a worktree. Hook commands in `claude/settings.json` call `$HOME/.claude/hooks/...`, so a hook runs the code of the main checkout. A change in a worktree reaches `~/.claude/` only after it merges.
+- **Tests.** Run `bash tests/run-all.sh` from the worktree root. A script that reads `~/.claude` needs a throwaway HOME. `tests/lib/fresh-home.sh` builds one whose `~/.claude` links point at the worktree under test.
+- **Installer.** Test `install.sh` only in a throwaway HOME. Even there, its links point at the main checkout and not at the worktree.
+- **Git hooks.** All worktrees share one hooks folder. Test hook installers only in a throwaway repo. `install-repo-hooks.sh` and `ensure-repo-hooks.sh` work in a linked worktree.
+- **Memory.** The project key comes from the working directory, so each worktree has its own project memory tier. Memory saved in one worktree does not appear in another.
+- **Stop hook.** `stop-hook-git-check.sh` reports only the git state of the current folder. Check another worktree with `git -C <path> status --short`.
+- **Parallel work.** Two worktrees that edit the same file create a merge risk. Give each worktree its own set of files.
 
 ---
 
@@ -333,14 +430,16 @@ bash ~/anaiis-dotfiles/claude/scripts/brew-sync.sh install
 # Check for drift (packages installed but not in Brewfile, or missing)
 bash ~/anaiis-dotfiles/claude/scripts/brew-sync.sh check
 
-# After installing something new: refresh the Brewfile and commit
+# After installing something new: add it to the Brewfile and commit
 bash ~/anaiis-dotfiles/claude/scripts/brew-sync.sh dump
-git add Brewfile && git commit -m "chore: add <formula> to Brewfile"
+git add Brewfile && git commit -m "build(deps): add <formula> to Brewfile"
 ```
 
 `install.sh` prints the `install` command as a reminder but does not run it automatically (bundle install can take several minutes on a fresh machine and may prompt for sudo).
 
-`shared.bash` refreshes the Brewfile from the installed packages once per day in the background. The file changes only when the package set changed, and the shell prints a one-line notice when it does. Commit the refreshed file from a dotfiles session.
+**The Brewfile refresh is additive only.** `dump` and the daily refresh add entries and never remove or rewrite a line. An entry is new when its type and quoted name (for example `brew "pup"`) are not in the file yet. When an existing line has the same key, the existing line stays, so `brew "pup", trusted: true` is not duplicated. Several profiles share the package list, and a profile may lack a package that another profile installed. To remove an entry, edit `Brewfile` by hand.
+
+`shared.bash` runs `brew-sync.sh refresh` in the background at each shell start. The `refresh` verb works at most once per 24 hours. It stays silent unless it added entries, and then it prints a one-line notice. Commit the changed file from a dotfiles session.
 
 ### Shared prefix across macOS profiles
 
@@ -356,7 +455,7 @@ It adds two inheritable ACL entries for group `admin` to the prefix, one for dir
 
 ## Per-machine prerequisites
 
-`install.sh` only handles symlinks. The CLI tools the hooks need (`gh`, `jq`, `shellcheck`, `shfmt`, `ruff`, `uv`, `shandy-sqlfmt`) are in the Brewfile; install them with:
+`install.sh` links the config and wires the shell. It does not install packages. The CLI tools the hooks need (`gh`, `jq`, `shellcheck`, `shfmt`, `ruff`, `uv`, `shandy-sqlfmt`) are in the Brewfile; install them with:
 
 ```bash
 bash ~/anaiis-dotfiles/claude/scripts/brew-sync.sh install
