@@ -12,6 +12,8 @@
 #
 # Exit 0 on full pass; non-zero on any failure.
 
+# SC2016: single quotes hold literal backticks and "$HOME" text on purpose.
+# shellcheck disable=SC2016
 set -u
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -288,6 +290,52 @@ mkdir -p "$WORK/norepo"
 printf 'bad message\n' >"$WORK/norepo/msg"
 (cd "$WORK/norepo" && GIT_CEILING_DIRECTORIES="$WORK" HOME="$TMP_HOME" "$BASH" "$REPO_DIR/claude/hooks/repo-commit-msg.sh" "$WORK/norepo/msg" >/dev/null 2>&1)
 assert_eq "H.9 outside a git repo the hook exits 0" "0" "$?"
+
+# ── Rubric drift: claude/rules/git.md must agree with the validator ───────
+# The rubric is prose and the validator is code. These cases keep them equal:
+# the types table matches --types, and every example in the doc passes the
+# validator. Fail-to-fail: D.2 runs the same comparison on a copy of git.md
+# with one type removed and requires a mismatch.
+echo "# Rubric (rules/git.md)"
+GIT_MD="${GIT_MD_UNDER_TEST:-$REPO_DIR/claude/rules/git.md}"
+
+# git_md_types <file>: the types in the "Commit types" table, one per line, sorted.
+git_md_types() {
+	sed -n '/^### Commit types/,/^#/p' "$1" | sed -n 's/^| `\([a-z]*\)` |.*/\1/p' | sort
+}
+
+# types_verdict <file>: "same" when the table and --types agree, else "differs".
+types_verdict() {
+	if [ "$(git_md_types "$1")" = "$("$BASH" "$LINT" --types | sort)" ]; then
+		echo same
+	else
+		echo differs
+	fi
+}
+
+# fenced_block <file> <heading>: the body of the first fenced block after the heading.
+fenced_block() {
+	awk -v h="$2" '$0 == h {f = 1; next} f && /^```/ {if (inb) exit; inb = 1; next} f && inb {print}' "$1"
+}
+
+assert_eq "D.1 the git.md commit types table equals --types" "same" "$(types_verdict "$GIT_MD")"
+grep -v '^| `perf` ' "$GIT_MD" >"$WORK/git-md-short"
+assert_eq "D.2 the same check fails on a git.md copy with one type removed" "differs" "$(types_verdict "$WORK/git-md-short")"
+
+EX_N=0
+EX_BAD=0
+while IFS= read -r example; do
+	[ -n "$example" ] || continue
+	EX_N=$((EX_N + 1))
+	run_lint "$example"
+	[ "$LINT_RC" -eq 0 ] || EX_BAD=$((EX_BAD + 1))
+done <<<"$(fenced_block "$GIT_MD" "### Subject examples")"
+assert_eq "D.3 every subject example in git.md passes the validator" "0" "$EX_BAD"
+assert_eq "D.4 git.md holds at least six subject examples" "1" "$([ "$EX_N" -ge 6 ] && echo 1 || echo 0)"
+expect_pass "D.5 the full message example in git.md passes the validator" "$(fenced_block "$GIT_MD" "### Full message example")"
+has_text() { if grep -qF -- "$1" "$GIT_MD"; then echo 1; else echo 0; fi; }
+assert_eq "D.6 git.md names the validator, the opt-in marker, and the bypass" "1 1 1" \
+	"$(has_text 'commit-msg-lint.sh') $(has_text '.conventional-commits') $(has_text 'SKIP_COMMIT_LINT=1')"
 
 # ── Summary ───────────────────────────────────────────────────────────────
 if [ -n "${COV:-}" ]; then
