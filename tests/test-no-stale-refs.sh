@@ -7,8 +7,8 @@
 # keeps each removed thing gone. Each stream that removes something appends its tokens to
 # DEAD_TOKENS.
 #
-# Same pattern as tests/test-no-rtk.sh: scan the tracked files, and prove the scanner fails on a
-# tree that still holds a token (section 0).
+# Same pattern as the suite that guards the other removed tool: scan the tracked files, and
+# prove the scanner fails on a tree that still holds a token (section 0).
 #
 # Exemption: AGENTS.md and README.md still describe the removal in prose. Stream d-docs-sync owns
 # both files. It rewrites them and then deletes the two names from EXEMPT_FILES.
