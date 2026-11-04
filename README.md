@@ -143,7 +143,7 @@ Three flags run one part of the installer:
 
 ### 3. Open a new terminal
 
-The shell reads the lines that the installer wrote only when it starts, so open a new terminal. The PATH line puts `web-verify` on your PATH. For zsh or fish, the installer does not edit your config. Add the line by hand to the file that your shell reads:
+The shell reads the new lines only when it starts. Open a new terminal. The PATH line puts `web-verify` on your PATH. For zsh or fish, the installer does not edit your config. Add the line by hand to the file that your shell reads:
 
 ```bash
 export PATH="$HOME/anaiis-dotfiles/bin:$PATH"
@@ -324,7 +324,7 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 | Event | Matcher | Script | Behavior |
 |---|---|---|---|
 | `UserPromptSubmit` |, | `maintenance-check.sh` | Weekly plan-file check; monthly session-storage check; weekly repo-hooks audit (pre-commit and commit-msg dispatchers) |
-| `UserPromptSubmit` |, | `ensure-repo-hooks.sh` | Silently installs the pre-commit, pre-push, and commit-msg dispatchers in the current repo if any is missing; works in a linked worktree |
+| `UserPromptSubmit` |, | `ensure-repo-hooks.sh` | Silently installs the pre-commit, pre-push, and commit-msg dispatchers in the current repo if any is missing. Works in a linked worktree |
 | `UserPromptSubmit` |, | `list-merged-claude-branches.sh` | Advisory: lists merged Claude branches (`claude-<type>/*`, and legacy `claude/*`) and shows the delete command |
 | `SessionStart` | `startup\|resume\|clear\|compact` | `session-start-context.sh` | Delivers the global memory tier via `additionalContext` (startup/clear/compact); restores the newest pre-compact handoff (compact); advises `/seed-project` when the current project has no memory dir; delivery-gated monthly staleness advisory |
 | `PostToolUse` | `Edit\|Write` | `post-edit-lint.sh` | `.py` ruff; `.sh` shfmt (auto-fix) + shellcheck; `.sql` sqlfmt; `.R` lintr; `.json` jq --indent 4 |
@@ -339,7 +339,7 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 | `StatusLine` | n/a | `statusline-command.sh` (in `scripts/`) | Custom status line display; also bridges the exact context percentage to `context-watch.sh` via a per-session `/tmp` file |
 | (in project repos) | n/a | `repo-pre-commit.sh` | Pre-commit dispatcher: staged-file linters only (R, Python, Shell, JSON, SQL); installed into repos by `install-repo-hooks.sh`; not a Claude Code hook |
 | (in project repos) | n/a | `repo-pre-push.sh` | Pre-push dispatcher: runs the repo's `tests/run-all.sh` when present and the push sends commits (skipped for no-op pushes and deletions; `SKIP_TESTS=1 git push` to bypass); installed alongside pre-commit; not a Claude Code hook |
-| (in project repos) | n/a | `repo-commit-msg.sh` | Commit-msg dispatcher: runs `commit-msg-lint.sh` on the message in a repo that has a `.conventional-commits` file at its root (the opt-in marker; this repo tracks one); no marker, `SKIP_COMMIT_LINT=1`, or a missing validator means exit 0 at once; installed alongside the other two; not a Claude Code hook |
+| (in project repos) | n/a | `repo-commit-msg.sh` | Commit-msg dispatcher: runs `commit-msg-lint.sh` only in a repo with a `.conventional-commits` file at its root (the opt-in marker); skipped when the marker or the validator is absent or `SKIP_COMMIT_LINT=1`; installed alongside the other two; not a Claude Code hook |
 
 Hook latency on this machine (measured 2026-07-15, 3-hook chain after the memory-delivery hooks moved to SessionStart): aggregate UserPromptSubmit chain median = **81 ms** (under 100 ms target). Re-measure with `bash tests/measure-userpromptsubmit.sh` if the chain grows.
 
