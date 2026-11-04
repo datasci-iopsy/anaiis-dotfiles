@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # clean-plans.sh -- remove plan files older than N days (default: 14)
-# Usage: bash ~/.claude/clean-plans.sh [days]
+# Usage: bash ~/.claude/scripts/clean-plans.sh [days]
 
 set -euo pipefail
 PLAN_DIR="$HOME/.claude/plans"
