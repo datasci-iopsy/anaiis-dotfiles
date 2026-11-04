@@ -216,6 +216,34 @@ H="$(build_home)"
 printf '# [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"\n' >"$H/.bash_profile"
 expect_one "2.6 a commented-out .bashrc line does not count" "$H" \
 	"MISSING ~/.bash_profile (never mentions ~/.bashrc): $FIX_LOGIN"
+# A file that sources only ~/.bashrc.local never loads ~/.bashrc in a login shell. A file whose
+# name only starts with .bashrc is not .bashrc.
+# shellcheck disable=SC2016 # $HOME stays literal in the fixture file
+for line in 'source "$HOME/.bashrc.local"' '. ~/.bashrc_old' '[ -f ~/.bashrc.bak ] && . ~/.bashrc.bak'; do
+	H="$(build_home)"
+	printf '%s\n' "$line" >"$H/.bash_profile"
+	expect_one "2.7 only '$line' does not count" "$H" \
+		"MISSING ~/.bash_profile (never mentions ~/.bashrc): $FIX_LOGIN"
+done
+# Each real way to source .bashrc still counts, also with a trailing comment.
+# shellcheck disable=SC2016 # $HOME stays literal in the fixture file
+for line in \
+	'[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"' \
+	'source ~/.bashrc' \
+	'. ~/.bashrc' \
+	'. "${HOME}/.bashrc"' \
+	'if [ -f ~/.bashrc ]; then . ~/.bashrc; fi' \
+	'[ -r ~/.bashrc ] && source ~/.bashrc # shell config'; do
+	H="$(build_home)"
+	printf '%s\n' "$line" >"$H/.bash_profile"
+	doctor "$H"
+	assert_eq "2.8 '$line' counts: exit 0" 0 "$RC"
+done
+H="$(build_home)"
+# shellcheck disable=SC2016 # $HOME stays literal in the fixture file
+printf 'source "$HOME/.bashrc.local"\n. ~/.bashrc\n' >"$H/.bash_profile"
+doctor "$H"
+assert_eq "2.9 a .bashrc.local line does not hide a real .bashrc line: exit 0" 0 "$RC"
 
 echo "--- 3. the nine ~/.claude links"
 for name in $NAMES; do
