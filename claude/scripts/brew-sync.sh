@@ -17,9 +17,13 @@ BREWFILE="$CANONICAL/Brewfile"
 verb="${1:-}"
 
 # refresh runs from every shell start, so it stays silent unless it has work to do.
+if ! command -v brew >/dev/null 2>&1; then
+	[ "$verb" = refresh ] || echo "brew not found -- install Homebrew first: https://brew.sh"
+	exit 0
+fi
+
 if [ "$verb" = refresh ]; then
 	STAMP="${XDG_CACHE_HOME:-$HOME/.cache}/brewfile-check.stamp"
-	command -v brew >/dev/null 2>&1 || exit 0
 	[ -f "$BREWFILE" ] || exit 0
 	[ -w "${HOMEBREW_PREFIX:-/opt/homebrew}" ] || exit 0
 	if [ -f "$STAMP" ]; then
@@ -28,11 +32,6 @@ if [ "$verb" = refresh ]; then
 	fi
 	mkdir -p "$(dirname "$STAMP")"
 	touch "$STAMP"
-fi
-
-if ! command -v brew >/dev/null 2>&1; then
-	echo "brew not found -- install Homebrew first: https://brew.sh"
-	exit 0
 fi
 
 # merge_dump: append the entries of a fresh `brew bundle dump` whose key is absent from the

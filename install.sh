@@ -68,10 +68,8 @@ wire_bashrc() {
 	local tmp_bashrc
 	# A fresh machine has no ~/.bashrc, and awk below fails on a missing file.
 	[ -f "$BASHRC" ] || touch "$BASHRC"
-	if [ "$(grep -c 'anaiis-dotfiles/bin' "$BASHRC")" = 1 ] && grep -qxF "$PATH_LINE" "$BASHRC"; then
-		# One canonical line is in place. Leave the file alone so a re-run changes nothing.
-		:
-	else
+	# Rewrite unless exactly one canonical line is in place, so a re-run of a good file changes nothing.
+	if [ "$(grep -c 'anaiis-dotfiles/bin' "$BASHRC")" != 1 ] || ! grep -qxF "$PATH_LINE" "$BASHRC"; then
 		tmp_bashrc="$(mktemp "${TMPDIR:-/tmp}/bashrc_path_fix.XXXXXX")" || return 1
 		# Strip any prior form (bare export, indented export inside an if-guard, or
 		# duplicates), then append the single canonical line. Idempotent by design.
