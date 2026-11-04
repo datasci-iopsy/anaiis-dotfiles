@@ -10,7 +10,9 @@
 # Checks:
 #   1. ~/.bashrc exists and holds the PATH line and the shared.bash source line
 #   2. the login shell file (the first of ~/.bash_profile, ~/.bash_login, ~/.profile) mentions ~/.bashrc
-#   3. each ~/.claude link resolves into ~/anaiis-dotfiles/claude/
+#   3. each ~/.claude link resolves to its own target in ~/anaiis-dotfiles/claude/
+#
+# In checks 1 and 2 a line that starts with # does not count: the shell never reads it.
 #   4. each enabled plugin has a folder in ~/.claude/plugins/cache/
 #   5. when gh uses the ssh protocol, known_hosts holds a github.com key
 #
@@ -48,16 +50,22 @@ phys() {
 	printf '%s/%s\n' "$d" "$(basename "$p")"
 }
 
+# active <file> <regex>: succeed when a line holds the pattern and its first character other than
+# a space or a tab is not #. A line that ends in a comment still counts.
+active() {
+	grep -qE "^[[:space:]]*([^[:space:]#].*)?$2" "$1"
+}
+
 # ---- 1. ~/.bashrc -----------------------------------------------------------
 if [ ! -f "$HOME/.bashrc" ]; then
 	missing "~/.bashrc (absent)" "$FIX_BASHRC"
 else
-	if grep -qF 'anaiis-dotfiles/bin' "$HOME/.bashrc"; then
+	if active "$HOME/.bashrc" 'anaiis-dotfiles/bin'; then
 		ok "~/.bashrc PATH line"
 	else
 		missing "~/.bashrc PATH line" "$FIX_BASHRC"
 	fi
-	if grep -qF 'anaiis-dotfiles/bash/shared.bash' "$HOME/.bashrc"; then
+	if active "$HOME/.bashrc" 'anaiis-dotfiles/bash/shared[.]bash'; then
 		ok "~/.bashrc shared.bash line"
 	else
 		missing "~/.bashrc shared.bash line" "$FIX_BASHRC"
@@ -75,7 +83,7 @@ for f in .bash_profile .bash_login .profile; do
 done
 if [ -z "$login" ]; then
 	missing "login shell file (no ~/.bash_profile, ~/.bash_login, or ~/.profile)" "$FIX_BASHRC"
-elif grep -qF '.bashrc' "$HOME/$login"; then
+elif active "$HOME/$login" '[.]bashrc'; then
 	ok "~/$login mentions ~/.bashrc"
 else
 	missing "~/$login (never mentions ~/.bashrc)" "$FIX_LOGIN"
@@ -95,7 +103,8 @@ for name in settings.json keybindings.json rules commands skills agents hooks sc
 		resolved="$(phys "$link")"
 		if [ -n "$root" ]; then
 			case "$resolved" in
-				"$root"/*) why="" ;;
+				"$root/$name") why="" ;;
+				"$root"/*) why="points to the wrong place, expected ~/anaiis-dotfiles/claude/$name" ;;
 			esac
 		fi
 	fi

@@ -259,6 +259,34 @@ assert_eq "only .profile exists: one note line" "1" "$(printf '%s\n' "$OUT" | gr
 EMDASH="$(printf '\342\200\224')"
 assert_eq "install.sh has no em dash" "0" "$(LC_ALL=C grep -c "$EMDASH" "$INSTALL" || true)"
 
+# ---- Test 13: a commented-out shared.bash line is not a source line ------
+# Why: the shell never reads a comment. If the installer counts it, --bashrc-only (the fix that
+# bootstrap-doctor.sh prints) changes nothing and the shell still loads no shared.bash.
+CMT_SRC="$TMPDIR_TEST/commented_source"
+mkdir -p "$CMT_SRC"
+# shellcheck disable=SC2016 # $HOME stays literal in the mock file
+printf '# mine\n# source "$HOME/anaiis-dotfiles/bash/shared.bash"\n' >"$CMT_SRC/.bashrc"
+run_capture "$CMT_SRC"
+assert_eq "commented source line: exits 0" "0" "$RC"
+# shellcheck disable=SC2016 # \$ is a regular-expression escape for a literal dollar sign
+assert_eq "commented source line: an active source line is added" "1" \
+	"$(grep -cx 'source "\$HOME/anaiis-dotfiles/bash/shared\.bash"' "$CMT_SRC/.bashrc" || true)"
+# An active line that ends in a comment is still a source line: the installer adds nothing.
+ACT_SRC="$TMPDIR_TEST/trailing_comment_source"
+mkdir -p "$ACT_SRC"
+# shellcheck disable=SC2016 # $HOME stays literal in the mock file
+printf '# mine\nsource "$HOME/anaiis-dotfiles/bash/shared.bash" # prompt\n' >"$ACT_SRC/.bashrc"
+run_capture "$ACT_SRC"
+assert_eq "source line with a trailing comment: nothing is added" "0" \
+	"$(printf '%s\n' "$OUT" | grep -c '^  add  source shared.bash' || true)"
+
+# ---- Test 14: a commented-out .bashrc line in .bash_profile is not a source line
+CMT_PROF="$TMPDIR_TEST/profile_commented"
+mkdir -p "$CMT_PROF"
+printf '# . ~/.bashrc\n' >"$CMT_PROF/.bash_profile"
+run_capture "$CMT_PROF"
+assert_eq "profile with a commented .bashrc line: one note line" "1" "$(printf '%s\n' "$OUT" | grep -c '^  note ' || true)"
+
 if [ -n "${COV:-}" ]; then
 	cov_end
 	cov_report "$INSTALL"

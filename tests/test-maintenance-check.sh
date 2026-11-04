@@ -49,11 +49,13 @@ if [ -n "${COV:-}" ]; then
 	cov_begin "$TMPD/cov.log"
 fi
 
+# new_home <var>: build a throwaway HOME, put its path in <var>, and list it in HOMES for the EXIT trap.
+# Call it without $(...): a subshell would lose the change to HOMES, and the HOME would stay on disk.
 new_home() {
 	local h
-	h="$(fresh_home_new "$REPO_DIR")"
+	h="$(fresh_home_new "$REPO_DIR")" || return 1
 	HOMES="$HOMES $h"
-	printf '%s\n' "$h"
+	printf -v "$1" '%s' "$h"
 }
 
 # Run the hook against HOME $1. Standard error goes to $TMPD/err; the exit code is in RC.
@@ -86,7 +88,7 @@ yesno() {
 }
 
 echo "--- 1. fresh HOME: no plans folder, no projects folder"
-H1="$(new_home)"
+new_home H1
 run_hook "$H1"
 assert_eq "1.1 exit code is 0" 0 "$RC"
 assert_eq "1.2 standard error is empty" "" "$ERR"
@@ -118,7 +120,7 @@ named="${named%%[[:space:]]*}"
 assert_eq "3.3 the named script exists under HOME" yes "$(yesno test -f "$H1/$named")"
 
 echo "--- 4. one plan file older than 14 days"
-H2="$(new_home)"
+new_home H2
 make_plans "$H2" 1
 touch -t 200001010000 "$H2/.claude/plans/plan-1.md"
 run_hook "$H2"
@@ -130,7 +132,7 @@ esac
 assert_eq "4.2 an old file alone triggers the message" yes "$found"
 
 echo "--- 5. plans and projects folders that exist but are empty"
-H3="$(new_home)"
+new_home H3
 make_plans "$H3" 0
 mkdir -p "$H3/.claude/projects"
 run_hook "$H3"
@@ -138,7 +140,7 @@ assert_eq "5.1 exit code is 0" 0 "$RC"
 assert_eq "5.2 empty folders stay silent" "" "$ERR"
 
 echo "--- 6. sessions folder over 50 MB"
-H4="$(new_home)"
+new_home H4
 mkdir -p "$H4/.claude/projects"
 dd if=/dev/zero of="$H4/.claude/projects/big" bs=1048576 count=52 2>/dev/null
 run_hook "$H4"
@@ -150,7 +152,7 @@ esac
 assert_eq "6.2 a big sessions folder is reported" yes "$found"
 
 echo "--- 7. a repo without a pre-commit hook"
-H5="$(new_home)"
+new_home H5
 mkdir -p "$TMPD/repos"
 git init -q --template= "$TMPD/repos/r1"
 HOOK_SEARCH_DIRS="$TMPD/repos" run_hook "$H5"
