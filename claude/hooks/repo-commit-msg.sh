@@ -5,8 +5,9 @@
 # commit message file as argument 1.
 #
 # The hook checks the message with commit-msg-lint.sh. It checks only in a repo
-# that opts in with a tracked .conventional-commits file at the repo root, because
-# other repos use other commit conventions (decision D-005).
+# that opts in with a .conventional-commits file in its working tree at the repo
+# root, because other repos use other commit conventions (decision D-005). The
+# file need not be tracked by git.
 #
 # The hook exits 0 at once when:
 #   - SKIP_COMMIT_LINT=1 is set,

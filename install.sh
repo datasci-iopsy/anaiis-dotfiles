@@ -112,7 +112,8 @@ wire_bashrc() {
 		printf '\n%s\n' "$PATH_LINE" >>"$BASHRC"
 	fi
 	echo "  ok   PATH line (canonical)"
-	if grep -qF 'anaiis-dotfiles/bash/shared.bash' "$BASHRC" 2>/dev/null; then
+	# A line that starts with # is a comment: the shell never reads it, so it is not a source line.
+	if grep -qE '^[[:space:]]*([^[:space:]#].*)?anaiis-dotfiles/bash/shared[.]bash' "$BASHRC" 2>/dev/null; then
 		echo "  ok   shared.bash source line"
 	else
 		if grep -qF '.bashrc.local' "$BASHRC" 2>/dev/null; then
@@ -133,7 +134,7 @@ source "$HOME/anaiis-dotfiles/bash/shared.bash"
 	# shellcheck disable=SC2016 # $HOME stays literal: the line is written into ~/.bash_profile as text
 	local PROFILE_LINE='[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"'
 	if [ -f "$PROFILE" ]; then
-		if grep -qF '.bashrc' "$PROFILE"; then
+		if grep -qE '^[[:space:]]*([^[:space:]#].*)?[.]bashrc' "$PROFILE"; then
 			echo "  ok   $PROFILE mentions .bashrc"
 		else
 			echo "  note  $PROFILE never sources ~/.bashrc. Add this line to it: $PROFILE_LINE"

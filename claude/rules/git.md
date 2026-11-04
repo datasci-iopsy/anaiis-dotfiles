@@ -126,7 +126,7 @@ A PR title follows the subject grammar and ends with the ticket in brackets (see
 ### Lint
 
 - The validator is `claude/scripts/commit-msg-lint.sh`. To check a draft, run `bash ~/.claude/scripts/commit-msg-lint.sh <message-file>`. To print the allowed types, add the `--types` flag instead of a file.
-- The `commit-msg` hook runs the validator only in a repo that has a tracked `.conventional-commits` file at its root. This repo has that file. Other repos accept any message.
+- The `commit-msg` hook runs the validator only in a repo whose working tree has a `.conventional-commits` file at its root. This repo has that file. Other repos accept any message.
 - If the lint rejects a message, fix the message.
 - `SKIP_COMMIT_LINT=1 git commit` bypasses the lint. Only the user uses it. Claude never uses it.
 

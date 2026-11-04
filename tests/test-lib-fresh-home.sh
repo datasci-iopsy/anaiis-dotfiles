@@ -57,6 +57,17 @@ assert_eq "3.1 plans folder is absent (fresh machine state)" no "$(yesno test -e
 assert_eq "3.2 projects folder is absent (fresh machine state)" no "$(yesno test -e "$H1/.claude/projects")"
 assert_eq "3.3 real HOME listing is unchanged" "$REAL_HOME_BEFORE" "$(find "$HOME" -maxdepth 1 | sort | cksum)"
 
+echo "--- 4. a suite that builds HOMEs with the helper removes them at exit"
+# Why: test-maintenance-check.sh once built each HOME inside $(...). The subshell lost the list of
+# HOMEs, so every run left them behind, one with a 52 MB file. The suite runs here with a private
+# TMPDIR, and that folder must be empty when the suite ends.
+LEFT="$(mktemp -d "${TMPDIR:-/tmp}/test-lib-fresh-home.XXXXXX")"
+TMPDIR="$LEFT" "$BASH" "$REPO_DIR/tests/test-maintenance-check.sh" >/dev/null 2>&1
+rc=$?
+assert_eq "4.1 the maintenance suite passes" 0 "$rc"
+assert_eq "4.2 it leaves nothing in TMPDIR" "" "$(ls -A "$LEFT")"
+rm -rf "$LEFT"
+
 echo
 echo "============================================================"
 echo "  Tests passed: $PASS"

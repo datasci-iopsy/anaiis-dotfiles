@@ -215,8 +215,8 @@ assert_eq "O.5 a missing message file exits 2" "2" "$?"
 # ── The commit-msg hook (opt-in, D-005) ───────────────────────────────────
 # A real `git commit` in a throwaway repo, with the hooks that
 # install-repo-hooks.sh writes. HOME is a throwaway tree whose ~/.claude links
-# point at this checkout. The repo is opted in by a tracked .conventional-commits
-# file at its root.
+# point at this checkout. The repo is opted in by a .conventional-commits file
+# in its working tree at its root.
 . "$REPO_DIR/tests/lib/fresh-home.sh"
 TMP_HOME="$(TMPDIR="$WORK" fresh_home_new "$REPO_DIR")"
 INSTALLER="$REPO_DIR/claude/scripts/install-repo-hooks.sh"
@@ -290,6 +290,12 @@ mkdir -p "$WORK/norepo"
 printf 'bad message\n' >"$WORK/norepo/msg"
 (cd "$WORK/norepo" && GIT_CEILING_DIRECTORIES="$WORK" HOME="$TMP_HOME" "$BASH" "$REPO_DIR/claude/hooks/repo-commit-msg.sh" "$WORK/norepo/msg" >/dev/null 2>&1)
 assert_eq "H.9 outside a git repo the hook exits 0" "0" "$?"
+# The hook tests the working tree, not the index. An untracked marker file opts the repo in.
+RH10="$WORK/rh10"
+make_hooked_repo "$RH10" 0
+printf '# This file opts the repo in to commit message lint.\n' >"$RH10/.conventional-commits"
+try_commit "$RH10" "bad message"
+assert_eq "H.10 an untracked .conventional-commits file opts the repo in" "1" "$COMMIT_RC"
 
 # ── Rubric drift: claude/rules/git.md must agree with the validator ───────
 # The rubric is prose and the validator is code. These cases keep them equal:
