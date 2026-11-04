@@ -54,12 +54,13 @@ fail() {
 
 # has_description <file>: true when the front matter (the lines between the first
 # "---" and the next "---") holds a description: line with text after the colon.
+# Front matter with no closing "---" is not valid, so it fails.
 has_description() {
 	awk '
 		NR == 1 { if ($0 != "---") exit; fm = 1; next }
-		fm && /^---[[:space:]]*$/ { exit }
+		fm && /^---[[:space:]]*$/ { closed = 1; exit }
 		fm && /^description:[[:space:]]*[^[:space:]]/ { found = 1 }
-		END { exit !found }
+		END { exit !(found && closed) }
 	' "$1"
 }
 
