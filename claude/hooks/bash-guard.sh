@@ -294,11 +294,14 @@ fi
 # emit "allow" for a compound command: rm -rf .venv && rm -rf /etc must not
 # get laundered through an allow keyed off the first-looking operand.
 #
-# One carve-out exists (rm_wrap_eligible, below; stream e-bash-guard-rm).
-# If every statement of the command is on a short vetted list, the hook
-# returns an updatedInput command that first sources safe-rm.sh. That file
-# replaces rm with a function that checks each expanded operand against the
-# deletion roots. The shell, not this parser, then verifies each path. The
+# Three carve-outs exist. Two are older and run first, with no run-time guard:
+# the mktemp cleanup (an mktemp assignment, then an rm of that variable) and
+# the cache-then-runner carve-out (one cache-directory rm plus runners such as
+# uv or make, test 7a.9). The third is rm_wrap_eligible, below (stream
+# e-bash-guard-rm). If every statement of the command is on a short vetted
+# list, the hook returns an updatedInput command that first sources
+# safe-rm.sh. That file replaces rm and mkdir with functions that check each
+# expanded operand against the deletion roots. The shell, not this parser, then verifies each path. The
 # decision is "allow" only after a first-use canary proved that the harness
 # applies updatedInput (see the canary paragraph below); before that it is
 # "ask". If any statement is not vetted, the hook emits "ask" as before.
@@ -631,12 +634,15 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 	# The catch-all ask below exists because a static parser cannot check each
 	# path of a compound command. The shell can, after it expands variables and
 	# globs. So for a command whose EVERY statement is on a short vetted list,
-	# this section returns allow and rewrites the command (updatedInput) so
-	# that it first sources claude/hooks/safe-rm.sh. That file defines an rm
-	# function that checks each expanded operand against explicit deletion
-	# roots and deletes nothing unless all pass. A refusal at run time stops
-	# the WHOLE command (the function exits the shell); the user can then run
-	# the delete as its own call with a literal path, which still asks.
+	# this section returns allow (after the first-use canary below) and rewrites
+	# the command (updatedInput) so that it first sources claude/hooks/safe-rm.sh.
+	# That file defines rm and mkdir functions that check each expanded operand
+	# against explicit roots and change nothing unless all pass. A refusal at run
+	# time stops the WHOLE command (the function exits the shell); the user can
+	# then run the delete as its own call with a literal path, which still asks.
+	# A refusal ends only a subshell in a pipe, a loop or if block on the left of
+	# a pipe, a group, a substitution, or a background job. The vetting below asks
+	# for each of those shapes, so the stop holds for every command that it allows.
 	#
 	# An allow covers the whole command and skips every prompt in it, so the
 	# vetting is deliberately small and strict (the same invariant as the cache
@@ -654,7 +660,8 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 	#     and the filter words are not statement heads: a child program runs the
 	#     real rm or creates a path outside the function.
 	#   - after a pipe, only grep head tail wc cut tr basename dirname. The left
-	#     side of a pipe must not be an rm statement or a loop.
+	#     side of a pipe must not be an rm or mkdir statement, a loop, or an if
+	#     block (the word before the pipe is rm, mkdir, done, or fi).
 	#   - a literal assignment of one word, never to a name on the deny list
 	#     (PATH, IFS, HOME, __SAFE_RM_*, and others). The value holds no $.
 	#   - for NAME in <literal words>, with the same name deny list for NAME, and
@@ -663,7 +670,9 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 	#     blank or the end of the command.
 	# Every word of every statement, quotes removed, is also checked against a deny
 	# set (rm outside head position, rmdir, find, xargs, sudo, eval, bash, git, mv,
-	# and others), and a printf statement with a -v word asks. Forbidden anywhere:
+	# and others), and a printf statement with a word that starts with -v asks.
+	# These rules apply inside this section only. The two older carve-outs above
+	# run first and do not apply them. Forbidden anywhere:
 	# a backtick, a backslash, < > ( ) { } ! a lone &, and a $ that does not start
 	# a plain $NAME.
 	# First-use canary (D-E-15). The decision depends on a sentinel file,
@@ -671,11 +680,12 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 	# from cksum of $HOME/.claude/hooks/safe-rm.sh. With the sentinel, the hook
 	# returns allow plus updatedInput. Without it, the hook returns ask plus the
 	# same updatedInput, and the prefix writes the sentinel after safe-rm.sh
-	# loaded and rm is a function. If the harness ignores updatedInput, nothing
-	# writes the sentinel and every later run asks. A change to safe-rm.sh
-	# changes the key and asks once more. If safe-rm.sh is unreadable, the hook
-	# asks with no rewrite. The prefix also exits 97 when the file loads but
-	# defines no rm function (an empty or foreign file).
+	# loaded and rm and mkdir are functions. If the harness ignores updatedInput,
+	# nothing writes the sentinel and every later run asks. A change to
+	# safe-rm.sh changes the key and asks once more. If safe-rm.sh is unreadable,
+	# the hook asks with no rewrite. The prefix also prints a message and exits 97
+	# when the file loads but does not define both functions (an empty, partial,
+	# or foreign file). It tests with declare -F, which ignores aliases.
 	# Accepted risk (D-E-16): an agent that writes the sentinel by hand or edits
 	# claude/hooks/ is out of scope. The guard stops accidents, not an adversary.
 	RM_SEG='([^./][^/]*/)*[^./][^/]*'
