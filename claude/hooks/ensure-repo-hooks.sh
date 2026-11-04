@@ -21,10 +21,14 @@ case "$hooks" in
 	*) hooks="$repo/$hooks" ;;
 esac
 
-# Already wired up -- nothing to do
+# Already wired up -- nothing to do. Git skips a hook that is not executable,
+# so each hook needs its marker and its execute bit.
 if grep -qF -- 'repo-pre-commit.sh' "$hooks/pre-commit" 2>/dev/null \
+	&& [ -x "$hooks/pre-commit" ] \
 	&& grep -qF -- 'repo-pre-push.sh' "$hooks/pre-push" 2>/dev/null \
-	&& grep -qF -- 'repo-commit-msg.sh' "$hooks/commit-msg" 2>/dev/null; then
+	&& [ -x "$hooks/pre-push" ] \
+	&& grep -qF -- 'repo-commit-msg.sh' "$hooks/commit-msg" 2>/dev/null \
+	&& [ -x "$hooks/commit-msg" ]; then
 	exit 0
 fi
 

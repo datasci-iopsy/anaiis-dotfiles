@@ -6,7 +6,7 @@
 #   pre-push   -> bash "$HOME/.claude/hooks/repo-pre-push.sh"           (full test suite)
 #   commit-msg -> bash "$HOME/.claude/hooks/repo-commit-msg.sh" "$1"    (message lint, opt-in)
 #
-# The commit-msg hook checks a message only in a repo that has a tracked
+# The commit-msg hook checks a message only in a repo whose working tree has a
 # .conventional-commits file at its root. Other repos accept any message.
 #
 # Run once from any project root after cloning on a new machine.

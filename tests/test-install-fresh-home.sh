@@ -152,6 +152,10 @@ echo "--- 5. the CI step runs this stream's suites on bash 3.2"
 STEP_SUITES="test-brew-sync test-maintenance-check test-install-bashrc test-install-hostkeys test-bootstrap-doctor test-no-stale-refs test-install-fresh-home"
 # shellcheck disable=SC2016 # \$ is a regular-expression escape for a literal dollar sign
 assert_eq "5.1 the workflow runs suites with /bin/bash" 1 "$(grep -c '/bin/bash "tests/\$t\.sh"' "$WORKFLOW")"
+# Suites start bare `bash` for the hook or the installer. Homebrew bash leads PATH on the runner, so
+# the step puts /bin (bash 3.2) first, or those subprocesses would run Homebrew bash.
+# shellcheck disable=SC2016 # \$ is a regular-expression escape for a literal dollar sign
+assert_eq "5.2 the workflow puts /bin first on PATH for those suites" 1 "$(grep -c 'PATH="/bin:\$PATH"' "$WORKFLOW")"
 for s in $STEP_SUITES; do
 	assert_eq "5.$s is listed in the workflow" 1 "$(grep -c "$s" "$WORKFLOW")"
 	assert_eq "5.$s exists" yes "$([ -f "$REPO_DIR/tests/$s.sh" ] && echo yes || echo no)"

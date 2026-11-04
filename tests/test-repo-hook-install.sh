@@ -335,6 +335,22 @@ chmod +x "$R10/.git/hooks/pre-commit" "$R10/.git/hooks/pre-push"
 assert_eq "10.1 ensure-repo-hooks installs commit-msg when the other two exist" "1" \
 	"$(grep -cF 'repo-commit-msg.sh' "$R10/.git/hooks/commit-msg" 2>/dev/null || echo 0)"
 
+# ── 11. Auto-installer restores a lost execute bit ────────────────────────
+# git silently skips a hook file that is not executable. A hook that holds its
+# marker but lost the execute bit must not end the early exit of
+# ensure-repo-hooks.sh. Fail-to-fail: each case fails if the early exit does
+# not test the execute bit of that one hook.
+echo "# 11. Auto-installer on a hook without the execute bit"
+for hook11 in pre-commit pre-push commit-msg; do
+	R11="$WORK/r11-$hook11"
+	make_repo "$R11"
+	(cd "$R11" && HOME="$TMP_HOME" bash "$INSTALLER" >/dev/null 2>&1)
+	chmod -x "$R11/.git/hooks/$hook11"
+	(cd "$R11" && HOME="$TMP_HOME" bash "$ENSURE" >/dev/null 2>&1)
+	assert_eq "11.$hook11 ensure-repo-hooks restores the execute bit of a marker-present hook" "1" \
+		"$([ -x "$R11/.git/hooks/$hook11" ] && echo 1 || echo 0)"
+done
+
 # ── Summary ───────────────────────────────────────────────────────────────
 if [ -n "${COV:-}" ]; then
 	cov_end
