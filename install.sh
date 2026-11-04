@@ -197,6 +197,8 @@ echo "=== Canonical path ==="
 if [ "$DOTFILES" != "$CANONICAL" ]; then
 	if [ -e "$CANONICAL" ] && [ ! -L "$CANONICAL" ]; then
 		echo "  SKIP $CANONICAL (real directory exists, move or remove it first)"
+	elif [ -L "$CANONICAL" ] && [ "$(readlink "$CANONICAL")" = "$DOTFILES" ]; then
+		echo "  ok   $CANONICAL -> $DOTFILES"
 	else
 		ln -sfn "$DOTFILES" "$CANONICAL"
 		echo "  link $CANONICAL -> $DOTFILES"

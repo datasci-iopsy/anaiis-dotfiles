@@ -53,3 +53,20 @@ jobs:
 
       - name: Run the test suite
         run: bash tests/run-all.sh
+
+      # A fresh Mac starts on bash 3.2 (/bin/bash). run-all.sh uses the bash that comes
+      # first on PATH, which is Homebrew bash after the install step above. This step
+      # runs the bootstrap suites with /bin/bash and stops at the first failure.
+      - name: Run the bootstrap suites on bash 3.2
+        run: |
+          for t in \
+            test-brew-sync \
+            test-maintenance-check \
+            test-install-bashrc \
+            test-install-hostkeys \
+            test-bootstrap-doctor \
+            test-no-stale-refs \
+            test-install-fresh-home; do
+            echo "=== /bin/bash tests/$t.sh ==="
+            /bin/bash "tests/$t.sh" || exit 1
+          done
