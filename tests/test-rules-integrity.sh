@@ -59,26 +59,44 @@ assert_contains() {
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
-# make_fixture <dir>: copy the tracked inputs of the doctor into <dir> and index them.
-# -P keeps claude/skills' symlinks as symlinks instead of copying targets.
+# make_fixture <src> <dir>: copy the tracked inputs of the doctor from the repo <src> into <dir> and
+# index them. The list comes from git ls-files, so an ignored or untracked file in <src> stays out.
+# tar keeps claude/skills' symlinks as symlinks instead of copying targets.
 make_fixture() {
-	mkdir -p "$1"
-	cp -RP "$REPO_DIR/claude" "$1/claude"
-	cp -RP "$REPO_DIR/bash" "$1/bash"
-	cp -RP "$REPO_DIR/.github" "$1/.github"
-	cp -P "$REPO_DIR/install.sh" "$1/install.sh"
-	git init -q --template= "$1"
-	git -C "$1" add claude bash .github install.sh
+	mkdir -p "$2"
+	git -C "$1" ls-files -z -- claude bash .github install.sh | tar -C "$1" --null -T - -cf - | tar -C "$2" -xf -
+	git init -q --template= "$2"
+	git -C "$2" add claude bash .github install.sh
 }
 
 TMP_REPO="$WORK/repo"
-make_fixture "$TMP_REPO"
+make_fixture "$REPO_DIR" "$TMP_REPO"
 SETTINGS="$TMP_REPO/claude/settings.json"
 BEHAV_MD="$TMP_REPO/claude/rules/behavioral.md"
 
 run_doctor() {
 	RULES_DOCTOR_REPO_DIR="$TMP_REPO" bash "$DOCTOR" >"$1" 2>&1
 }
+
+# ── 0. The fixture holds tracked files only ──────────────────────────────
+# A machine-local rule file (claude/rules/<name>.local.md, ignored by .gitignore) or an untracked
+# script in the real checkout must not change the result of this test.
+echo "# 0. Fixture holds tracked files only"
+SRC="$WORK/src"
+mkdir -p "$SRC/claude/rules" "$SRC/bash" "$SRC/.github"
+printf '*.local.md\n' >"$SRC/.gitignore"
+printf 'tracked\n' >"$SRC/claude/rules/shared.md"
+printf 'tracked\n' >"$SRC/bash/tracked.sh"
+printf 'tracked\n' >"$SRC/.github/tracked.yml"
+printf 'tracked\n' >"$SRC/install.sh"
+printf 'ignored\n' >"$SRC/claude/rules/mine.local.md"
+printf 'untracked\n' >"$SRC/bash/untracked.sh"
+git init -q --template= "$SRC"
+git -C "$SRC" add .gitignore claude/rules/shared.md bash/tracked.sh .github/tracked.yml install.sh
+make_fixture "$SRC" "$WORK/fixture-check"
+assert "0.1 the fixture holds a tracked rule file" yes "$([ -f "$WORK/fixture-check/claude/rules/shared.md" ] && echo yes || echo no)"
+assert "0.2 the fixture lacks an ignored machine-local rule file" no "$([ -e "$WORK/fixture-check/claude/rules/mine.local.md" ] && echo yes || echo no)"
+assert "0.3 the fixture lacks an untracked script" no "$([ -e "$WORK/fixture-check/bash/untracked.sh" ] && echo yes || echo no)"
 
 # ── 1. Doctor passes on green tree, and the context rule file is in place ──
 echo "# 1. Doctor on green tree"
@@ -161,7 +179,7 @@ fi
 # the wrong reason. A reference to a rule that does not exist goes stale silently when rules are renumbered.
 echo "# 3. Dangling behavioral.md rule reference"
 REPO3="$WORK/repo3"
-make_fixture "$REPO3"
+make_fixture "$REPO_DIR" "$REPO3"
 printf '\nSee also: `rules/behavioral.md` rule 99 (does not exist).\n' >>"$REPO3/claude/rules/git.md"
 RULES_DOCTOR_REPO_DIR="$REPO3" bash "$DOCTOR" >"$WORK/dangling.out" 2>&1
 assert "3.1 doctor exits non-zero on a dangling rule reference" "1" "$?"
