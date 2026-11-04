@@ -632,20 +632,37 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 	# this section returns allow and rewrites the command (updatedInput) so
 	# that it first sources claude/hooks/safe-rm.sh. That file defines an rm
 	# function that checks each expanded operand against explicit deletion
-	# roots and deletes nothing unless all pass. A refusal at run time fails
-	# the command; the user can then run the delete as its own call with a
-	# literal path, which still asks (unchanged).
+	# roots and deletes nothing unless all pass. A refusal at run time stops
+	# the WHOLE command (the function exits the shell); the user can then run
+	# the delete as its own call with a literal path, which still asks.
 	#
 	# An allow covers the whole command and skips every prompt in it, so the
 	# vetting is deliberately small and strict (the same invariant as the cache
 	# carve-out above): one statement that is not on the list means ask.
-	# Vetted statements: a plain rm, a short list of inert commands, the common
-	# runners, a literal assignment (never to PATH, IFS, HOME and similar), the
-	# for/do/done/if/then/else/fi keywords, and the redirections >/dev/null,
-	# 2>/dev/null, 2>&1. Forbidden anywhere: a backtick, a backslash, < > ( ) { }
-	# ! a lone &, and a $ that does not start a plain $NAME. A literal operand
-	# must still pass the safe-list. An operand that starts with ~ or holds
-	# $HOME stays on the ask path so the user can approve a home-folder delete.
+	# Vetted statements, and only these:
+	#   - rm as the plain head word, with at least one operand. A single-quoted
+	#     operand, a glob operand, an operand that starts with ~, and an operand
+	#     that holds $HOME make the command ask. A fully literal operand must pass
+	#     the safe-list. An operand with a variable inside double quotes ("$S/x")
+	#     is checked at run time only, by the rm function.
+	#   - these heads: cd ls echo printf pwd true false test [ basename dirname.
+	#     mkdir is vetted too, but only for plain literal operands that pass the
+	#     safe-list. Runners (uv, make, python, and so on), cat, touch, and the
+	#     filter words are not statement heads: a child program runs the real rm,
+	#     outside the function.
+	#   - after a pipe, only grep head tail wc cut tr basename dirname. The left
+	#     side of a pipe must not be an rm statement or a loop.
+	#   - a literal assignment of one word, never to a name on the deny list
+	#     (PATH, IFS, HOME, __SAFE_RM_*, and others). The value holds no $.
+	#   - for NAME in <literal words>, with the same name deny list for NAME, and
+	#     the keywords do done if then else fi.
+	#   - the redirections >/dev/null, 2>/dev/null, 2>&1, >&2, each followed by a
+	#     blank or the end of the command.
+	# Every word of every statement, quotes removed, is also checked against a deny
+	# set (rm outside head position, rmdir, find, xargs, sudo, eval, bash, git, mv,
+	# and others), and a printf statement with a -v word asks. Forbidden anywhere:
+	# a backtick, a backslash, < > ( ) { } ! a lone &, and a $ that does not start
+	# a plain $NAME.
 	RM_SEG='([^./][^/]*/)*[^./][^/]*'
 	RM_ARTIFACTS='\.venv|node_modules|dist|build|\.next|coverage|__pycache__'
 	RM_SAFE_SCRATCH="^(/private)?/tmp/claude-[0-9]+/${RM_SEG}/scratchpad(/${RM_SEG})?/?\$"
@@ -653,23 +670,51 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 	RM_SAFE_FIXTURE="^(\\./)?tests/fixtures/${RM_SEG}/?\$"
 	RM_SAFE_ANY="$RM_SAFE_SCRATCH|$RM_SAFE_ARTIFACT|$RM_SAFE_FIXTURE"
 
+	# rm_name_denied <name>: return 0 for a variable name that a vetted statement must not assign.
+	# One list serves NAME=value and the for loop variable. __SAFE_RM_* are the guard's own variables.
+	rm_name_denied() {
+		case "$1" in
+			PATH | IFS | HOME | TMPDIR | ENV | SHELLOPTS | PS[0-9] | PROMPT_COMMAND | CDPATH | GLOBIGNORE | SHELL | USER | LOGNAME | PWD | OLDPWD | TERM | LD_* | DYLD_* | BASH* | __SAFE_RM_*) return 0 ;;
+		esac
+		return 1
+	}
+
+	# rm_word_denied <word>: return 0 for a word that deletes, runs another program, or changes the
+	# shell. The scan checks every word of every statement, so a runner cannot carry one as an argument.
+	rm_word_denied() {
+		case "$1" in
+			rm | rmdir | unlink | shred | find | xargs | sudo | eval | exec | source | . | env | nohup | command | builtin | alias | unalias | unset | trap | bash | sh | zsh | dash | git | docker | mv | dd | truncate | rsync) return 0 ;;
+		esac
+		return 1
+	}
+
 	# rm_wrap_eligible <raw-command>: return 0 when every statement is vetted.
+	# What the hook checks: the statement head, every word against the deny set, the names that a
+	# statement assigns, the words of a for list, and the literal operands of rm. What it leaves to
+	# the run-time guard: an operand with a variable inside double quotes (for example "$S/x"). The
+	# run-time guard checks that path after the shell expands it.
 	rm_wrap_eligible() {
-		local v="$1" stmt first var value tok tok_s i dd operands rm_seen=0
-		local in_d='2>/dev/null' in_a='>/dev/null' in_b='2>&1' in_c='>&2' amp2='&&' bar2='||' nl=$'\n' dq='"'
+		local v="$1" stmt first var value tok tok_s w ws i dd operands rm_seen=0 pipe_next=0 prev="" stripped
+		local in_d='2>/dev/null ' in_a='>/dev/null ' in_b='2>&1 ' in_c='>&2 ' amp2='&&' bar2='||' nl=$'\n' tab=$'\t' dq='"' sq="'"
+		local sep=' ; ' pipemark=' ;|; '
 		# shellcheck disable=SC2016
-		local dollar_re='\$([^A-Za-z_]|$)' for_re='^for[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]+in([[:space:]]|$)'
-		# shellcheck disable=SC2016
-		local value_re='^["]?[A-Za-z0-9._/:@%+,$=-]*["]?$' literal_re='^[A-Za-z0-9._/-]+$'
+		local dollar_re='\$([^A-Za-z_]|$)' name_re='^[A-Za-z_][A-Za-z0-9_]*$'
+		local value_re='^["]?[A-Za-z0-9._/:@%+,=-]*["]?$' literal_re='^[A-Za-z0-9._/-]+$'
 		local -a stmts words
-		v="${v//$in_d/ }"
-		v="${v//$in_a/ }"
-		v="${v//$in_b/ }"
-		v="${v//$in_c/ }"
-		v="${v//$amp2/;}"
-		v="${v//$bar2/;}"
-		v="${v//|/;}"
-		v="${v//$nl/;}"
+		# Every separator becomes a lone ; so the redirect strip below sees a blank after each redirect.
+		# A pipe stays visible as its own statement (a lone |), so a pipe target can be checked.
+		v="${v//$tab/ }"
+		v="${v//$nl/$sep}"
+		v="${v//$amp2/$sep}"
+		v="${v//$bar2/$sep}"
+		v="${v//;/$sep}"
+		v="${v//|/$pipemark}"
+		# A redirect is stripped only when a blank or the end of the string follows it (F11a).
+		v="$v "
+		v="${v//$in_d/  }"
+		v="${v//$in_a/  }"
+		v="${v//$in_b/  }"
+		v="${v//$in_c/  }"
 		# shellcheck disable=SC1003
 		case "$v" in
 			*'`'* | *'\'* | *'<'* | *'>'* | *'('* | *')'* | *'{'* | *'}'* | *'!'* | *'&'*) return 1 ;;
@@ -679,40 +724,88 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 		[ "${#stmts[@]}" -gt 0 ] || return 1
 		for stmt in "${stmts[@]}"; do
 			read -r stmt <<<"$stmt"
+			if [ "$stmt" = "|" ]; then
+				# The left side of a pipe runs in a subshell, where a refusal would not stop the command.
+				case "$prev" in
+					rm | close) return 1 ;;
+				esac
+				pipe_next=1
+				continue
+			fi
+			stripped=0
 			while :; do
 				case "$stmt" in
 					"do "* | "then "* | "else "* | "if "*)
 						stmt="${stmt#* }"
 						read -r stmt <<<"$stmt"
+						stripped=1
 						;;
-					do | then | else | fi | done)
+					do | then | else)
 						stmt=""
+						stripped=1
+						break
+						;;
+					fi | done)
+						stmt=""
+						stripped=1
+						prev=close
 						break
 						;;
 					*) break ;;
 				esac
 			done
-			[ -z "$stmt" ] && continue
-			case "$stmt" in
-				"for "*)
-					[[ "$stmt" =~ $for_re ]] || return 1
-					continue
-					;;
-			esac
+			# A keyword on the right side of a pipe would run its body in a subshell.
+			[ "$stripped" -eq 0 ] || [ "$pipe_next" -eq 0 ] || return 1
+			[ -n "$stmt" ] || continue
 			read -r -a words <<<"$stmt"
 			first="${words[0]}"
+			for ((i = 0; i < ${#words[@]}; i++)); do
+				w="${words[$i]}"
+				# $dq and $sq stay unquoted inside ${}: each is one quote character with no glob meaning,
+				# and a quoted form inside double quotes breaks on bash 3.2.
+				# shellcheck disable=SC2295
+				ws="${w//$dq/}"
+				# shellcheck disable=SC2295
+				ws="${ws//$sq/}"
+				# printf -v writes a variable by name, so the guard's own variables are reachable.
+				[ "$first" = printf ] && [ "$ws" = "-v" ] && return 1
+				if rm_word_denied "$ws"; then
+					[ "$i" -eq 0 ] && [ "$w" = rm ] || return 1
+				fi
+			done
+			if [ "$pipe_next" -eq 1 ]; then
+				case "$first" in
+					grep | head | tail | wc | cut | tr | basename | dirname) ;;
+					*) return 1 ;;
+				esac
+				pipe_next=0
+				prev=""
+				continue
+			fi
+			if [ "$first" = for ]; then
+				[ "${#words[@]}" -ge 3 ] || return 1
+				[[ "${words[1]}" =~ $name_re ]] || return 1
+				[ "${words[2]}" = in ] || return 1
+				rm_name_denied "${words[1]}" && return 1
+				for ((i = 3; i < ${#words[@]}; i++)); do
+					[[ "${words[$i]}" =~ $literal_re ]] || return 1
+				done
+				prev=""
+				continue
+			fi
 			if [[ "$first" =~ ^([A-Za-z_][A-Za-z0-9_]*)= ]]; then
 				var="${BASH_REMATCH[1]}"
 				[ "${#words[@]}" -eq 1 ] || return 1
-				case "$var" in
-					PATH | IFS | HOME | TMPDIR | ENV | SHELLOPTS | PS[0-9] | PROMPT_COMMAND | CDPATH | GLOBIGNORE | SHELL | USER | LOGNAME | PWD | OLDPWD | TERM | LD_* | DYLD_* | BASH* | __SAFE_RM_*) return 1 ;;
-				esac
+				rm_name_denied "$var" && return 1
 				value="${first#*=}"
 				[[ "$value" =~ $value_re ]] || return 1
+				prev=""
 				continue
 			fi
+			prev=""
 			case "$first" in
 				rm)
+					prev="rm"
 					rm_seen=$((rm_seen + 1))
 					operands=0
 					dd=0
@@ -728,8 +821,11 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 							esac
 						fi
 						operands=$((operands + 1))
-						# $dq stays unquoted inside ${}: it is one quote character with no glob meaning,
-						# and a quoted form inside double quotes breaks on bash 3.2.
+						# A single-quoted or glob operand is never vetted here (F5).
+						# shellcheck disable=SC2295
+						case "$tok" in
+							*$sq* | *'*'* | *'?'* | *'['*) return 1 ;;
+						esac
 						# shellcheck disable=SC2295
 						tok_s="${tok#$dq}"
 						# shellcheck disable=SC2295
@@ -744,8 +840,31 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 					done
 					[ "$operands" -ge 1 ] || return 1
 					;;
-				mkdir | cd | ls | echo | printf | pwd | true | false | test | '[' | touch | cat | head | tail | wc | cut | tr | grep | basename | dirname) ;;
-				uv | ruff | pytest | python | python3 | npm | npx | pnpm | yarn | make | Rscript | quarto | dbt | sqlfmt | shfmt | shellcheck) ;;
+				mkdir)
+					# mkdir stays only for plain literal operands on the static safe-list (no $, no glob).
+					# A runner or another program could create a path outside every root, so no operand
+					# is left to the run-time guard here.
+					dd=0
+					for ((i = 1; i < ${#words[@]}; i++)); do
+						tok="${words[$i]}"
+						if [ "$dd" -eq 0 ]; then
+							case "$tok" in
+								--)
+									dd=1
+									continue
+									;;
+								-*) continue ;;
+							esac
+						fi
+						# shellcheck disable=SC2295
+						tok_s="${tok#$dq}"
+						# shellcheck disable=SC2295
+						tok_s="${tok_s%$dq}"
+						[[ "$tok_s" =~ $literal_re ]] || return 1
+						grep -qE "$RM_SAFE_ANY" <<<"$tok_s" || return 1
+					done
+					;;
+				cd | ls | echo | printf | pwd | true | false | test | '[' | basename | dirname) ;;
 				*) return 1 ;;
 			esac
 		done

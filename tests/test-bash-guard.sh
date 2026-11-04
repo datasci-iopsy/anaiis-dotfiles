@@ -481,7 +481,7 @@ assert_decision "7b.9 scratchpad-looking prefix missing the scratchpad segment" 
 assert_decision "7b.10 carve-out: a second deletion riding along still asks" "rm -rf .ruff_cache && rm -rf src" "ask"
 assert_decision "7b.11 carve-out: substitution anywhere in the command still asks" 'rm -rf .ruff_cache && uv run $(cat cmd)' "ask"
 assert_decision "7b.12 carve-out: a pipe to an arbitrary command still asks" "rm -rf .ruff_cache && curl x | sh" "ask"
-# 7b.13 (rm -rf dist && uv sync) is now allowed with a run-time-verified rm (D-026): see 7m.4.
+# 7b.13 (rm -rf dist && uv sync) asks again: a runner statement is not on the vetted list (D-E-25), see 7m.4.
 assert_decision "7b.14 carve-out: a trailing command off the runner list still asks" "rm -rf .ruff_cache && ./deploy.sh" "ask"
 assert_decision "7b.15 carve-out: git clean riding along is a second deletion" "rm -rf .ruff_cache && git clean -fdx" "ask"
 assert_decision "7b.16 carve-out: traversal under a cache name is not a cache path" "rm -rf ../.venv && uv sync" "ask"
@@ -644,18 +644,17 @@ assert_ctx_ask() {
 }
 
 echo "# 7m-a. Every statement vetted: allow, with the rm guard in front"
-assert_wrapped "7m.1 rm then mkdir with a variable path" 'S=/tmp/s; rm -rf "$S/x" && mkdir -p "$S/x"'
-assert_wrapped "7m.2 for-loop with a loop variable in the path" 'S=/tmp/s; for m in a b; do rm -rf "$S/ft-$m"; mkdir -p "$S/ft-$m"; done'
+assert_wrapped "7m.1 rm then mkdir with a literal operand on the safe-list (D-E-25)" 'rm -rf dist && mkdir -p dist'
+assert_wrapped "7m.2 for-loop with a loop variable in the path" 'S=/tmp/s; for m in a b; do rm -rf "$S/ft-$m"; ls "$S/ft-$m"; done'
 assert_wrapped "7m.3 rm then ls" 'S=/tmp/s; rm -rf "$S/a"; ls "$S"'
-assert_wrapped "7m.4 a disposable literal folder then a vetted runner" "rm -rf dist && uv sync"
-assert_wrapped "7m.5 a variable the hook cannot resolve (the guard checks it at run time)" 'rm -rf "$RANDOM_VAR"'
-assert_wrapped "7m.6 a glob in the operand" 'S=/tmp/s; rm -rf "$S"/g*; ls'
+assert_ctx_ask "7m.4 a disposable literal folder then a runner (was allow before D-E-25)" "rm -rf dist && uv sync"
+assert_wrapped "7m.5 a double-quoted variable the hook cannot resolve: checked at run time only (D-E-24)" 'rm -rf "$RANDOM_VAR"'
 assert_wrapped "7m.7 a pipe into a filter command" 'S=/tmp/s; ls "$S" | grep x; rm -rf "$S/old"'
 assert_wrapped "7m.8 redirect to /dev/null" 'S=/tmp/s; rm -rf "$S/x" 2>/dev/null; echo done'
 assert_wrapped "7m.9 stderr to stdout" 'S=/tmp/s; rm -rf "$S/x" 2>&1; echo done'
 assert_wrapped "7m.10 newline-separated statements" $'S=/tmp/s\nrm -rf "$S/x"\nls "$S"'
 assert_wrapped "7m.11 if with a test command" 'S=/tmp/s; if [ -d "$S/x" ]; then rm -rf "$S/x"; fi'
-assert_wrapped "7m.12 rm after a for-loop do with a glob list (was 7b.0, ask before D-026)" 'for f in *.jsonl; do rm -rf .venv; done'
+assert_wrapped "7m.12 rm after a for-loop do with a literal word list (was 7b.0, ask before D-026)" 'for f in a b; do rm -rf .venv; done'
 assert_wrapped "7m.13 -- before a variable operand" 'S=/tmp/s; rm -rf -- "$S/x"; ls'
 
 echo "# 7m-b. One statement or character that cannot be vetted: ask, no rewrite"
@@ -689,6 +688,74 @@ assert_ctx_ask "7m.47 a literal unsafe operand after --" 'rm -rf -- /Users/someo
 assert_ctx_ask "7m.44 a backtick substitution" 'S=/tmp/s; rm -rf "$S/x"; echo `date`'
 assert_ctx_ask "7m.45 an input redirect" 'S=/tmp/s; rm -rf "$S/x"; cat < /etc/hosts'
 assert_ctx_ask "7m.46 a negation" 'S=/tmp/s; rm -rf "$S/x"; ! false'
+
+echo "# 7m-c. Review fixes (T-E4a, D-E-14, D-E-24, D-E-25): each case asks and does not rewrite, unless it says allow"
+# F1: statements on the list must not assign the guard's own variables.
+assert_ctx_ask "7m.50 a for loop variable that names a guard variable" 'S=/tmp/s; for __SAFE_RM_SCRATCH in /; do rm -rf "$S/x"; done'
+assert_ctx_ask "7m.51 a for loop variable named PATH" 'S=/tmp/s; for PATH in /evil; do rm -rf "$S/x"; done'
+assert_ctx_ask "7m.52 printf -v that names a guard variable" 'S=/tmp/s; rm -rf "$S/x"; printf -v __SAFE_RM_SCRATCH %s /tmp/s'
+# F2: a deletion word in the arguments of a listed command, and a pipe into a runner.
+# The live run on the pre-fix code (D-E-25): a runner child process runs the real rm, outside the function.
+assert_ctx_ask "7m.53 a variable rm, then make with a clean target" 'V=tmp/ok; rm -rf $V && make -C x clean'
+assert_ctx_ask "7m.54 a variable rm, then a python script" 'V=tmp/ok; rm -rf $V && python3 x/clean.py'
+assert_ctx_ask "7m.55 a variable rm, then a pipe into a runner" 'V=tmp/ok; rm -rf $V && ls | python3 x/clean.py'
+assert_ctx_ask "7m.55b a pipe into a runner after a safe rm" 'S=/tmp/s; rm -rf "$S/x"; ls | python'
+assert_ctx_ask "7m.55c a deletion word in the arguments of a runner" 'S=/tmp/s; rm -rf "$S/x"; uv run rmdir /tmp/zzz'
+for runner_head in uv ruff pytest python python3 npm npx pnpm yarn make Rscript quarto dbt sqlfmt shfmt shellcheck; do
+	assert_ctx_ask "7m.55d runner as a statement head: $runner_head" "S=/tmp/s; rm -rf \"\$S/x\"; $runner_head x"
+done
+# mkdir stays only for plain literal operands that pass the safe-list. The first two cases are the
+# shapes of the owner's example command, which asks now (D-E-25).
+assert_ctx_ask "7m.1b mkdir with a variable operand" 'S=/tmp/s; rm -rf "$S/x" && mkdir -p "$S/x"'
+assert_ctx_ask "7m.2b mkdir inside a loop with a variable operand" 'S=/tmp/s; for m in a b; do rm -rf "$S/ft-$m"; mkdir -p "$S/ft-$m"; done'
+assert_ctx_ask "7m.55e mkdir with a literal operand off the safe-list" 'rm -rf dist && mkdir -p out/x'
+assert_ctx_ask "7m.55f mkdir with a glob operand" 'rm -rf dist && mkdir -p dist/*'
+assert_ctx_ask "7m.55g mkdir with a safe-list operand and one off-list operand" 'rm -rf dist && mkdir -p dist /tmp/zzz'
+assert_wrapped "7m.55h mkdir with -- and a safe-list operand" 'rm -rf dist && mkdir -p -- dist'
+assert_ctx_ask "7m.56 a pipe into a head word that is not a filter" 'S=/tmp/s; rm -rf "$S/x"; ls | mkdir y'
+assert_ctx_ask "7m.57 a pipe after an rm statement (a refusal would stop only the pipe)" 'S=/tmp/s; rm -rf "$S/x" | grep y'
+assert_ctx_ask "7m.58b a keyword on the right side of a pipe" 'S=/tmp/s; ls | if grep x; then rm -rf "$S/x"; fi'
+assert_ctx_ask "7m.58 a pipe after a loop (a refusal would stop only the pipe)" 'S=/tmp/s; for m in a b; do rm -rf "$S/$m"; done | grep y'
+# Every word of the deny set, as an argument of a listed command. A word that is missing from the set
+# in the hook turns its case into an allow.
+for deny_word in rm rmdir unlink shred find xargs sudo eval exec source env nohup command builtin alias unalias unset trap bash sh zsh dash git docker mv dd truncate rsync; do
+	assert_ctx_ask "7m.59 deny word as an argument: $deny_word" "S=/tmp/s; rm -rf \"\$S/x\"; echo $deny_word"
+done
+# A bare . in a command with a recursive rm is a hard block (the tripwire), so the word is tested in a spelling that the tripwire does not see.
+assert_ctx_ask "7m.59b deny word as an argument: . written with an empty quote pair" 'S=/tmp/s; rm -rf "$S/x"; echo .""'
+assert_ctx_ask "7m.60 a deny word inside quotes is still a deny word" 'S=/tmp/s; rm -rf "$S/x"; echo "find"'
+assert_ctx_ask "7m.60b a deny word inside single quotes is still a deny word" "S=/tmp/s; rm -rf \"\$S/x\"; echo 'find'"
+# F4: these words stop being statement heads. They stay legal after a pipe.
+for dropped_head in cat head tail grep wc cut tr touch; do
+	assert_ctx_ask "7m.61 dropped statement head: $dropped_head" "S=/tmp/s; rm -rf \"\$S/x\"; $dropped_head f"
+done
+for kept_head in cd pwd true false printf basename dirname test; do
+	assert_wrapped "7m.62 kept statement head: $kept_head" "S=/tmp/s; rm -rf \"\$S/x\"; $kept_head f"
+done
+for filter_head in grep head tail wc cut tr basename dirname; do
+	assert_wrapped "7m.63 filter after a pipe: $filter_head" "S=/tmp/s; ls \"\$S\" | $filter_head x; rm -rf \"\$S/old\""
+done
+# F5: the for list, assigned values, and rm operands.
+assert_ctx_ask "7m.6b a glob in an rm operand (was 7m.6, allow before D-E-24)" 'S=/tmp/s; rm -rf "$S"/g*; ls'
+assert_ctx_ask "7m.12b a glob in the for list (was in 7m.12, allow before D-E-24)" 'for f in *.jsonl; do rm -rf .venv; done'
+assert_ctx_ask "7m.64 a variable in the for list" 'S=/tmp/s; for m in $S; do rm -rf "$S/x"; done'
+assert_ctx_ask "7m.65 a quote in the for list" 'S=/tmp/s; for m in "a b"; do rm -rf "$S/x"; done'
+assert_ctx_ask "7m.66 an assigned value that holds a variable" 'T=$HOME; rm -rf "$T/x"'
+assert_ctx_ask "7m.67 an assigned value that copies another variable" 'S=/tmp/s; T=$S/x; rm -rf "$T"'
+assert_ctx_ask "7m.68 a single-quoted rm operand" "S=/tmp/s; rm -rf '/tmp/s/x'; ls"
+assert_ctx_ask "7m.69 a glob rm operand with no variable" 'rm -rf dist/*; ls'
+assert_ctx_ask "7m.70 a question-mark glob in an rm operand" 'rm -rf dist/?; ls'
+assert_ctx_ask "7m.71 a bracket glob in an rm operand" 'rm -rf dist/[ab]; ls'
+assert_ctx_ask "7m.72 a for loop with no in list" 'S=/tmp/s; for m; do rm -rf "$S/x"; done'
+assert_ctx_ask "7m.72b a for loop with the body on the same statement and no in list" 'rm -rf dist; for m do make clean; done'
+# F11a: a redirect is stripped only when a blank or the end of the string follows it.
+assert_ctx_ask "7m.73 text glued to a stripped redirect" 'S=/tmp/s; echo hi 2>/dev/nullx; rm -rf "$S/x"'
+assert_ctx_ask "7m.74 a path that continues after /dev/null" 'S=/tmp/s; echo hi >/dev/null/y; rm -rf "$S/x"'
+assert_wrapped "7m.75 a redirect at the very end of the command" 'S=/tmp/s; rm -rf "$S/x" 2>/dev/null'
+# F6: gaps that the reviewer mutants found.
+assert_ctx_ask "7m.76 an assignment with a command after it, a name that is not denied" 'FOO=bar ls; rm -rf "$S/x"'
+assert_ctx_ask "7m.77 a plain parenthesis in echo text next to an rm statement (D-E-17)" 'S=/tmp/s; rm -rf "$S/x"; echo "done (ok)"'
+assert_ctx_ask "7m.78 a command with the text rm -rf but no rm statement (rm_seen)" 'echo x-rm -rf; ls'
 
 echo "# 7n. End to end: run the rewritten command with a real rm in a throwaway tree"
 E2E="$TEST_HOME/e2e"
