@@ -43,7 +43,13 @@ for dir in "${SEARCH_DIRS[@]}"; do
 
 	while IFS= read -r git_dir; do
 		repo=$(git -C "$(dirname "$git_dir")" rev-parse --show-toplevel 2>/dev/null) || continue
-		hook="$git_dir/hooks/pre-commit"
+		# Ask git where hooks live (core.hooksPath moves the folder). The path is relative to the repo root.
+		hooks_dir=$(git -C "$repo" rev-parse --git-path hooks 2>/dev/null) || continue
+		case "$hooks_dir" in
+			/*) ;;
+			*) hooks_dir="$repo/$hooks_dir" ;;
+		esac
+		hook="$hooks_dir/pre-commit"
 
 		if [ ! -f "$hook" ]; then
 			printf "  absent   %s\n" "$repo"

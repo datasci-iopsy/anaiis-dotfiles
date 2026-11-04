@@ -13,7 +13,13 @@ set -euo pipefail
 
 repo=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 
-hooks="$repo/.git/hooks"
+# Ask git where hooks live: a linked worktree has a `.git` file, not a folder,
+# and core.hooksPath moves the folder. The path is relative to the repo root.
+hooks=$(cd "$repo" && git rev-parse --git-path hooks 2>/dev/null) || exit 0
+case "$hooks" in
+	/*) ;;
+	*) hooks="$repo/$hooks" ;;
+esac
 
 # Already wired up -- nothing to do
 if grep -qF -- 'repo-pre-commit.sh' "$hooks/pre-commit" 2>/dev/null \

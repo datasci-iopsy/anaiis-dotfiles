@@ -15,11 +15,19 @@
 
 set -euo pipefail
 
-HOOK_DIR="$(git rev-parse --git-dir 2>/dev/null || true)/hooks"
-if [ -z "$HOOK_DIR" ] || [ "$HOOK_DIR" = "/hooks" ]; then
+# Ask git where hooks live. In a linked worktree this is the common hooks
+# folder, and it honors core.hooksPath. Git prints the path relative to the
+# current folder, so make it absolute.
+HOOK_DIR="$(git rev-parse --git-path hooks 2>/dev/null || true)"
+if [ -z "$HOOK_DIR" ]; then
 	echo "ERROR: not inside a git repository." >&2
 	exit 1
 fi
+case "$HOOK_DIR" in
+	/*) ;;
+	*) HOOK_DIR="$PWD/$HOOK_DIR" ;;
+esac
+mkdir -p "$HOOK_DIR"
 
 # Marker for the legacy pre-commit form (direct lint-script paths)
 STALE_MARKER='lint-staged.sh'

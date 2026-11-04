@@ -39,10 +39,15 @@ assert_eq() {
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
-TMP_HOME="$WORK/home"
-mkdir -p "$TMP_HOME/.claude"
-ln -s "$REPO_DIR/claude/scripts" "$TMP_HOME/.claude/scripts"
-ln -s "$REPO_DIR/claude/hooks" "$TMP_HOME/.claude/hooks"
+# Throwaway HOME whose ~/.claude links point at this checkout (F0 helper).
+. "$REPO_DIR/tests/lib/fresh-home.sh"
+TMP_HOME="$(TMPDIR="$WORK" fresh_home_new "$REPO_DIR")"
+
+# Opt-in line coverage: COV=1 bash tests/test-repo-hook-install.sh (needs bash 4.1 or later).
+if [ -n "${COV:-}" ]; then
+	. "$REPO_DIR/tests/lib/cov.sh"
+	cov_begin "$WORK/cov.log"
+fi
 
 # make_repo <dir>: a committed git repo with a stub tests/run-all.sh that
 # creates .suite-ran at the repo root when executed.
@@ -159,7 +164,122 @@ assert_eq "5.1 marker-present pre-commit hook is executable after re-run" "1" \
 assert_eq "5.2 appended-to pre-push hook is executable after re-run" "1" \
 	"$([ -x "$R5/.git/hooks/pre-push" ] && echo 1 || echo 0)"
 
+# ── 6. Installer from a linked worktree ───────────────────────────────────
+# In a linked worktree, `.git` is a file and `git rev-parse --git-dir` names a
+# per-worktree folder that has no hooks folder. Git itself runs the hooks of
+# the common folder. Fail-to-fail: 6.1 and 6.2 fail if the installer builds the
+# hooks path from --git-dir; 6.5 fails if it exits 0 on a non-repo folder.
+echo "# 6. Installer from a linked worktree"
+R6="$WORK/r6"
+W6="$WORK/w6"
+make_repo "$R6"
+git -C "$R6" worktree add -q -b wt6 "$W6"
+(cd "$W6" && HOME="$TMP_HOME" bash "$INSTALLER" >/dev/null 2>&1)
+RC6=$?
+assert_eq "6.1 installer exits 0 from a linked worktree" "0" "$RC6"
+assert_eq "6.2 pre-commit hook lands in the common hooks folder" "1" \
+	"$(grep -cF 'repo-pre-commit.sh' "$R6/.git/hooks/pre-commit" 2>/dev/null || echo 0)"
+assert_eq "6.3 pre-push hook lands in the common hooks folder" "1" \
+	"$(grep -cF 'repo-pre-push.sh' "$R6/.git/hooks/pre-push" 2>/dev/null || echo 0)"
+BEFORE6=$(shasum "$R6/.git/hooks/pre-commit" "$R6/.git/hooks/pre-push" 2>/dev/null | cut -d' ' -f1 | tr '\n' ' ')
+RERUN6=$(cd "$W6" && HOME="$TMP_HOME" bash "$INSTALLER" 2>&1)
+assert_eq "6.4 second run from the worktree reports ok twice and changes nothing" "2 $BEFORE6" \
+	"$(printf '%s\n' "$RERUN6" | grep -c '^  ok ') $(shasum "$R6/.git/hooks/pre-commit" "$R6/.git/hooks/pre-push" | cut -d' ' -f1 | tr '\n' ' ')"
+mkdir -p "$WORK/norepo"
+NOREPO_OUT=$(cd "$WORK/norepo" && GIT_CEILING_DIRECTORIES="$WORK" HOME="$TMP_HOME" bash "$INSTALLER" 2>&1)
+NOREPO_RC=$?
+assert_eq "6.5 outside a git repo the installer exits 1 with its error text" "1 ERROR: not inside a git repository." \
+	"$NOREPO_RC $NOREPO_OUT"
+# The hook path in the report is absolute even from a sub folder.
+R6B="$WORK/r6b"
+make_repo "$R6B"
+mkdir -p "$R6B/sub"
+SUB_LINE=$(cd "$R6B/sub" && HOME="$TMP_HOME" bash "$INSTALLER" 2>&1 | sed -n '1p')
+case "$SUB_LINE" in
+	"  created  /"*) SUB_ABS=1 ;;
+	*) SUB_ABS=0 ;;
+esac
+assert_eq "6.6 installer report names an absolute hook path from a sub folder" "1" "$SUB_ABS"
+
+# ── 7. Auto-installer from a linked worktree ──────────────────────────────
+# Fail-to-fail: 7.1 and 7.2 fail if ensure-repo-hooks.sh reads $repo/.git/hooks
+# (a file path in a worktree); 7.4 fails if it never detects the wired hooks.
+echo "# 7. Auto-installer from a linked worktree"
+R7="$WORK/r7"
+W7="$WORK/w7"
+make_repo "$R7"
+git -C "$R7" worktree add -q -b wt7 "$W7"
+ERR7=$(cd "$W7" && HOME="$TMP_HOME" bash "$ENSURE" 2>&1 >/dev/null)
+RC7=$?
+assert_eq "7.1 ensure-repo-hooks exits 0 with empty stderr from a worktree" "0 " "$RC7 $ERR7"
+assert_eq "7.2 ensure-repo-hooks wired both hooks in the common folder" "1 1" \
+	"$(grep -cF 'repo-pre-commit.sh' "$R7/.git/hooks/pre-commit" 2>/dev/null || echo 0) $(grep -cF 'repo-pre-push.sh' "$R7/.git/hooks/pre-push" 2>/dev/null || echo 0)"
+# Second run with a HOME that has no installer: a silent run proves the early exit.
+ERR7B=$(cd "$W7" && HOME="$WORK/no-such-home" bash "$ENSURE" 2>&1 >/dev/null)
+assert_eq "7.3 second run from the worktree exits before it calls the installer" "" "$ERR7B"
+# Same check from a sub folder of the worktree.
+mkdir -p "$W7/sub"
+ERR7C=$(cd "$W7/sub" && HOME="$WORK/no-such-home" bash "$ENSURE" 2>&1 >/dev/null)
+assert_eq "7.4 the early exit also holds from a sub folder of the worktree" "" "$ERR7C"
+# In a normal repo git prints a path relative to the repo root (`.git/hooks`).
+R7B="$WORK/r7b"
+make_repo "$R7B"
+mkdir -p "$R7B/sub"
+(cd "$R7B/sub" && HOME="$TMP_HOME" bash "$ENSURE" >/dev/null 2>&1)
+ERR7D=$(cd "$R7B/sub" && HOME="$WORK/no-such-home" bash "$ENSURE" 2>&1 >/dev/null)
+assert_eq "7.5 the early exit holds from a sub folder of a normal repo" "" "$ERR7D"
+
+# ── 8. core.hooksPath is honored ──────────────────────────────────────────
+# Git ignores .git/hooks when core.hooksPath is set. Fail-to-fail: 8.1 fails if
+# the installer writes to .git/hooks; 8.2 fails if a relative path is not made
+# absolute (git runs hooks from the top of the working tree).
+echo "# 8. core.hooksPath"
+R8="$WORK/r8"
+make_repo "$R8"
+git -C "$R8" config core.hooksPath "$WORK/custom-hooks"
+(cd "$R8" && HOME="$TMP_HOME" bash "$INSTALLER" >/dev/null 2>&1)
+assert_eq "8.1 absolute core.hooksPath receives both hooks (folder created)" "1 1" \
+	"$(grep -cF 'repo-pre-commit.sh' "$WORK/custom-hooks/pre-commit" 2>/dev/null || echo 0) $(grep -cF 'repo-pre-push.sh' "$WORK/custom-hooks/pre-push" 2>/dev/null || echo 0)"
+R9="$WORK/r9"
+make_repo "$R9"
+git -C "$R9" config core.hooksPath rel-hooks
+mkdir -p "$R9/sub"
+(cd "$R9/sub" && HOME="$TMP_HOME" bash "$INSTALLER" >/dev/null 2>&1)
+assert_eq "8.2 relative core.hooksPath resolves from the top of the working tree" "1" \
+	"$(grep -cF 'repo-pre-commit.sh' "$R9/rel-hooks/pre-commit" 2>/dev/null || echo 0)"
+
+# ── 9. Audit agrees with the installer ────────────────────────────────────
+# maintenance-check.sh counts audit lines that start with STALE, missing, or
+# absent. A repo that the installer wired must read as ok, or the user gets a
+# warning that no action can clear. Fail-to-fail: 9.1 fails if the audit reads
+# $git_dir/hooks instead of asking git; 9.2 fails if the audit does not make
+# git's relative path absolute. 9.2 also pins the decision that the audit needs
+# no worktree logic: a linked worktree has a `.git` file, so find skips it.
+echo "# 9. Audit"
+AUDIT="$REPO_DIR/claude/scripts/audit-repo-hooks.sh"
+AUDIT_DIR="$WORK/auditdir"
+mkdir -p "$AUDIT_DIR"
+make_repo "$AUDIT_DIR/hp"
+git -C "$AUDIT_DIR/hp" config core.hooksPath "$WORK/audit-hooks"
+(cd "$AUDIT_DIR/hp" && HOME="$TMP_HOME" bash "$INSTALLER" >/dev/null 2>&1)
+# Run the audit from a neutral folder, so a relative hooks path cannot match the caller's repo.
+AUDIT_OUT=$(cd "$WORK" && HOOK_SEARCH_DIRS="$AUDIT_DIR" bash "$AUDIT" 2>&1)
+assert_eq "9.1 audit reports a core.hooksPath repo as ok after install" "1" \
+	"$(printf '%s\n' "$AUDIT_OUT" | grep -c '^  ok ')"
+AUDIT_DIR2="$WORK/auditdir2"
+mkdir -p "$AUDIT_DIR2"
+make_repo "$AUDIT_DIR2/wt-main"
+git -C "$AUDIT_DIR2/wt-main" worktree add -q -b wt9 "$AUDIT_DIR2/wt-linked"
+(cd "$AUDIT_DIR2/wt-main" && HOME="$TMP_HOME" bash "$INSTALLER" >/dev/null 2>&1)
+AUDIT_OUT=$(cd "$WORK" && HOOK_SEARCH_DIRS="$AUDIT_DIR2" bash "$AUDIT" 2>&1)
+assert_eq "9.2 audit counts a repo with a linked worktree once" "1 0" \
+	"$(printf '%s\n' "$AUDIT_OUT" | grep -c '^  ok ') $(printf '%s\n' "$AUDIT_OUT" | grep -c 'wt-linked')"
+
 # ── Summary ───────────────────────────────────────────────────────────────
+if [ -n "${COV:-}" ]; then
+	cov_end
+	cov_report "$INSTALLER" "$ENSURE" "$AUDIT"
+fi
 echo
 echo "test-repo-hook-install: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]
