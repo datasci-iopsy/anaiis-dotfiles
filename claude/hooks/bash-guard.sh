@@ -290,9 +290,16 @@ fi
 # never gets downgraded to this section's ask.
 #
 # A hook's permissionDecision covers the WHOLE command, not per-subcommand
-# (unlike settings.json rule matching), so this never emits "allow" for a
-# compound command: rm -rf .venv && rm -rf /etc must not get laundered
-# through an allow keyed off the first-looking operand.
+# (unlike settings.json rule matching), so a static check alone must never
+# emit "allow" for a compound command: rm -rf .venv && rm -rf /etc must not
+# get laundered through an allow keyed off the first-looking operand.
+#
+# One carve-out exists (rm_wrap_eligible, below; stream e-bash-guard-rm).
+# If every statement of the command is on a short vetted list, the hook
+# emits "allow" with an updatedInput command that first sources safe-rm.sh.
+# That file replaces rm with a function that checks each expanded operand
+# against the deletion roots. The shell, not this parser, then verifies each
+# path. If any statement is not vetted, the hook emits "ask" as before.
 #
 # Detection is broadened (rm, /bin/rm, /usr/bin/rm, \rm; every recursive
 # flag spelling; a bare word boundary rather than a strict subcommand-start
@@ -310,7 +317,10 @@ fi
 # silently allow. Requires an attacker to have already planted that symlink,
 # a materially higher bar than a crafted command; closing it fully would
 # need realpath/readlink -f resolution, a class of logic (real filesystem
-# syscalls) this file doesn't otherwise use.
+# syscalls) this file doesn't otherwise use. The run-time guard in
+# safe-rm.sh does resolve symlinks in the parent path, so a compound command
+# that gets the rewrite does not have this gap. A standalone command that
+# matches the static safe-list still has it.
 #
 # Also known: this is word-splitting, not a shell parser, so a quoted-but-
 # otherwise-safe operand (rm -rf ".venv") fails the character allowlist below
