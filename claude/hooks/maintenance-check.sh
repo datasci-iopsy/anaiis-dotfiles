@@ -40,10 +40,15 @@ stamp_days_ago() {
 # --- Plan files (weekly) ---
 PLAN_STAMP="$STATE_DIR/.maintenance-plans"
 if [ "$(stamp_days_ago "$PLAN_STAMP")" -ge 7 ]; then
-	count=$(find "$PLAN_DIR" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
-	old=$(find "$PLAN_DIR" -name "*.md" -mtime +14 2>/dev/null | wc -l | tr -d ' ')
+	count=0
+	old=0
+	# A fresh machine has no plans folder. find would fail, and pipefail plus set -e would end the script.
+	if [ -d "$PLAN_DIR" ]; then
+		count=$(find "$PLAN_DIR" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+		old=$(find "$PLAN_DIR" -name "*.md" -mtime +14 2>/dev/null | wc -l | tr -d ' ')
+	fi
 	if [ "$count" -gt 10 ] || [ "$old" -gt 0 ]; then
-		echo "[maintenance] Plans: ${count} files, ${old} older than 14 days -- bash ~/.claude/clean-plans.sh" >&2
+		echo "[maintenance] Plans: ${count} files, ${old} older than 14 days -- bash ~/.claude/scripts/clean-plans.sh" >&2
 	fi
 	echo "$TODAY" >"$PLAN_STAMP"
 fi

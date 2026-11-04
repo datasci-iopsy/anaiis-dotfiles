@@ -90,6 +90,16 @@ if [ -z "${FRESH_HOME_INNER:-}" ]; then
 	assert_eq "4.1 a relative TMPDIR still passes" 0 "$?"
 	FRESH_HOME_INNER=1 TMPDIR=/no/such/folder bash "$REPO_DIR/tests/test-lib-fresh-home.sh" >/dev/null 2>&1
 	assert_eq "4.2 an unusable TMPDIR stops the suite" 1 "$?"
+
+	echo "--- 5. a suite that builds HOMEs with the helper removes them at exit"
+	# Why: test-maintenance-check.sh once built each HOME inside $(...). The subshell lost the list of
+	# HOMEs, so every run left them behind, one with a 52 MB file. The suite runs here with a private
+	# TMPDIR inside the absolute $PARENT, and that folder must be empty when the suite ends.
+	LEFT="$(mktemp -d "$PARENT/maintenance.XXXXXX")" || exit 1
+	TMPDIR="$LEFT" "$BASH" "$REPO_DIR/tests/test-maintenance-check.sh" >/dev/null 2>&1
+	rc=$?
+	assert_eq "5.1 the maintenance suite passes" 0 "$rc"
+	assert_eq "5.2 it leaves nothing in TMPDIR" "" "$(ls -A "$LEFT")"
 fi
 
 echo
