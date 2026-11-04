@@ -290,9 +290,21 @@ fi
 # never gets downgraded to this section's ask.
 #
 # A hook's permissionDecision covers the WHOLE command, not per-subcommand
-# (unlike settings.json rule matching), so this never emits "allow" for a
-# compound command: rm -rf .venv && rm -rf /etc must not get laundered
-# through an allow keyed off the first-looking operand.
+# (unlike settings.json rule matching), so a static check alone must never
+# emit "allow" for a compound command: rm -rf .venv && rm -rf /etc must not
+# get laundered through an allow keyed off the first-looking operand.
+#
+# Three carve-outs exist. Two are older and run first, with no run-time guard:
+# the mktemp cleanup (an mktemp assignment, then an rm of that variable) and
+# the cache-then-runner carve-out (one cache-directory rm plus runners such as
+# uv or make, test 7a.9). The third is rm_wrap_eligible, below (stream
+# e-bash-guard-rm). If every statement of the command is on a short vetted
+# list, the hook returns an updatedInput command that first sources
+# safe-rm.sh. That file replaces rm and mkdir with functions that check each
+# expanded operand against the deletion roots. The shell, not this parser, then verifies each path. The
+# decision is "allow" only after a first-use canary proved that the harness
+# applies updatedInput (see the canary paragraph below); before that it is
+# "ask". If any statement is not vetted, the hook emits "ask" as before.
 #
 # Detection is broadened (rm, /bin/rm, /usr/bin/rm, \rm; every recursive
 # flag spelling; a bare word boundary rather than a strict subcommand-start
@@ -310,7 +322,10 @@ fi
 # silently allow. Requires an attacker to have already planted that symlink,
 # a materially higher bar than a crafted command; closing it fully would
 # need realpath/readlink -f resolution, a class of logic (real filesystem
-# syscalls) this file doesn't otherwise use.
+# syscalls) this file doesn't otherwise use. The run-time guard in
+# safe-rm.sh does resolve symlinks in the parent path, so a compound command
+# that gets the rewrite does not have this gap. A standalone command that
+# matches the static safe-list still has it.
 #
 # Also known: this is word-splitting, not a shell parser, so a quoted-but-
 # otherwise-safe operand (rm -rf ".venv") fails the character allowlist below
@@ -615,7 +630,298 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 		exit 0
 	fi
 
+	# ── Run-time-verified rm (stream e-bash-guard-rm, D-026 to D-029) ──────
+	# The catch-all ask below exists because a static parser cannot check each
+	# path of a compound command. The shell can, after it expands variables and
+	# globs. So for a command whose EVERY statement is on a short vetted list,
+	# this section returns allow (after the first-use canary below) and rewrites
+	# the command (updatedInput) so that it first sources claude/hooks/safe-rm.sh.
+	# That file defines rm and mkdir functions that check each expanded operand
+	# against explicit roots and change nothing unless all pass. A refusal at run
+	# time stops the WHOLE command (the function exits the shell); the user can
+	# then run the delete as its own call with a literal path, which still asks.
+	# A refusal ends only a subshell in a pipe, a loop or if block on the left of
+	# a pipe, a group, a substitution, or a background job. The vetting below asks
+	# for each of those shapes, so the stop holds for every command that it allows.
+	#
+	# An allow covers the whole command and skips every prompt in it, so the
+	# vetting is deliberately small and strict (the same invariant as the cache
+	# carve-out above): one statement that is not on the list means ask.
+	# Vetted statements, and only these:
+	#   - rm as the plain head word, with at least one operand. A single-quoted
+	#     operand, a glob operand, an operand that starts with ~, and an operand
+	#     that holds $HOME make the command ask. A fully literal operand must pass
+	#     the safe-list. An operand with a variable inside double quotes ("$S/x")
+	#     is checked at run time only, by the rm function.
+	#   - these heads: mkdir cd ls echo printf pwd true false test [ basename
+	#     dirname. The operands of mkdir are not checked here: the mkdir function
+	#     in safe-rm.sh checks each expanded path at run time against the same
+	#     roots as rm (D-E-28). Runners (uv, make, python, and so on), cat, touch,
+	#     and the filter words are not statement heads: a child program runs the
+	#     real rm or creates a path outside the function.
+	#   - after a pipe, only grep head tail wc cut tr basename dirname. The left
+	#     side of a pipe must not be an rm or mkdir statement, a loop, or an if
+	#     block (the word before the pipe is rm, mkdir, done, or fi).
+	#   - a literal assignment of one word, never to a name on the deny list
+	#     (PATH, IFS, HOME, __SAFE_RM_*, and others). The value holds no $.
+	#   - for NAME in <literal words>, with the same name deny list for NAME, and
+	#     the keywords do done if then else fi.
+	#   - the redirections >/dev/null, 2>/dev/null, 2>&1, >&2, each followed by a
+	#     blank or the end of the command.
+	# Every word of every statement, quotes removed, is also checked against a deny
+	# set (rm outside head position, rmdir, find, xargs, sudo, eval, bash, git, mv,
+	# and others), and a printf statement with a word that starts with -v asks.
+	# These rules apply inside this section only. The two older carve-outs above
+	# run first and do not apply them. Forbidden anywhere:
+	# a backtick, a backslash, < > ( ) { } ! a lone &, and a $ that does not start
+	# a plain $NAME.
+	# First-use canary (D-E-15). The decision depends on a sentinel file,
+	# $HOME/.claude/state/safe-rm-canary-<crc>-<size>, where crc and size come
+	# from cksum of $HOME/.claude/hooks/safe-rm.sh. With the sentinel, the hook
+	# returns allow plus updatedInput. Without it, the hook returns ask plus the
+	# same updatedInput, and the prefix writes the sentinel after safe-rm.sh
+	# loaded and rm and mkdir are functions. If the harness ignores updatedInput,
+	# nothing writes the sentinel and every later run asks. A change to
+	# safe-rm.sh changes the key and asks once more. If safe-rm.sh is unreadable,
+	# the hook asks with no rewrite. The prefix also prints a message and exits 97
+	# when the file loads but does not define both functions (an empty, partial,
+	# or foreign file). It tests with declare -F, which ignores aliases.
+	# Accepted risk (D-E-16): an agent that writes the sentinel by hand or edits
+	# claude/hooks/ is out of scope. The guard stops accidents, not an adversary.
+	RM_SEG='([^./][^/]*/)*[^./][^/]*'
+	RM_ARTIFACTS='\.venv|node_modules|dist|build|\.next|coverage|__pycache__'
+	RM_SAFE_SCRATCH="^(/private)?/tmp/claude-[0-9]+/${RM_SEG}/scratchpad(/${RM_SEG})?/?\$"
+	RM_SAFE_ARTIFACT="^(\\./)?(${RM_SEG}/)?(${RM_ARTIFACTS})(/${RM_SEG})?/?\$"
+	RM_SAFE_FIXTURE="^(\\./)?tests/fixtures/${RM_SEG}/?\$"
+	RM_SAFE_ANY="$RM_SAFE_SCRATCH|$RM_SAFE_ARTIFACT|$RM_SAFE_FIXTURE"
+
+	# rm_name_denied <name>: return 0 for a variable name that a vetted statement must not assign.
+	# One list serves NAME=value and the for loop variable. __SAFE_RM_* are the guard's own variables.
+	rm_name_denied() {
+		case "$1" in
+			PATH | IFS | HOME | TMPDIR | ENV | SHELLOPTS | PS[0-9] | PROMPT_COMMAND | CDPATH | GLOBIGNORE | SHELL | USER | LOGNAME | PWD | OLDPWD | TERM | LD_* | DYLD_* | BASH* | __SAFE_RM_*) return 0 ;;
+		esac
+		return 1
+	}
+
+	# rm_word_denied <word>: return 0 for a word that deletes, runs another program, or changes the
+	# shell. The scan checks every word of every statement, so no statement can carry one as an argument.
+	rm_word_denied() {
+		case "$1" in
+			rm | rmdir | unlink | shred | find | xargs | sudo | eval | exec | source | . | env | nohup | command | builtin | alias | unalias | unset | trap | bash | sh | zsh | dash | git | docker | mv | dd | truncate | rsync) return 0 ;;
+		esac
+		return 1
+	}
+
+	# rm_wrap_eligible <raw-command>: return 0 when every statement is vetted.
+	# What the hook checks: the statement head, every word against the deny set, the names that a
+	# statement assigns, the words of a for list, and the literal operands of rm. What it leaves to
+	# the run-time guard: an operand with a variable inside double quotes (for example "$S/x"). The
+	# run-time guard checks that path after the shell expands it.
+	rm_wrap_eligible() {
+		local v="$1" stmt first var value tok tok_s w ws i dd operands rm_seen=0 pipe_next=0 prev="" stripped
+		local in_d='2>/dev/null ' in_a='>/dev/null ' in_b='2>&1 ' in_c='>&2 ' amp2='&&' bar2='||' nl=$'\n' tab=$'\t' dq='"' sq="'"
+		local sep=' ; ' pipemark=' ;|; '
+		# shellcheck disable=SC2016
+		local dollar_re='\$([^A-Za-z_]|$)' name_re='^[A-Za-z_][A-Za-z0-9_]*$'
+		local value_re='^["]?[A-Za-z0-9._/:@%+,=-]*["]?$' literal_re='^[A-Za-z0-9._/-]+$'
+		local -a stmts words
+		# Every separator becomes a lone ; so the redirect strip below sees a blank after each redirect.
+		# A pipe stays visible as its own statement (a lone |), so a pipe target can be checked.
+		v="${v//$tab/ }"
+		v="${v//$nl/$sep}"
+		v="${v//$amp2/$sep}"
+		v="${v//$bar2/$sep}"
+		v="${v//;/$sep}"
+		v="${v//|/$pipemark}"
+		# A redirect is stripped only when a blank or the end of the string follows it (F11a).
+		v="$v "
+		v="${v//$in_d/  }"
+		v="${v//$in_a/  }"
+		v="${v//$in_b/  }"
+		v="${v//$in_c/  }"
+		# shellcheck disable=SC1003
+		case "$v" in
+			*'`'* | *'\'* | *'<'* | *'>'* | *'('* | *')'* | *'{'* | *'}'* | *'!'* | *'&'*) return 1 ;;
+		esac
+		[[ "$v" =~ $dollar_re ]] && return 1
+		IFS=';' read -r -a stmts <<<"$v"
+		[ "${#stmts[@]}" -gt 0 ] || return 1
+		for stmt in "${stmts[@]}"; do
+			read -r stmt <<<"$stmt"
+			if [ "$stmt" = "|" ]; then
+				# The left side of a pipe runs in a subshell, where a refusal would not stop the command. That
+				# holds for rm and mkdir (the two guarded functions) and for a loop or an if block.
+				case "$prev" in
+					guarded | close) return 1 ;;
+				esac
+				pipe_next=1
+				continue
+			fi
+			stripped=0
+			while :; do
+				case "$stmt" in
+					"do "* | "then "* | "else "* | "if "*)
+						stmt="${stmt#* }"
+						read -r stmt <<<"$stmt"
+						stripped=1
+						;;
+					do | then | else)
+						stmt=""
+						stripped=1
+						break
+						;;
+					fi | done)
+						stmt=""
+						stripped=1
+						prev=close
+						break
+						;;
+					*) break ;;
+				esac
+			done
+			# A keyword on the right side of a pipe would run its body in a subshell.
+			[ "$stripped" -eq 0 ] || [ "$pipe_next" -eq 0 ] || return 1
+			[ -n "$stmt" ] || continue
+			read -r -a words <<<"$stmt"
+			first="${words[0]}"
+			for ((i = 0; i < ${#words[@]}; i++)); do
+				w="${words[$i]}"
+				# $dq and $sq stay unquoted inside ${}: each is one quote character with no glob meaning,
+				# and a quoted form inside double quotes breaks on bash 3.2.
+				# shellcheck disable=SC2295
+				ws="${w//$dq/}"
+				# shellcheck disable=SC2295
+				ws="${ws//$sq/}"
+				# printf -v writes a variable by name, as -v NAME or as -vNAME.
+				if [ "$first" = printf ]; then
+					case "$ws" in
+						-v*) return 1 ;;
+					esac
+				fi
+				if rm_word_denied "$ws"; then
+					[ "$i" -eq 0 ] && [ "$w" = rm ] || return 1
+				fi
+			done
+			if [ "$pipe_next" -eq 1 ]; then
+				case "$first" in
+					grep | head | tail | wc | cut | tr | basename | dirname) ;;
+					*) return 1 ;;
+				esac
+				pipe_next=0
+				prev=""
+				continue
+			fi
+			if [ "$first" = for ]; then
+				[ "${#words[@]}" -ge 3 ] || return 1
+				[[ "${words[1]}" =~ $name_re ]] || return 1
+				[ "${words[2]}" = in ] || return 1
+				rm_name_denied "${words[1]}" && return 1
+				for ((i = 3; i < ${#words[@]}; i++)); do
+					[[ "${words[$i]}" =~ $literal_re ]] || return 1
+				done
+				prev=""
+				continue
+			fi
+			if [[ "$first" =~ ^([A-Za-z_][A-Za-z0-9_]*)= ]]; then
+				var="${BASH_REMATCH[1]}"
+				[ "${#words[@]}" -eq 1 ] || return 1
+				rm_name_denied "$var" && return 1
+				value="${first#*=}"
+				[[ "$value" =~ $value_re ]] || return 1
+				prev=""
+				continue
+			fi
+			prev=""
+			case "$first" in
+				rm)
+					prev="guarded"
+					rm_seen=$((rm_seen + 1))
+					operands=0
+					dd=0
+					for ((i = 1; i < ${#words[@]}; i++)); do
+						tok="${words[$i]}"
+						if [ "$dd" -eq 0 ]; then
+							case "$tok" in
+								--)
+									dd=1
+									continue
+									;;
+								-*) continue ;;
+							esac
+						fi
+						operands=$((operands + 1))
+						# A single-quoted or glob operand is never vetted here (F5).
+						# shellcheck disable=SC2295
+						case "$tok" in
+							*$sq* | *'*'* | *'?'* | *'['*) return 1 ;;
+						esac
+						# shellcheck disable=SC2295
+						tok_s="${tok#$dq}"
+						# shellcheck disable=SC2295
+						tok_s="${tok_s%$dq}"
+						# shellcheck disable=SC2016
+						case "$tok_s" in
+							'~'* | *'$HOME'*) return 1 ;;
+						esac
+						if [[ "$tok_s" =~ $literal_re ]]; then
+							grep -qE "$RM_SAFE_ANY" <<<"$tok_s" || return 1
+						fi
+					done
+					[ "$operands" -ge 1 ] || return 1
+					;;
+				mkdir)
+					prev="guarded"
+					;;
+				cd | ls | echo | printf | pwd | true | false | test | '[' | basename | dirname) ;;
+				*) return 1 ;;
+			esac
+		done
+		[ "$rm_seen" -ge 1 ]
+	}
+
 	if grep -qE '[;&|`$()<>]' <<<"$GUARD_STR" || [[ "$GUARD_STR" == *$'\n'* ]]; then
+		if rm_wrap_eligible "$CMD"; then
+			RM_WRAP_CWD=$(jq -r '.cwd // empty' <<<"$INPUT")
+			RM_WRAP_SCRATCH=$(jq -r '.scratchpad_dir // empty' <<<"$INPUT")
+			# First-use canary (D-E-15). The key is the cksum of safe-rm.sh as this process sees it:
+			# <crc>-<size>. If the file is unreadable, there is no key and the command asks, with no rewrite.
+			RM_WRAP_KEY=""
+			if [ -n "${HOME:-}" ] && [ -r "$HOME/.claude/hooks/safe-rm.sh" ]; then
+				read -r RM_CK_CRC RM_CK_SIZE _ <<<"$(cksum <"$HOME/.claude/hooks/safe-rm.sh" 2>/dev/null)"
+				[ -n "$RM_CK_CRC" ] && [ -n "$RM_CK_SIZE" ] && RM_WRAP_KEY="$RM_CK_CRC-$RM_CK_SIZE"
+			fi
+			if [ -n "$RM_WRAP_CWD" ] && [ -n "$RM_WRAP_KEY" ]; then
+				# $HOME stays literal here on purpose: the shell that runs the command expands it. The prefix
+				# loads safe-rm.sh and exits 97, with a message, unless rm and mkdir are then both functions (an
+				# empty, partial, or foreign file loads with status 0 and defines nothing). declare -F ignores
+				# aliases. type -t does not: with an alias for mkdir it prints alias and would exit 97 on every run.
+				# The prefix and the command are two lines, so the shell parses the command after the prefix ran.
+				# An alias is expanded before the function is looked up. An alias whose value does not start with
+				# its own name (command rm, /bin/rm) would run the real program. The loop removes such an alias.
+				# An alias that starts with its own name (rm -i, mkdir -pv) stays: it reaches the function.
+				# shellcheck disable=SC2016
+				RM_WRAP_PREFIX=$(printf '__SAFE_RM_CWD=%q; __SAFE_RM_SCRATCH=%q; for __sr_n in rm mkdir; do case "$(alias $__sr_n 2>/dev/null)" in "" | "alias $__sr_n='\''$__sr_n "* | "alias $__sr_n='\''$__sr_n'\''") ;; *) unalias $__sr_n ;; esac; done; unset __sr_n; . "$HOME/.claude/hooks/safe-rm.sh" && declare -F rm mkdir >/dev/null 2>&1 || { echo '\''safe-rm: guard did not load'\'' >&2; exit 97; }' "$RM_WRAP_CWD" "$RM_WRAP_SCRATCH")
+				if [ -f "$HOME/.claude/state/safe-rm-canary-$RM_WRAP_KEY" ]; then
+					RM_WRAP_DECISION="allow"
+					RM_WRAP_WHY="every statement is vetted; rm is replaced by a run-time guard that checks each expanded path (stream e-bash-guard-rm)"
+				else
+					# No sentinel: ask, and let the prefix write the sentinel after the guard loaded. If the harness
+					# does not apply updatedInput, nothing writes it and every later run asks again.
+					# The prefix calls the captured real mkdir, because the mkdir function would refuse $HOME/.claude/state.
+					RM_WRAP_DECISION="ask"
+					RM_WRAP_WHY="first use of this guard version: every statement is vetted and rm is replaced by a run-time guard. Confirm once. This run writes a marker after the guard loads, and later runs of this version do not prompt (stream e-bash-guard-rm)"
+					# shellcheck disable=SC2016
+					RM_WRAP_PREFIX="$RM_WRAP_PREFIX; "'"$__SAFE_RM_REALMKDIR" -p "$HOME/.claude/state" && : >"$HOME/.claude/state/safe-rm-canary-'"$RM_WRAP_KEY"'"'
+				fi
+				jq -n --argjson ti "$(jq -c '.tool_input' <<<"$INPUT")" \
+					--arg c "${RM_WRAP_PREFIX}"$'\n'"${CMD}" \
+					--arg d "$RM_WRAP_DECISION" \
+					--arg r "$RM_WRAP_WHY" \
+					'{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": $d, "permissionDecisionReason": $r, "updatedInput": ($ti + {"command": $c})}}'
+				exit 0
+			fi
+		fi
 		jq -n --arg r "recursive rm alongside a shell operator/substitution -- cannot verify each path independently" \
 			'{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask", "permissionDecisionReason": $r}}'
 		exit 0
@@ -635,12 +941,8 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 		# Every remaining operand must be plain path text AND match
 		# the safe-list, or the whole command asks (first failure wins,
 		# named in the reason).
-		RM_SEG='([^./][^/]*/)*[^./][^/]*'
-		RM_ARTIFACTS='\.venv|node_modules|dist|build|\.next|coverage|__pycache__'
-		RM_SAFE_SCRATCH="^(/private)?/tmp/claude-[0-9]+/${RM_SEG}/scratchpad(/${RM_SEG})?/?\$"
-		RM_SAFE_ARTIFACT="^(\\./)?(${RM_SEG}/)?(${RM_ARTIFACTS})(/${RM_SEG})?/?\$"
-		RM_SAFE_FIXTURE="^(\\./)?tests/fixtures/${RM_SEG}/?\$"
-
+		# RM_SEG, RM_ARTIFACTS, and the RM_SAFE_* patterns are defined once,
+		# above the run-time-verified rm section, and shared by both paths.
 		RM_OPERAND_COUNT=0
 		RM_SEEN_DASHDASH=0
 		for ((RM_I = RM_IDX + 1; RM_I < ${#RM_WORDS[@]}; RM_I++)); do
