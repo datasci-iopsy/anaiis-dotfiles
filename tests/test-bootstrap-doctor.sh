@@ -172,6 +172,21 @@ H="$(build_home)"
 # shellcheck disable=SC2016 # $HOME stays literal in the fixture file
 printf '# mine\nexport PATH="$HOME/anaiis-dotfiles/bin:$PATH"\n' >"$H/.bashrc"
 expect_one "1.3 no shared.bash line" "$H" "MISSING ~/.bashrc shared.bash line: $FIX_BASHRC"
+# A commented-out line loads nothing, so it must not count (the shell never reads it).
+H="$(build_home)"
+# shellcheck disable=SC2016 # $HOME stays literal in the fixture file
+printf '# mine\n# export PATH="$HOME/anaiis-dotfiles/bin:$PATH"\nsource "$HOME/anaiis-dotfiles/bash/shared.bash"\n' >"$H/.bashrc"
+expect_one "1.4 a commented-out PATH line does not count" "$H" "MISSING ~/.bashrc PATH line: $FIX_BASHRC"
+H="$(build_home)"
+# shellcheck disable=SC2016 # $HOME stays literal in the fixture file
+printf '# mine\nexport PATH="$HOME/anaiis-dotfiles/bin:$PATH"\n  # source "$HOME/anaiis-dotfiles/bash/shared.bash"\n' >"$H/.bashrc"
+expect_one "1.5 an indented, commented-out shared.bash line does not count" "$H" \
+	"MISSING ~/.bashrc shared.bash line: $FIX_BASHRC"
+H="$(build_home)"
+# shellcheck disable=SC2016 # $HOME stays literal in the fixture file
+printf '# mine\nexport PATH="$HOME/anaiis-dotfiles/bin:$PATH" # tools\nsource "$HOME/anaiis-dotfiles/bash/shared.bash" # prompt\n' >"$H/.bashrc"
+doctor "$H"
+assert_eq "1.6 active lines that end in a comment still count: exit 0" 0 "$RC"
 
 echo "--- 2. login shell file"
 H="$(build_home)"
@@ -196,6 +211,11 @@ printf 'export EDITOR=vi\n' >"$H/.bash_login"
 printf '[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"\n' >"$H/.profile"
 expect_one "2.5 bash reads .bash_login first, so a good .profile does not count" "$H" \
 	"MISSING ~/.bash_login (never mentions ~/.bashrc): $FIX_LOGIN"
+H="$(build_home)"
+# shellcheck disable=SC2016 # $HOME stays literal in the fixture file
+printf '# [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"\n' >"$H/.bash_profile"
+expect_one "2.6 a commented-out .bashrc line does not count" "$H" \
+	"MISSING ~/.bash_profile (never mentions ~/.bashrc): $FIX_LOGIN"
 
 echo "--- 3. the nine ~/.claude links"
 for name in $NAMES; do
