@@ -615,7 +615,148 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 		exit 0
 	fi
 
+	# ── Run-time-verified rm (stream e-bash-guard-rm, D-026 to D-029) ──────
+	# The catch-all ask below exists because a static parser cannot check each
+	# path of a compound command. The shell can, after it expands variables and
+	# globs. So for a command whose EVERY statement is on a short vetted list,
+	# this section returns allow and rewrites the command (updatedInput) so
+	# that it first sources claude/hooks/safe-rm.sh. That file defines an rm
+	# function that checks each expanded operand against explicit deletion
+	# roots and deletes nothing unless all pass. A refusal at run time fails
+	# the command; the user can then run the delete as its own call with a
+	# literal path, which still asks (unchanged).
+	#
+	# An allow covers the whole command and skips every prompt in it, so the
+	# vetting is deliberately small and strict (the same invariant as the cache
+	# carve-out above): one statement that is not on the list means ask.
+	# Vetted statements: a plain rm, a short list of inert commands, the common
+	# runners, a literal assignment (never to PATH, IFS, HOME and similar), the
+	# for/do/done/if/then/else/fi keywords, and the redirections >/dev/null,
+	# 2>/dev/null, 2>&1. Forbidden anywhere: a backtick, a backslash, < > ( ) { }
+	# ! a lone &, and a $ that does not start a plain $NAME. A literal operand
+	# must still pass the safe-list. An operand that starts with ~ or holds
+	# $HOME stays on the ask path so the user can approve a home-folder delete.
+	RM_SEG='([^./][^/]*/)*[^./][^/]*'
+	RM_ARTIFACTS='\.venv|node_modules|dist|build|\.next|coverage|__pycache__'
+	RM_SAFE_SCRATCH="^(/private)?/tmp/claude-[0-9]+/${RM_SEG}/scratchpad(/${RM_SEG})?/?\$"
+	RM_SAFE_ARTIFACT="^(\\./)?(${RM_SEG}/)?(${RM_ARTIFACTS})(/${RM_SEG})?/?\$"
+	RM_SAFE_FIXTURE="^(\\./)?tests/fixtures/${RM_SEG}/?\$"
+	RM_SAFE_ANY="$RM_SAFE_SCRATCH|$RM_SAFE_ARTIFACT|$RM_SAFE_FIXTURE"
+
+	# rm_wrap_eligible <raw-command>: return 0 when every statement is vetted.
+	rm_wrap_eligible() {
+		local v="$1" stmt first var value tok tok_s i dd operands rm_seen=0
+		local in_d='2>/dev/null' in_a='>/dev/null' in_b='2>&1' in_c='>&2' amp2='&&' bar2='||' nl=$'\n' dq='"'
+		# shellcheck disable=SC2016
+		local dollar_re='\$([^A-Za-z_]|$)' for_re='^for[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]+in([[:space:]]|$)'
+		# shellcheck disable=SC2016
+		local value_re='^["]?[A-Za-z0-9._/:@%+,$=-]*["]?$' literal_re='^[A-Za-z0-9._/-]+$'
+		local -a stmts words
+		v="${v//$in_d/ }"
+		v="${v//$in_a/ }"
+		v="${v//$in_b/ }"
+		v="${v//$in_c/ }"
+		v="${v//$amp2/;}"
+		v="${v//$bar2/;}"
+		v="${v//|/;}"
+		v="${v//$nl/;}"
+		# shellcheck disable=SC1003
+		case "$v" in
+			*'`'* | *'\'* | *'<'* | *'>'* | *'('* | *')'* | *'{'* | *'}'* | *'!'* | *'&'*) return 1 ;;
+		esac
+		[[ "$v" =~ $dollar_re ]] && return 1
+		IFS=';' read -r -a stmts <<<"$v"
+		[ "${#stmts[@]}" -gt 0 ] || return 1
+		for stmt in "${stmts[@]}"; do
+			read -r stmt <<<"$stmt"
+			while :; do
+				case "$stmt" in
+					"do "* | "then "* | "else "* | "if "*)
+						stmt="${stmt#* }"
+						read -r stmt <<<"$stmt"
+						;;
+					do | then | else | fi | done)
+						stmt=""
+						break
+						;;
+					*) break ;;
+				esac
+			done
+			[ -z "$stmt" ] && continue
+			case "$stmt" in
+				"for "*)
+					[[ "$stmt" =~ $for_re ]] || return 1
+					continue
+					;;
+			esac
+			read -r -a words <<<"$stmt"
+			first="${words[0]}"
+			if [[ "$first" =~ ^([A-Za-z_][A-Za-z0-9_]*)= ]]; then
+				var="${BASH_REMATCH[1]}"
+				[ "${#words[@]}" -eq 1 ] || return 1
+				case "$var" in
+					PATH | IFS | HOME | TMPDIR | ENV | SHELLOPTS | PS[0-9] | PROMPT_COMMAND | CDPATH | GLOBIGNORE | SHELL | USER | LOGNAME | PWD | OLDPWD | TERM | LD_* | DYLD_* | BASH* | __SAFE_RM_*) return 1 ;;
+				esac
+				value="${first#*=}"
+				[[ "$value" =~ $value_re ]] || return 1
+				continue
+			fi
+			case "$first" in
+				rm)
+					rm_seen=$((rm_seen + 1))
+					operands=0
+					dd=0
+					for ((i = 1; i < ${#words[@]}; i++)); do
+						tok="${words[$i]}"
+						if [ "$dd" -eq 0 ]; then
+							case "$tok" in
+								--)
+									dd=1
+									continue
+									;;
+								-*) continue ;;
+							esac
+						fi
+						operands=$((operands + 1))
+						# $dq stays unquoted inside ${}: it is one quote character with no glob meaning,
+						# and a quoted form inside double quotes breaks on bash 3.2.
+						# shellcheck disable=SC2295
+						tok_s="${tok#$dq}"
+						# shellcheck disable=SC2295
+						tok_s="${tok_s%$dq}"
+						# shellcheck disable=SC2016
+						case "$tok_s" in
+							'~'* | *'$HOME'*) return 1 ;;
+						esac
+						if [[ "$tok_s" =~ $literal_re ]]; then
+							grep -qE "$RM_SAFE_ANY" <<<"$tok_s" || return 1
+						fi
+					done
+					[ "$operands" -ge 1 ] || return 1
+					;;
+				mkdir | cd | ls | echo | printf | pwd | true | false | test | '[' | touch | cat | head | tail | wc | cut | tr | grep | basename | dirname) ;;
+				uv | ruff | pytest | python | python3 | npm | npx | pnpm | yarn | make | Rscript | quarto | dbt | sqlfmt | shfmt | shellcheck) ;;
+				*) return 1 ;;
+			esac
+		done
+		[ "$rm_seen" -ge 1 ]
+	}
+
 	if grep -qE '[;&|`$()<>]' <<<"$GUARD_STR" || [[ "$GUARD_STR" == *$'\n'* ]]; then
+		if rm_wrap_eligible "$CMD"; then
+			RM_WRAP_CWD=$(jq -r '.cwd // empty' <<<"$INPUT")
+			RM_WRAP_SCRATCH=$(jq -r '.scratchpad_dir // empty' <<<"$INPUT")
+			if [ -n "$RM_WRAP_CWD" ]; then
+				# $HOME stays literal here on purpose: the shell that runs the command expands it.
+				# shellcheck disable=SC2016
+				RM_WRAP_PREFIX=$(printf '__SAFE_RM_CWD=%q; __SAFE_RM_SCRATCH=%q; . "$HOME/.claude/hooks/safe-rm.sh" || exit 97' "$RM_WRAP_CWD" "$RM_WRAP_SCRATCH")
+				jq -n --argjson ti "$(jq -c '.tool_input' <<<"$INPUT")" \
+					--arg c "${RM_WRAP_PREFIX}"$'\n'"${CMD}" \
+					--arg r "every statement is vetted; rm is replaced by a run-time guard that checks each expanded path (stream e-bash-guard-rm)" \
+					'{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow", "permissionDecisionReason": $r, "updatedInput": ($ti + {"command": $c})}}'
+				exit 0
+			fi
+		fi
 		jq -n --arg r "recursive rm alongside a shell operator/substitution -- cannot verify each path independently" \
 			'{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask", "permissionDecisionReason": $r}}'
 		exit 0
@@ -635,12 +776,8 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 		# Every remaining operand must be plain path text AND match
 		# the safe-list, or the whole command asks (first failure wins,
 		# named in the reason).
-		RM_SEG='([^./][^/]*/)*[^./][^/]*'
-		RM_ARTIFACTS='\.venv|node_modules|dist|build|\.next|coverage|__pycache__'
-		RM_SAFE_SCRATCH="^(/private)?/tmp/claude-[0-9]+/${RM_SEG}/scratchpad(/${RM_SEG})?/?\$"
-		RM_SAFE_ARTIFACT="^(\\./)?(${RM_SEG}/)?(${RM_ARTIFACTS})(/${RM_SEG})?/?\$"
-		RM_SAFE_FIXTURE="^(\\./)?tests/fixtures/${RM_SEG}/?\$"
-
+		# RM_SEG, RM_ARTIFACTS, and the RM_SAFE_* patterns are defined once,
+		# above the run-time-verified rm section, and shared by both paths.
 		RM_OPERAND_COUNT=0
 		RM_SEEN_DASHDASH=0
 		for ((RM_I = RM_IDX + 1; RM_I < ${#RM_WORDS[@]}; RM_I++)); do
