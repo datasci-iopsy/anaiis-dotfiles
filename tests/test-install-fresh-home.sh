@@ -166,15 +166,21 @@ echo "--- 6. the old CLAUDE.md link"
 # reads that path. install.sh removes the link only when its target ends in
 # /anaiis-dotfiles/claude/CLAUDE.md. A real file or a link to another target stays, and the run says so.
 run_links() {
-	OUT="$(HOME="$1" PATH="$TMPD/stub:$PATH" "$BASH" "$INSTALL" --symlinks-only 2>&1)"
+	OUT="$(HOME="$1" PATH="$TMPD/stub:$PATH" "$BASH" "${2:-$INSTALL}" --symlinks-only 2>&1)"
 	RC=$?
 }
 mentions() { printf '%s\n' "$OUT" | grep -c 'CLAUDE\.md'; }
 
+# The stale-link case needs a canonical folder that has rules/context.md (see section 7). The main
+# checkout lacks that file when it is older than the installer, so the case uses a fixture folder.
+FX6="$TMPD/fx6"
+mkdir -p "$FX6/claude/rules"
+cp "$INSTALL" "$FX6/install.sh"
+printf 'context\n' >"$FX6/claude/rules/context.md"
 H6="$(mktemp -d "$TMPD/home.XXXXXX")"
 mkdir -p "$H6/.claude"
 ln -s "$H6/anaiis-dotfiles/claude/CLAUDE.md" "$H6/.claude/CLAUDE.md"
-run_links "$H6"
+run_links "$H6" "$FX6/install.sh"
 assert_eq "6.1 stale link: exit code is 0" 0 "$RC"
 assert_eq "6.2 stale link: the link is removed" no \
 	"$([ -L "$H6/.claude/CLAUDE.md" ] || [ -e "$H6/.claude/CLAUDE.md" ] && echo yes || echo no)"
@@ -182,7 +188,7 @@ assert_eq "6.3 stale link: one unlink line names the link" 1 "$(printf '%s\n' "$
 assert_eq "6.4 stale link: the other links are still made" yes \
 	"$([ -L "$H6/.claude/settings.json" ] && [ -L "$H6/.claude/rules" ] && echo yes || echo no)"
 SNAP6="$(snapshot "$H6")"
-run_links "$H6"
+run_links "$H6" "$FX6/install.sh"
 assert_eq "6.5 second run: exit code is 0" 0 "$RC"
 assert_eq "6.6 second run: no line mentions CLAUDE.md" 0 "$(mentions)"
 assert_eq "6.7 second run: no change line" 0 "$(printf '%s\n' "$OUT" | grep -cE "$CHANGE_RE")"
@@ -205,6 +211,30 @@ assert_eq "6.12 link elsewhere: exit code is 0" 0 "$RC"
 assert_eq "6.13 link elsewhere: the link target is unchanged" "$H6/elsewhere/CLAUDE.md" "$(readlink "$H6/.claude/CLAUDE.md")"
 assert_eq "6.14 link elsewhere: the target file stays" other "$(cat "$H6/elsewhere/CLAUDE.md")"
 assert_eq "6.15 link elsewhere: the run prints one note about it" 1 "$(printf '%s\n' "$OUT" | grep -c '^  note  .*CLAUDE\.md is a link to ')"
+
+echo "--- 7. the old CLAUDE.md link stays until its replacement exists"
+# install.sh resolves the main checkout as canonical, and that checkout can be older than the installer
+# (for example, the installer runs from a linked worktree). A copy of install.sh in a folder outside any
+# git repo makes that folder canonical, so the test controls whether claude/rules/context.md exists there.
+FX7="$TMPD/fx7"
+mkdir -p "$FX7/claude/rules"
+cp "$INSTALL" "$FX7/install.sh"
+H7="$(mktemp -d "$TMPD/home.XXXXXX")"
+mkdir -p "$H7/.claude"
+ln -s "$H7/anaiis-dotfiles/claude/CLAUDE.md" "$H7/.claude/CLAUDE.md"
+run_links "$H7" "$FX7/install.sh"
+assert_eq "7.1 no context.md: exit code is 0" 0 "$RC"
+assert_eq "7.2 no context.md: the link stays" "$H7/anaiis-dotfiles/claude/CLAUDE.md" "$(readlink "$H7/.claude/CLAUDE.md")"
+assert_eq "7.3 no context.md: no unlink line" 0 "$(printf '%s\n' "$OUT" | grep -c '^  unlink ')"
+assert_eq "7.4 no context.md: one note names context.md" 1 "$(printf '%s\n' "$OUT" | grep -c '^  note  .*CLAUDE\.md kept: .*context\.md is missing')"
+assert_eq "7.5 no context.md: the other links are still made" yes \
+	"$([ -L "$H7/.claude/settings.json" ] && [ -L "$H7/.claude/rules" ] && echo yes || echo no)"
+printf 'context\n' >"$FX7/claude/rules/context.md"
+run_links "$H7" "$FX7/install.sh"
+assert_eq "7.6 context.md added, run again: exit code is 0" 0 "$RC"
+assert_eq "7.7 context.md added, run again: the link is removed" no \
+	"$([ -L "$H7/.claude/CLAUDE.md" ] || [ -e "$H7/.claude/CLAUDE.md" ] && echo yes || echo no)"
+assert_eq "7.8 context.md added, run again: one unlink line names the link" 1 "$(printf '%s\n' "$OUT" | grep -c "^  unlink $H7/.claude/CLAUDE.md ")"
 
 if [ -n "${COV:-}" ]; then
 	cov_end

@@ -61,13 +61,18 @@ symlink() {
 # Remove the old CLAUDE.md link from $HOME/.claude (decision D-003). The repo has no CLAUDE.md now.
 # The function acts only on a symlink whose target ends in /anaiis-dotfiles/claude/CLAUDE.md.
 # It leaves a real file or a link to another target alone. Claude Code still reads such a file, so the
-# function prints a note for each.
+# function prints a note for each. It also keeps the link while $CANONICAL has no rules/context.md,
+# because that checkout can be older than this installer. The next run removes the link.
 remove_old_claude_md_link() {
 	local link="$HOME/.claude/CLAUDE.md" target
 	if [ -L "$link" ]; then
 		target="$(readlink "$link")"
 		case "$target" in
 			*/anaiis-dotfiles/claude/CLAUDE.md)
+				if [ ! -f "$CANONICAL/claude/rules/context.md" ]; then
+					echo "  note  $link kept: $CANONICAL/claude/rules/context.md is missing. Update that checkout, then run install.sh again."
+					return 0
+				fi
 				rm -f "$link"
 				echo "  unlink $link (old link to $target; rules/context.md replaces it)"
 				;;
