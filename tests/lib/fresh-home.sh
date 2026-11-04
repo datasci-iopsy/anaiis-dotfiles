@@ -19,8 +19,9 @@
 fresh_home_new() {
 	local repo_dir home name
 	# A relative path would make each link resolve against $home/.claude and dangle. Make it absolute
-	# first. The logical pwd keeps an absolute argument exactly as the caller wrote it.
-	repo_dir="$(cd "$1" && pwd)" || return 1
+	# first. The logical pwd keeps an absolute argument exactly as the caller wrote it. An empty
+	# CDPATH stops cd from picking another folder with the same name and printing its path.
+	repo_dir="$(CDPATH='' cd -- "$1" && pwd)" || return 1
 	home="$(mktemp -d "${TMPDIR:-/tmp}/fresh-home.XXXXXX")" || return 1
 	mkdir -p "$home/.claude"
 	for name in hooks scripts rules commands skills agents memory; do
