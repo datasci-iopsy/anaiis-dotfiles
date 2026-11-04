@@ -32,29 +32,12 @@ for _brew_prefix in \
 done
 unset _brew_prefix
 
-# Refresh the Brewfile from installed packages (once per day, non-blocking) so
-# it cannot drift. The file changes only when the package set changed; commit
-# it from a dotfiles session. Cross-profile write access to the prefix is an
-# ACL, see claude/scripts/brew-share.sh.
-_brewfile="$HOME/anaiis-dotfiles/Brewfile"
-_bfstamp="${XDG_CACHE_HOME:-$HOME/.cache}/brewfile-check.stamp"
-if command -v brew &>/dev/null && [ -f "$_brewfile" ] \
-	&& [ -w "${HOMEBREW_PREFIX:-/opt/homebrew}" ]; then
-	_bfage=$(($(date +%s) - $(stat -f %m "$_bfstamp" 2>/dev/null || echo 0)))
-	if [ ! -f "$_bfstamp" ] || [ "$_bfage" -gt 86400 ]; then
-		touch "$_bfstamp"
-		(
-			_bfnew="$(mktemp)"
-			if brew bundle dump --no-describe --force --file="$_bfnew" &>/dev/null \
-				&& ! cmp -s "$_bfnew" "$_brewfile"; then
-				command cp -f "$_bfnew" "$_brewfile"
-				echo "[dotfiles] Brewfile refreshed from installed packages; commit it from the dotfiles repo."
-			fi
-			command rm -f "$_bfnew"
-		) &
-	fi
-fi
-unset _brewfile _bfstamp _bfage
+# Add installed packages to the Brewfile (additive only, at most once per day, in
+# the background). brew-sync.sh refresh checks brew, the file, prefix access, and
+# the stamp; commit the result from a dotfiles session. Cross-profile write
+# access to the prefix is an ACL, see claude/scripts/brew-share.sh.
+[ -f "$HOME/anaiis-dotfiles/claude/scripts/brew-sync.sh" ] \
+	&& (bash "$HOME/anaiis-dotfiles/claude/scripts/brew-sync.sh" refresh &)
 
 # ── bash-completion (interactive shells only) ─────────────────────────────────
 if [[ $- == *i* ]] && [ -n "$HOMEBREW_PREFIX" ] && [ -r "$HOMEBREW_PREFIX/etc/profile.d/bash_completion.sh" ]; then
