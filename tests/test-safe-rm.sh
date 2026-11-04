@@ -69,12 +69,14 @@ chmod +x "$STUB/mkdir"
 #   mode "homeintmp": like stub, but HOME is a tmp.* folder under TMPDIR (a home inside a root).
 #   mode "cwdhome": like stub, but the working directory is HOME. "cwdabovehome": the cwd is a parent of
 #   HOME. "cwdroot": the cwd is the root folder.
+#   mode "notmpdir": like stub, but TMPDIR is not set, so the tmp.* root is /tmp.
 #   mode "aliases": like stub, but the shell has expand_aliases on and the aliases of the owner's profile
 #   (mkdir='mkdir -pv', pwd='pwd -P', ls='ls -GFhp', rm='rm -i') are defined BEFORE the file is sourced.
 # Sets RC, ERR (stderr text), CALLED (yes when the stub or real rm was reached), and MKCALLED (the same for mkdir).
 child() {
 	local mode="$1" snippet="$2" path_dir="$STUB:/usr/bin:/bin" run_dir="$CWD" home_dir="$HOMEF"
-	local pre='. "$SAFE_RM"; '
+	local pre='. "$SAFE_RM"; ' tmp_arg="TMPDIR=$TMPR"
+	[ "$mode" = notmpdir ] && tmp_arg="UNUSED_C=1"
 	[ "$mode" = aliases ] && pre="shopt -s expand_aliases
 alias mkdir='mkdir -pv'
 alias pwd='pwd -P'
@@ -106,7 +108,7 @@ alias rm='rm -i'
 		cwdhome | cwdabovehome | cwdroot) cwd_arg="__SAFE_RM_CWD=$run_dir" ;;
 	esac
 	# BASH_ENV, BASH_XTRACEFD, and PS4 pass through env -i so that COV=1 can trace the child shell.
-	ERR="$(cd "$run_dir" && env -i PATH="$path_dir" HOME="$home_dir" TMPDIR="$TMPR" "$scratch_arg" "$cwd_arg" \
+	ERR="$(cd "$run_dir" && env -i PATH="$path_dir" HOME="$home_dir" "$tmp_arg" "$scratch_arg" "$cwd_arg" \
 		BASH_ENV="${BASH_ENV:-}" BASH_XTRACEFD="${BASH_XTRACEFD:-}" PS4="${PS4:-+ }" \
 		SCRATCH="$SCRATCH" CWD="$CWD" OUT="$OUT" TMPR="$TMPR" HOMEF="$HOMEF" ALIAS="$TREE/alias" TREE="$TREE" SAFE_RM="$SAFE_RM" \
 		"$BASH" -c "$pre$snippet" 2>&1 >/dev/null)"
@@ -447,6 +449,18 @@ expect_mk_log "16.9 -vp is an allowed cluster" 'mkdir -vp "$SCRATCH/vp"' "-vp --
 expect_refuse "16.10 rm -i names the flag" 'rm -i "$SCRATCH/a"' "'-i'"
 expect_refuse "16.11 a cluster with one bad letter names the whole word" 'rm -rfi "$SCRATCH/a"' "'-rfi'"
 expect_mk_refuse "16.12 mkdir -m names the flag" 'mkdir -m 755 "$SCRATCH/a"' "'-m'"
+
+echo "--- 17. every root name, near-miss names, TMPDIR unset, and the -d flag (T-E4f, review 2 N4)"
+for disposable in .pytest_cache .tox .ruff_cache .mypy_cache __pycache__ .next build coverage; do
+	expect_pass "17.1 disposable name inside the working directory: $disposable" "rm -rf \"\$CWD/$disposable\""
+done
+expect_refuse "17.2 near-miss name xdist is not dist" 'rm -rf "$CWD/src/xdist/f"' "refused"
+expect_refuse "17.3 near-miss name mybuild is not build" 'rm -rf "$CWD/src/mybuild/f"' "refused"
+expect_refuse "17.4 near-miss name not.venv is not .venv" 'rm -rf "$CWD/src/not.venv/f"' "refused"
+expect_pass "17.5 TMPDIR unset: the tmp.* root is /tmp" 'rm -rf /tmp/tmp.noenv' notmpdir
+expect_refuse "17.6 TMPDIR unset: a /tmp folder that is not tmp.* is refused" 'rm -rf /tmp/other-folder' "refused" notmpdir
+expect_log "17.7 rm -d reaches rm" 'rm -d "$SCRATCH/a"' "-d -- $PSCRATCH/a"
+expect_log "17.8 rm --dir reaches rm" 'rm --dir "$SCRATCH/a"' "--dir -- $PSCRATCH/a"
 
 if [ -n "${COV:-}" ]; then
 	cov_end
