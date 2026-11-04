@@ -590,6 +590,25 @@ assert_decision "7l-neg.15 tilde expansion inside mktemp's own arguments must as
 echo "# 7m. Run-time-verified rm (stream e-bash-guard-rm, D-026 to D-029)"
 CTX_CWD="$TEST_HOME/proj"
 CTX_SCRATCH="$TEST_HOME/session/scratchpad"
+# The hook reads $HOME/.claude/hooks/safe-rm.sh to build the canary key, and it allows an eligible command
+# only when the sentinel for that key exists (D-E-15). TEST_HOME gets the hooks link and the sentinel here,
+# so every assert_wrapped case below runs in the state "this guard version was proven before".
+. "$REPO_DIR/tests/lib/fresh-home.sh"
+ln -s "$REPO_DIR/claude/hooks" "$TEST_HOME/.claude/hooks"
+
+# canary_key <home>: the key the hook builds, <crc>-<size> of the home's safe-rm.sh.
+canary_key() {
+	local c z
+	read -r c z _ <<<"$(cksum <"$1/.claude/hooks/safe-rm.sh")"
+	printf '%s-%s' "$c" "$z"
+}
+
+# canary_mark <home> [key]: create the sentinel file for the key (default: the home's own key).
+canary_mark() {
+	mkdir -p "$1/.claude/state"
+	: >"$1/.claude/state/safe-rm-canary-${2:-$(canary_key "$1")}"
+}
+canary_mark "$TEST_HOME"
 
 # run_guard_ctx <command> [cwd] [scratchpad]: like run_guard_json, plus the payload fields the rm
 # section reads (cwd, scratchpad_dir) and the tool_input fields it must keep (description, timeout).
@@ -597,7 +616,7 @@ run_guard_ctx() {
 	local cmd="$1" cwd="${2-$CTX_CWD}" scratch="${3-$CTX_SCRATCH}"
 	STDOUT=$(jq -n --arg c "$cmd" --arg cwd "$cwd" --arg sp "$scratch" \
 		'{"session_id":"test","cwd":$cwd,"scratchpad_dir":$sp,"tool_input":{"command":$c,"description":"d","timeout":5000}}' \
-		| HOME="$TEST_HOME" bash "$GUARD" 2>"$STDERR_TMP")
+		| HOME="${CTX_HOME:-$TEST_HOME}" bash "$GUARD" 2>"$STDERR_TMP")
 	RC=$?
 	STDERR=$(cat "$STDERR_TMP")
 }
@@ -613,8 +632,11 @@ assert_wrapped() {
 	new=$(printf '%s' "$STDOUT" | jq -r '.hookSpecificOutput.updatedInput.command // empty' 2>/dev/null)
 	[ "$got" = "allow" ] || ok=no
 	case "$new" in
-		*"__SAFE_RM_CWD="*"safe-rm.sh"*"exit 97"*) ;;
+		*"__SAFE_RM_CWD="*"safe-rm.sh"*'[ "$(type -t rm)" = function ]'*"exit 97"*) ;;
 		*) ok=no ;;
+	esac
+	case "${new%%$nl*}" in
+		*safe-rm-canary*) ok=no ;;
 	esac
 	[ "${new#*$nl}" = "$cmd" ] || ok=no
 	[ "$(printf '%s' "$STDOUT" | jq -r '.hookSpecificOutput.updatedInput.description // empty')" = "d" ] || ok=no
@@ -815,6 +837,115 @@ mkdir -p "$E_CWD/dist/x"
 run_rewritten "rm -rf dist && ls"
 assert_state "7n.5 a disposable literal folder in the working directory is deleted (dist is not a cache name, so only the new path rewrites it)" "rc=0 gone=yes" \
 	"rc=$RC gone=$([ -e "$E_CWD/dist" ] && echo no || echo yes)"
+
+echo "# 7o. First-use canary (D-E-15): allow only after a proven rewrite"
+CAN_CMD="S=$E_SCRATCH"'; echo ran >&2; rm -rf "$S/canary-x"; ls "$S"'
+
+# canary_home [copy]: a throwaway HOME inside TEST_HOME. By default its hooks folder links to this repo.
+# With "copy", safe-rm.sh is a plain copy, so a test can change it without touching the repo.
+canary_home() {
+	local h
+	h="$(TMPDIR="$TEST_HOME" fresh_home_new "$REPO_DIR")" || return 1
+	if [ "${1:-}" = copy ]; then
+		rm "$h/.claude/hooks"
+		mkdir "$h/.claude/hooks"
+		cp "$REPO_DIR/claude/hooks/safe-rm.sh" "$h/.claude/hooks/safe-rm.sh"
+	fi
+	printf '%s\n' "$h"
+}
+
+# run_canary <home> <command>: ask the hook as that home. Sets CAN_DEC, CAN_NEW (the rewritten command), CAN_WHY.
+run_canary() {
+	CTX_HOME="$1" run_guard_ctx "$2" "$E_CWD" "$E_SCRATCH"
+	CAN_DEC=$(printf '%s' "$STDOUT" | jq -r '.hookSpecificOutput.permissionDecision // "none"')
+	CAN_NEW=$(printf '%s' "$STDOUT" | jq -r '.hookSpecificOutput.updatedInput.command // empty')
+	CAN_WHY=$(printf '%s' "$STDOUT" | jq -r '.hookSpecificOutput.permissionDecisionReason // empty')
+}
+
+# can_state: one word list that describes the last run_canary result.
+can_state() {
+	local w=no f=no
+	case "${CAN_NEW%%$'\n'*}" in
+		*': >"$HOME/.claude/state/safe-rm-canary-'*) w=yes ;;
+	esac
+	case "$CAN_WHY" in
+		*"first use"*) f=yes ;;
+	esac
+	printf 'decision=%s rewritten=%s sentinel_write=%s first_use_reason=%s' "$CAN_DEC" "$([ -n "$CAN_NEW" ] && echo yes || echo no)" "$w" "$f"
+}
+
+H1="$(canary_home)"
+run_canary "$H1" "$CAN_CMD"
+assert_state "7o.1 no sentinel: ask, rewritten, the prefix writes the sentinel, the reason says first use" \
+	"decision=ask rewritten=yes sentinel_write=yes first_use_reason=yes" "$(can_state)"
+
+canary_mark "$H1"
+run_canary "$H1" "$CAN_CMD"
+assert_state "7o.2 sentinel present: allow, rewritten, no sentinel write" \
+	"decision=allow rewritten=yes sentinel_write=no first_use_reason=no" "$(can_state)"
+
+H3="$(canary_home)"
+canary_mark "$H3" "1-1"
+run_canary "$H3" "$CAN_CMD"
+assert_state "7o.3 a sentinel for another key does not count" \
+	"decision=ask rewritten=yes sentinel_write=yes first_use_reason=yes" "$(can_state)"
+
+H4="$(canary_home copy)"
+canary_mark "$H4"
+run_canary "$H4" "$CAN_CMD"
+assert_state "7o.4a a copy of safe-rm.sh with its sentinel: allow" \
+	"decision=allow rewritten=yes sentinel_write=no first_use_reason=no" "$(can_state)"
+printf '# changed\n' >>"$H4/.claude/hooks/safe-rm.sh"
+run_canary "$H4" "$CAN_CMD"
+assert_state "7o.4b the same copy after an edit changes the key and asks again" \
+	"decision=ask rewritten=yes sentinel_write=yes first_use_reason=yes" "$(can_state)"
+
+H5="$E2E/nohooks"
+mkdir -p "$H5/.claude"
+run_canary "$H5" "$CAN_CMD"
+assert_state "7o.5 an unreadable safe-rm.sh: ask with no rewrite" \
+	"decision=ask rewritten=no sentinel_write=no first_use_reason=no" "$(can_state)"
+
+# run_in_home <home> <command>: run a rewritten command in a clean shell as that home with the real rm.
+run_in_home() {
+	ERR=$(cd "$E_CWD" && env -i PATH=/usr/bin:/bin HOME="$1" TMPDIR="$E2E" bash -c "$2" 2>&1 >/dev/null)
+	RC=$?
+}
+
+H6="$(canary_home copy)"
+: >"$H6/.claude/hooks/safe-rm.sh"
+run_canary "$H6" "$CAN_CMD"
+run_in_home "$H6" "$CAN_NEW"
+assert_state "7o.6a an empty safe-rm.sh: the rewritten command exits 97, runs nothing, writes no sentinel" \
+	"rc=97 ran=no sentinel=no" \
+	"rc=$RC ran=$(printf '%s' "$ERR" | grep -q '^ran$' && echo yes || echo no) sentinel=$([ -e "$H6/.claude/state" ] && echo yes || echo no)"
+
+H7="$(canary_home copy)"
+printf ':\n' >"$H7/.claude/hooks/safe-rm.sh"
+run_canary "$H7" "$CAN_CMD"
+run_in_home "$H7" "$CAN_NEW"
+assert_state "7o.6b a safe-rm.sh that defines no rm: the same result" \
+	"rc=97 ran=no sentinel=no" \
+	"rc=$RC ran=$(printf '%s' "$ERR" | grep -q '^ran$' && echo yes || echo no) sentinel=$([ -e "$H7/.claude/state" ] && echo yes || echo no)"
+
+H8="$(canary_home)"
+mkdir -p "$E_SCRATCH/canary-x"
+run_canary "$H8" "$CAN_CMD"
+run_in_home "$H8" "$CAN_NEW"
+assert_state "7o.7a end to end: the first rewritten run deletes inside the roots and writes the sentinel" \
+	"rc=0 ran=yes gone=yes sentinel=yes" \
+	"rc=$RC ran=$(printf '%s' "$ERR" | grep -q '^ran$' && echo yes || echo no) gone=$([ -e "$E_SCRATCH/canary-x" ] && echo no || echo yes) sentinel=$([ -e "$H8/.claude/state/safe-rm-canary-$(canary_key "$H8")" ] && echo yes || echo no)"
+run_canary "$H8" "$CAN_CMD"
+assert_state "7o.7b end to end: the next run of the same version is allowed" \
+	"decision=allow rewritten=yes sentinel_write=no first_use_reason=no" "$(can_state)"
+
+H9="$(canary_home)"
+run_in_home "$H9" "$CAN_CMD"
+assert_state "7o.8 the ORIGINAL command (updatedInput not applied) writes no sentinel, so the next run still asks" \
+	"sentinel=no" "sentinel=$([ -e "$H9/.claude/state" ] && echo yes || echo no)"
+run_canary "$H9" "$CAN_CMD"
+assert_state "7o.8b and the hook still asks" \
+	"decision=ask rewritten=yes sentinel_write=yes first_use_reason=yes" "$(can_state)"
 
 if [ -n "${COV:-}" ]; then
 	cov_end

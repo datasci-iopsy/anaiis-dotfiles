@@ -296,10 +296,12 @@ fi
 #
 # One carve-out exists (rm_wrap_eligible, below; stream e-bash-guard-rm).
 # If every statement of the command is on a short vetted list, the hook
-# emits "allow" with an updatedInput command that first sources safe-rm.sh.
-# That file replaces rm with a function that checks each expanded operand
-# against the deletion roots. The shell, not this parser, then verifies each
-# path. If any statement is not vetted, the hook emits "ask" as before.
+# returns an updatedInput command that first sources safe-rm.sh. That file
+# replaces rm with a function that checks each expanded operand against the
+# deletion roots. The shell, not this parser, then verifies each path. The
+# decision is "allow" only after a first-use canary proved that the harness
+# applies updatedInput (see the canary paragraph below); before that it is
+# "ask". If any statement is not vetted, the hook emits "ask" as before.
 #
 # Detection is broadened (rm, /bin/rm, /usr/bin/rm, \rm; every recursive
 # flag spelling; a bare word boundary rather than a strict subcommand-start
@@ -663,6 +665,18 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 	# and others), and a printf statement with a -v word asks. Forbidden anywhere:
 	# a backtick, a backslash, < > ( ) { } ! a lone &, and a $ that does not start
 	# a plain $NAME.
+	# First-use canary (D-E-15). The decision depends on a sentinel file,
+	# $HOME/.claude/state/safe-rm-canary-<crc>-<size>, where crc and size come
+	# from cksum of $HOME/.claude/hooks/safe-rm.sh. With the sentinel, the hook
+	# returns allow plus updatedInput. Without it, the hook returns ask plus the
+	# same updatedInput, and the prefix writes the sentinel after safe-rm.sh
+	# loaded and rm is a function. If the harness ignores updatedInput, nothing
+	# writes the sentinel and every later run asks. A change to safe-rm.sh
+	# changes the key and asks once more. If safe-rm.sh is unreadable, the hook
+	# asks with no rewrite. The prefix also exits 97 when the file loads but
+	# defines no rm function (an empty or foreign file).
+	# Accepted risk (D-E-16): an agent that writes the sentinel by hand or edits
+	# claude/hooks/ is out of scope. The guard stops accidents, not an adversary.
 	RM_SEG='([^./][^/]*/)*[^./][^/]*'
 	RM_ARTIFACTS='\.venv|node_modules|dist|build|\.next|coverage|__pycache__'
 	RM_SAFE_SCRATCH="^(/private)?/tmp/claude-[0-9]+/${RM_SEG}/scratchpad(/${RM_SEG})?/?\$"
@@ -875,14 +889,35 @@ if grep -qE "$RM_GATE_RE" <<<"$RM_GATE_SCAN_STR"; then
 		if rm_wrap_eligible "$CMD"; then
 			RM_WRAP_CWD=$(jq -r '.cwd // empty' <<<"$INPUT")
 			RM_WRAP_SCRATCH=$(jq -r '.scratchpad_dir // empty' <<<"$INPUT")
-			if [ -n "$RM_WRAP_CWD" ]; then
-				# $HOME stays literal here on purpose: the shell that runs the command expands it.
+			# First-use canary (D-E-15). The key is the cksum of safe-rm.sh as this process sees it:
+			# <crc>-<size>. If the file is unreadable, there is no key and the command asks, with no rewrite.
+			RM_WRAP_KEY=""
+			if [ -n "${HOME:-}" ] && [ -r "$HOME/.claude/hooks/safe-rm.sh" ]; then
+				read -r RM_CK_CRC RM_CK_SIZE _ <<<"$(cksum <"$HOME/.claude/hooks/safe-rm.sh" 2>/dev/null)"
+				[ -n "$RM_CK_CRC" ] && [ -n "$RM_CK_SIZE" ] && RM_WRAP_KEY="$RM_CK_CRC-$RM_CK_SIZE"
+			fi
+			if [ -n "$RM_WRAP_CWD" ] && [ -n "$RM_WRAP_KEY" ]; then
+				# $HOME stays literal here on purpose: the shell that runs the command expands it. The prefix
+				# loads safe-rm.sh and exits 97 unless rm is then a function (an empty or foreign file loads
+				# with status 0 and defines nothing).
 				# shellcheck disable=SC2016
-				RM_WRAP_PREFIX=$(printf '__SAFE_RM_CWD=%q; __SAFE_RM_SCRATCH=%q; . "$HOME/.claude/hooks/safe-rm.sh" || exit 97' "$RM_WRAP_CWD" "$RM_WRAP_SCRATCH")
+				RM_WRAP_PREFIX=$(printf '__SAFE_RM_CWD=%q; __SAFE_RM_SCRATCH=%q; . "$HOME/.claude/hooks/safe-rm.sh" && [ "$(type -t rm)" = function ] || exit 97' "$RM_WRAP_CWD" "$RM_WRAP_SCRATCH")
+				if [ -f "$HOME/.claude/state/safe-rm-canary-$RM_WRAP_KEY" ]; then
+					RM_WRAP_DECISION="allow"
+					RM_WRAP_WHY="every statement is vetted; rm is replaced by a run-time guard that checks each expanded path (stream e-bash-guard-rm)"
+				else
+					# No sentinel: ask, and let the prefix write the sentinel after the guard loaded. If the harness
+					# does not apply updatedInput, nothing writes it and every later run asks again.
+					RM_WRAP_DECISION="ask"
+					RM_WRAP_WHY="first use of this guard version: every statement is vetted and rm is replaced by a run-time guard. Confirm once. This run writes a marker after the guard loads, and later runs of this version do not prompt (stream e-bash-guard-rm)"
+					# shellcheck disable=SC2016
+					RM_WRAP_PREFIX="$RM_WRAP_PREFIX; "'mkdir -p "$HOME/.claude/state" && : >"$HOME/.claude/state/safe-rm-canary-'"$RM_WRAP_KEY"'"'
+				fi
 				jq -n --argjson ti "$(jq -c '.tool_input' <<<"$INPUT")" \
 					--arg c "${RM_WRAP_PREFIX}"$'\n'"${CMD}" \
-					--arg r "every statement is vetted; rm is replaced by a run-time guard that checks each expanded path (stream e-bash-guard-rm)" \
-					'{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "allow", "permissionDecisionReason": $r, "updatedInput": ($ti + {"command": $c})}}'
+					--arg d "$RM_WRAP_DECISION" \
+					--arg r "$RM_WRAP_WHY" \
+					'{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": $d, "permissionDecisionReason": $r, "updatedInput": ($ti + {"command": $c})}}'
 				exit 0
 			fi
 		fi
