@@ -11,7 +11,7 @@ set -euo pipefail
 # Usage:
 #   bash install.sh                   full install
 #   bash install.sh --symlinks-only   steps 1 and 2 only; stops before ~/.bashrc,
-#                                     graphify, CLI tools, R style, and Homebrew
+#                                     CLI tools, R style, and Homebrew
 #                                     (what CI runs to build the ~/.claude tree)
 #   bash install.sh --bashrc-only     step 3 only: wire $HOME/.bashrc (and check
 #                                     $HOME/.bash_profile) and exit (what
@@ -155,15 +155,11 @@ symlink "$CANONICAL/claude/memory" "$HOME/.claude/memory"
 
 if [ "$MODE" = "--symlinks-only" ]; then
 	echo ""
-	echo "Done (--symlinks-only: skipped shell config, graphify, CLI tools, R style, Homebrew)."
+	echo "Done (--symlinks-only: skipped shell config, CLI tools, R style, Homebrew)."
 	exit 0
 fi
 
 wire_bashrc
-
-echo ""
-echo "=== Claude Code: graphify (vendored) ==="
-bash "$CANONICAL/claude/scripts/install-graphify.sh"
 
 echo ""
 echo "=== Claude Code: CLI tools ==="
