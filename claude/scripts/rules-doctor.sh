@@ -54,12 +54,17 @@ fail() {
 
 # has_description <file>: true when the front matter (the lines between the first
 # "---" and the next "---") holds a description: line with text after the colon.
-# Front matter with no closing "---" is not valid, so it fails.
+# Front matter with no closing "---" is not valid, so it fails. A value of "" or '' (octal 047
+# is the single quote) holds no text, so it fails too.
 has_description() {
 	awk '
 		NR == 1 { if ($0 != "---") exit; fm = 1; next }
 		fm && /^---[[:space:]]*$/ { closed = 1; exit }
-		fm && /^description:[[:space:]]*[^[:space:]]/ { found = 1 }
+		fm && /^description:[[:space:]]*[^[:space:]]/ {
+			v = $0
+			sub(/^description:[[:space:]]*/, "", v)
+			if (v !~ /^("[[:space:]]*"|\047[[:space:]]*\047)[[:space:]]*$/) found = 1
+		}
 		END { exit !(found && closed) }
 	' "$1"
 }

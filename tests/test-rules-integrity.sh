@@ -59,26 +59,44 @@ assert_contains() {
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
-# make_fixture <dir>: copy the tracked inputs of the doctor into <dir> and index them.
-# -P keeps claude/skills' symlinks as symlinks instead of copying targets.
+# make_fixture <src> <dir>: copy the tracked inputs of the doctor from the repo <src> into <dir> and
+# index them. The list comes from git ls-files, so an ignored or untracked file in <src> stays out.
+# tar keeps claude/skills' symlinks as symlinks instead of copying targets.
 make_fixture() {
-	mkdir -p "$1"
-	cp -RP "$REPO_DIR/claude" "$1/claude"
-	cp -RP "$REPO_DIR/bash" "$1/bash"
-	cp -RP "$REPO_DIR/.github" "$1/.github"
-	cp -P "$REPO_DIR/install.sh" "$1/install.sh"
-	git init -q --template= "$1"
-	git -C "$1" add claude bash .github install.sh
+	mkdir -p "$2"
+	git -C "$1" ls-files -z -- claude bash .github install.sh | tar -C "$1" --null -T - -cf - | tar -C "$2" -xf -
+	git init -q --template= "$2"
+	git -C "$2" add claude bash .github install.sh
 }
 
 TMP_REPO="$WORK/repo"
-make_fixture "$TMP_REPO"
+make_fixture "$REPO_DIR" "$TMP_REPO"
 SETTINGS="$TMP_REPO/claude/settings.json"
 BEHAV_MD="$TMP_REPO/claude/rules/behavioral.md"
 
 run_doctor() {
 	RULES_DOCTOR_REPO_DIR="$TMP_REPO" bash "$DOCTOR" >"$1" 2>&1
 }
+
+# ── 0. The fixture holds tracked files only ──────────────────────────────
+# A machine-local rule file (claude/rules/<name>.local.md, ignored by .gitignore) or an untracked
+# script in the real checkout must not change the result of this test.
+echo "# 0. Fixture holds tracked files only"
+SRC="$WORK/src"
+mkdir -p "$SRC/claude/rules" "$SRC/bash" "$SRC/.github"
+printf '*.local.md\n' >"$SRC/.gitignore"
+printf 'tracked\n' >"$SRC/claude/rules/shared.md"
+printf 'tracked\n' >"$SRC/bash/tracked.sh"
+printf 'tracked\n' >"$SRC/.github/tracked.yml"
+printf 'tracked\n' >"$SRC/install.sh"
+printf 'ignored\n' >"$SRC/claude/rules/mine.local.md"
+printf 'untracked\n' >"$SRC/bash/untracked.sh"
+git init -q --template= "$SRC"
+git -C "$SRC" add .gitignore claude/rules/shared.md bash/tracked.sh .github/tracked.yml install.sh
+make_fixture "$SRC" "$WORK/fixture-check"
+assert "0.1 the fixture holds a tracked rule file" yes "$([ -f "$WORK/fixture-check/claude/rules/shared.md" ] && echo yes || echo no)"
+assert "0.2 the fixture lacks an ignored machine-local rule file" no "$([ -e "$WORK/fixture-check/claude/rules/mine.local.md" ] && echo yes || echo no)"
+assert "0.3 the fixture lacks an untracked script" no "$([ -e "$WORK/fixture-check/bash/untracked.sh" ] && echo yes || echo no)"
 
 # ── 1. Doctor passes on green tree, and the context rule file is in place ──
 echo "# 1. Doctor on green tree"
@@ -102,11 +120,13 @@ assert "1.7 .gitignore does not ignore a shared rule file" 1 "$?"
 echo "# 2. Every drift mutation applied at once"
 RULES="$TMP_REPO/claude/rules"
 # A.1: a rule file loses its description, one has no front matter, one has an empty description,
-# one has a description but never closes its front matter
+# one has a description but never closes its front matter, two have an empty quoted description
 sed '/^description:/d' "$RULES/tools.md" >"$RULES/tools.md.tmp" && mv "$RULES/tools.md.tmp" "$RULES/tools.md"
 printf '# Plain\n\nNo front matter here.\n' >"$RULES/no-front-matter.md"
 printf -- '---\nname: blank\ndescription:   \n---\n\n# Blank\n' >"$RULES/blank-description.md"
 printf -- '---\nname: open\ndescription: has text but no closing delimiter\n\n# Open\n' >"$RULES/unclosed-front-matter.md"
+printf -- '---\nname: dq\ndescription: %s\n---\n\n# Dq\n' '""' >"$RULES/empty-double-quoted.md"
+printf -- '---\nname: sq\ndescription: %s\n---\n\n# Sq\n' "''" >"$RULES/empty-single-quoted.md"
 # A.2: a rule file that names a rules file which does not exist
 printf '\nSee also: `rules/nonexistent-rule.md`.\n' >>"$RULES/git.md"
 # C.3: behavioral.md loses its numbered H2 imperatives
@@ -136,6 +156,8 @@ assert_contains "2.2 doctor names the rule file that lost its description (A.1)"
 assert_contains "2.3 doctor names the rule file with no front matter (A.1)" "no description: no-front-matter.md" "$OUT"
 assert_contains "2.4 doctor names the rule file with an empty description (A.1)" "no description: blank-description.md" "$OUT"
 assert_contains "2.4b doctor names the rule file with unclosed front matter (A.1)" "no description: unclosed-front-matter.md" "$OUT"
+assert_contains "2.4c doctor names the rule file with an empty double-quoted description (A.1)" "no description: empty-double-quoted.md" "$OUT"
+assert_contains "2.4d doctor names the rule file with an empty single-quoted description (A.1)" "no description: empty-single-quoted.md" "$OUT"
 assert_contains "2.5 doctor names the cross-reference check (A.2)" "A.2 cross-reference resolves" "$OUT"
 assert_contains "2.6 doctor names the file and the missing rules file (A.2)" "git.md references missing rules/nonexistent-rule.md" "$OUT"
 assert_contains "2.7 doctor reports the imperative count (C.3)" "C.3 H2 imperatives" "$OUT"
@@ -157,7 +179,7 @@ fi
 # the wrong reason. A reference to a rule that does not exist goes stale silently when rules are renumbered.
 echo "# 3. Dangling behavioral.md rule reference"
 REPO3="$WORK/repo3"
-make_fixture "$REPO3"
+make_fixture "$REPO_DIR" "$REPO3"
 printf '\nSee also: `rules/behavioral.md` rule 99 (does not exist).\n' >>"$REPO3/claude/rules/git.md"
 RULES_DOCTOR_REPO_DIR="$REPO3" bash "$DOCTOR" >"$WORK/dangling.out" 2>&1
 assert "3.1 doctor exits non-zero on a dangling rule reference" "1" "$?"

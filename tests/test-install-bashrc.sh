@@ -287,6 +287,49 @@ printf '# . ~/.bashrc\n' >"$CMT_PROF/.bash_profile"
 run_capture "$CMT_PROF"
 assert_eq "profile with a commented .bashrc line: one note line" "1" "$(printf '%s\n' "$OUT" | grep -c '^  note ' || true)"
 
+# ---- Test 15: a file whose name only starts with .bashrc is not .bashrc ---
+# Why: a login shell that reads a file which sources only ~/.bashrc.local never loads ~/.bashrc or
+# shared.bash. A substring test counted that file as healthy, so the installer stayed silent.
+n=0
+# shellcheck disable=SC2016 # $HOME stays literal in the fixture file
+for line in 'source "$HOME/.bashrc.local"' '. ~/.bashrc_old' '[ -f ~/.bashrc.bak ] && . ~/.bashrc.bak'; do
+	n=$((n + 1))
+	OTHER_NAME="$TMPDIR_TEST/profile_other_name_$n"
+	mkdir -p "$OTHER_NAME"
+	printf '%s\n' "$line" >"$OTHER_NAME/.bash_profile"
+	run_capture "$OTHER_NAME"
+	assert_eq "profile with only '$line': one note line" "1" "$(printf '%s\n' "$OUT" | grep -c '^  note ' || true)"
+	assert_eq "profile with only '$line': no ok line" "0" "$(printf '%s\n' "$OUT" | grep -c 'mentions .bashrc' || true)"
+done
+
+# ---- Test 16: each real way to source .bashrc still counts ---------------
+# Why: the boundary after .bashrc must not reject a source line that is written another way, or
+# that ends in a comment.
+n=0
+# shellcheck disable=SC2016 # $HOME stays literal in the fixture file
+for line in \
+	'[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"' \
+	'source ~/.bashrc' \
+	'. ~/.bashrc' \
+	'. "${HOME}/.bashrc"' \
+	'if [ -f ~/.bashrc ]; then . ~/.bashrc; fi' \
+	'[ -r ~/.bashrc ] && source ~/.bashrc # shell config'; do
+	n=$((n + 1))
+	REAL_FORM="$TMPDIR_TEST/profile_real_form_$n"
+	mkdir -p "$REAL_FORM"
+	printf '%s\n' "$line" >"$REAL_FORM/.bash_profile"
+	run_capture "$REAL_FORM"
+	assert_eq "profile with '$line': no note" "0" "$(printf '%s\n' "$OUT" | grep -c '^  note ' || true)"
+	assert_eq "profile with '$line': one ok line" "1" "$(printf '%s\n' "$OUT" | grep -c 'mentions .bashrc' || true)"
+done
+# A .bashrc.local line does not hide a real source line on another line of the same file.
+BOTH_LINES="$TMPDIR_TEST/profile_both_lines"
+mkdir -p "$BOTH_LINES"
+# shellcheck disable=SC2016 # $HOME stays literal in the fixture file
+printf 'source "$HOME/.bashrc.local"\n. ~/.bashrc\n' >"$BOTH_LINES/.bash_profile"
+run_capture "$BOTH_LINES"
+assert_eq "profile with .bashrc.local and .bashrc lines: no note" "0" "$(printf '%s\n' "$OUT" | grep -c '^  note ' || true)"
+
 if [ -n "${COV:-}" ]; then
 	cov_end
 	cov_report "$INSTALL"
