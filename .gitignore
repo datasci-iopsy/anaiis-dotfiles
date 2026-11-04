@@ -11,6 +11,9 @@
 *.pem
 *.key
 
+# Machine-local Claude rule files (see claude/rules/context.md)
+claude/rules/*.local.md
+
 # Local Claude session artifacts
 .claude/
 

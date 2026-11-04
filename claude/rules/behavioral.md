@@ -1,3 +1,8 @@
+---
+name: behavioral
+description: Eight imperatives for authorization, process, and reporting; build scope belongs to the ponytail plugin
+---
+
 # Behavioral Rules
 
 The eight imperatives below distill behaviors that hold across stacks and tasks. Prescriptive rules go stale when codebases shift; behaviors do not. This file expands each imperative with rationale and cross-links to existing rules.

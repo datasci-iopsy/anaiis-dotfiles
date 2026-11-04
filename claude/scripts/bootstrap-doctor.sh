@@ -16,9 +16,10 @@
 # In check 2 the name must end at .bashrc: a line that sources only .bashrc.local does not count.
 #   4. each enabled plugin has a folder in ~/.claude/plugins/cache/
 #   5. when gh uses the ssh protocol, known_hosts holds a github.com key
+#   6. when claude is on PATH, its version is at least 2.1.277 (AGENTS.md support)
 #
-# Tools used: dirname basename readlink grep jq gh ssh-keygen. ssh-keygen reads the passwd home and
-# ignores $HOME, so its call passes -f.
+# Tools used: dirname basename readlink grep jq gh ssh-keygen claude. ssh-keygen reads the passwd
+# home and ignores $HOME, so its call passes -f.
 
 # shellcheck disable=SC2088 # "~" is literal text in the messages, never a path to expand
 set -u
@@ -149,6 +150,46 @@ else
 		ok "github.com host key"
 	else
 		missing "github.com host key (~/.ssh/known_hosts)" "$FIX_KEYS"
+	fi
+fi
+
+# ---- 6. Claude Code version -------------------------------------------------
+# Claude Code reads AGENTS.md from 2.1.277. Without it, the repo's AGENTS.md is not loaded.
+
+# ver_ge <a> <b>: succeed when version a is at least version b. Each is major.minor.patch, digits
+# only. Any other text for a fails. The parts compare as integers, so 2.1.1000 is above 2.1.277.
+ver_ge() {
+	local a1 a2 a3 ax b1 b2 b3 part
+	IFS=. read -r a1 a2 a3 ax <<EOF
+$1
+EOF
+	IFS=. read -r b1 b2 b3 <<EOF
+$2
+EOF
+	for part in "$a1" "$a2" "$a3"; do
+		case "$part" in
+			'' | *[!0-9]*) return 1 ;;
+		esac
+	done
+	[ -z "$ax" ] || return 1
+	[ "$a1" -gt "$b1" ] && return 0
+	[ "$a1" -lt "$b1" ] && return 1
+	[ "$a2" -gt "$b2" ] && return 0
+	[ "$a2" -lt "$b2" ] && return 1
+	[ "$a3" -ge "$b3" ]
+}
+
+if ! command -v claude >/dev/null 2>&1; then
+	ok "claude version (not needed: claude not found)"
+else
+	# The first word of the first line: "2.1.318 (Claude Code)" gives 2.1.318.
+	cv="$(claude --version 2>/dev/null)" || cv=""
+	cv="${cv%%$'\n'*}"
+	cv="${cv%% *}"
+	if ver_ge "$cv" 2.1.277; then
+		ok "claude version $cv"
+	else
+		missing "claude version" "update Claude Code"
 	fi
 fi
 

@@ -7,18 +7,20 @@
 # script is grep-able from a higher-level test harness.
 #
 # Checks:
-#   A. Index integrity: every claude/rules/*.md file is listed in CLAUDE.md's
-#      rules index, and every rules/<name>.md referenced in CLAUDE.md exists
-#      on disk.
-#   B. Cross-reference integrity: every rules/<name>.md referenced inside any
-#      rules file exists on disk.
+#   A. Rule file integrity: every claude/rules/*.md file has a non-empty
+#      description: line in its front matter, and every rules/<name>.md named
+#      inside any rules file exists on disk. No CLAUDE.md index exists
+#      (decision D-003); Claude Code loads each rules file by itself. Former
+#      check B (cross-references) is now A.2; its letter stays unused so the
+#      other check ids keep their meaning.
 #   C. behavioral.md structure: H1 title and at least 9 numbered H2
 #      imperatives.
 #   D. No re-injection: no UserPromptSubmit hook in settings.json references
 #      behavioral rules (native loading makes injection a duplicate).
 #   E. Hook registration integrity: every $HOME/.claude/hooks/<name>.sh
 #      command in settings.json resolves to an existing file in claude/hooks/.
-#   F. No em dash (U+2014) in CLAUDE.md or any rules file.
+#   F. No em dash (U+2014) in any tracked shell script (install.sh included),
+#      any rules file, or the workflow file. The tracked list comes from git.
 #   G. Deterministic language: no banned vague qualifiers in rules files.
 #      A rule must state its threshold, not defer to judgment.
 #   H. Secrets denial: settings.json denies the protected Read/Write paths
@@ -31,10 +33,9 @@ set -u
 SCRIPT_REAL="$(realpath "${BASH_SOURCE[0]}")"
 # RULES_DOCTOR_REPO_DIR is a test-only override (same precedent as
 # MEMORY_DOCTOR_REPO_DIR): tests point the doctor at a throwaway copy of
-# claude/ so drift fixtures never touch the real CLAUDE.md, rules/, or the
-# live settings.json behind ~/.claude/settings.json. Unset in normal use.
+# claude/ so drift fixtures never touch the real rules/ or the live
+# settings.json behind ~/.claude/settings.json. Unset in normal use.
 REPO_DIR="${RULES_DOCTOR_REPO_DIR:-$(cd "$(dirname "$SCRIPT_REAL")/../.." && pwd)}"
-CLAUDE_MD="$REPO_DIR/claude/CLAUDE.md"
 RULES_DIR="$REPO_DIR/claude/rules"
 BEHAV_MD="$RULES_DIR/behavioral.md"
 SETTINGS="$REPO_DIR/claude/settings.json"
@@ -51,48 +52,51 @@ fail() {
 	FAIL=$((FAIL + 1))
 }
 
-# ── A. Index integrity: rules/ on disk ↔ CLAUDE.md rules index ────────────
-echo "## A. Index integrity"
-if [ -f "$CLAUDE_MD" ] && [ -d "$RULES_DIR" ]; then
-	UNLISTED=0
+# has_description <file>: true when the front matter (the lines between the first
+# "---" and the next "---") holds a description: line with text after the colon.
+# Front matter with no closing "---" is not valid, so it fails. A value of "" or '' (octal 047
+# is the single quote) holds no text, so it fails too.
+has_description() {
+	awk '
+		NR == 1 { if ($0 != "---") exit; fm = 1; next }
+		fm && /^---[[:space:]]*$/ { closed = 1; exit }
+		fm && /^description:[[:space:]]*[^[:space:]]/ {
+			v = $0
+			sub(/^description:[[:space:]]*/, "", v)
+			if (v !~ /^("[[:space:]]*"|\047[[:space:]]*\047)[[:space:]]*$/) found = 1
+		}
+		END { exit !(found && closed) }
+	' "$1"
+}
+
+# ── A. Rule file integrity ─────────────────────────────────────────────────
+echo "## A. Rule file integrity"
+if [ -d "$RULES_DIR" ]; then
+	NO_DESC=0
 	for f in "$RULES_DIR"/*.md; do
-		name="rules/$(basename "$f")"
-		if ! grep -qF "$name" "$CLAUDE_MD"; then
-			UNLISTED=$((UNLISTED + 1))
-			fail "A.1 rules file listed in CLAUDE.md index" "not listed: $name"
+		if ! has_description "$f"; then
+			NO_DESC=$((NO_DESC + 1))
+			fail "A.1 rule file has a description" "no description: $(basename "$f")"
 		fi
 	done
-	if [ "$UNLISTED" -eq 0 ]; then
-		ok "A.1 every rules file is listed in CLAUDE.md"
+	if [ "$NO_DESC" -eq 0 ]; then
+		ok "A.1 every rules file has a description in its front matter"
 	fi
 
-	DANGLING=0
-	while IFS= read -r ref; do
-		if [ ! -f "$REPO_DIR/claude/$ref" ]; then
-			DANGLING=$((DANGLING + 1))
-			fail "A.2 CLAUDE.md reference resolves" "missing on disk: $ref"
-		fi
-	done < <(grep -oE 'rules/[a-z0-9_-]+\.md' "$CLAUDE_MD" | sort -u)
-	if [ "$DANGLING" -eq 0 ]; then
-		ok "A.2 every rules/<name>.md referenced in CLAUDE.md exists"
+	XREF_BAD=0
+	for f in "$RULES_DIR"/*.md; do
+		while IFS= read -r ref; do
+			if [ ! -f "$REPO_DIR/claude/$ref" ]; then
+				XREF_BAD=$((XREF_BAD + 1))
+				fail "A.2 cross-reference resolves" "$(basename "$f") references missing $ref"
+			fi
+		done < <(grep -oE 'rules/[a-z0-9_-]+\.md' "$f" | sort -u)
+	done
+	if [ "$XREF_BAD" -eq 0 ]; then
+		ok "A.2 every rules/<name>.md referenced inside rules files exists"
 	fi
 else
-	fail "A.* prerequisites" "missing CLAUDE.md or rules/ directory"
-fi
-
-# ── B. Cross-reference integrity inside rules files ────────────────────────
-echo "## B. Cross-reference integrity"
-XREF_BAD=0
-for f in "$RULES_DIR"/*.md; do
-	while IFS= read -r ref; do
-		if [ ! -f "$REPO_DIR/claude/$ref" ]; then
-			XREF_BAD=$((XREF_BAD + 1))
-			fail "B.1 cross-reference resolves" "$(basename "$f") references missing $ref"
-		fi
-	done < <(grep -oE 'rules/[a-z0-9_-]+\.md' "$f" | sort -u)
-done
-if [ "$XREF_BAD" -eq 0 ]; then
-	ok "B.1 every rules/<name>.md referenced inside rules files exists"
+	fail "A.* prerequisites" "missing rules/ directory"
 fi
 
 # ── C. behavioral.md structure ─────────────────────────────────────────────
@@ -119,7 +123,7 @@ if [ -f "$BEHAV_MD" ]; then
 	fi
 	# C.4: a "behavioral.md rule N" reference must name a rule that exists; renumbering strands them silently.
 	BAD_RULE_REFS=""
-	for f in "$RULES_DIR"/*.md "$CLAUDE_MD"; do
+	for f in "$RULES_DIR"/*.md; do
 		[ -f "$f" ] || continue
 		while IFS= read -r n; do
 			[ "$n" -le "${H2_CT:-0}" ] || BAD_RULE_REFS="$BAD_RULE_REFS $(basename "$f"):rule-$n"
@@ -167,18 +171,33 @@ else
 	fail "E.* prerequisites" "jq missing or settings.json absent"
 fi
 
-# ── F. No em dash in CLAUDE.md or rules files ──────────────────────────────
+# ── F. No em dash in shell scripts, rules files, or the workflow file ───────
 echo "## F. Em dash ban"
 EMDASH=$(printf '\xe2\x80\x94')
 EM_BAD=0
-for f in "$CLAUDE_MD" "$RULES_DIR"/*.md; do
-	if grep -qF "$EMDASH" "$f" 2>/dev/null; then
+# em_check <path relative to the repo>: fail when the file holds U+2014.
+em_check() {
+	if grep -qF "$EMDASH" "$REPO_DIR/$1" 2>/dev/null; then
 		EM_BAD=$((EM_BAD + 1))
-		fail "F.1 no em dash" "U+2014 found in $(basename "$f")"
+		fail "F.1 no em dash" "U+2014 found in $1"
 	fi
+}
+# An empty list means git could not list the tree. Fail loud: F must not pass without a scan.
+EM_TRACKED=$(git -C "$REPO_DIR" ls-files -- '*.sh' '*.bash' .github/workflows/tests.yml 2>/dev/null)
+if [ -z "$EM_TRACKED" ]; then
+	fail "F.* prerequisites" "git ls-files lists no shell scripts in $REPO_DIR (not a git work tree?)"
+else
+	while IFS= read -r rel; do
+		em_check "$rel"
+	done <<EOF
+$EM_TRACKED
+EOF
+fi
+for f in "$RULES_DIR"/*.md; do
+	em_check "claude/rules/$(basename "$f")"
 done
-if [ "$EM_BAD" -eq 0 ]; then
-	ok "F.1 no em dash in CLAUDE.md or rules files"
+if [ "$EM_BAD" -eq 0 ] && [ -n "$EM_TRACKED" ]; then
+	ok "F.1 no em dash in any tracked shell script, rules file, or the workflow file"
 fi
 
 # ── G. Deterministic language: no vague qualifiers ─────────────────────────

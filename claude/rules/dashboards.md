@@ -1,3 +1,8 @@
+---
+name: dashboards
+description: Dashboard data provenance, manifest discipline, narrative-data alignment, and audience language for stakeholder pages
+---
+
 # Dashboard Rules
 
 Applies whenever `anaiis-dashboard` is active or whenever Claude generates a browser-rendered page that contains data visualizations for stakeholder audiences.
