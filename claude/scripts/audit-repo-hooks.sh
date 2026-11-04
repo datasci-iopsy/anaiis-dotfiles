@@ -2,10 +2,12 @@
 # audit-repo-hooks.sh -- find repos with stale or missing dotfiles hook wiring
 #
 # Searches SEARCH_DIRS for .git/hooks/pre-commit files, then reports:
-#   ok      -- dispatcher present
+#   ok      -- pre-commit and commit-msg dispatchers present
 #   stale   -- old direct-path lint references (needs install-repo-hooks.sh)
-#   missing -- no lint hook at all
+#   missing -- no lint hook at all, or no commit-msg dispatcher
 #   absent  -- no pre-commit hook file
+#
+# maintenance-check.sh counts the lines that start with STALE, missing, or absent.
 #
 # Usage:
 #   bash ~/.claude/scripts/audit-repo-hooks.sh
@@ -28,6 +30,7 @@ if [ -n "${HOOK_SEARCH_DIRS:-}" ]; then
 fi
 
 DISPATCHER_MARKER='repo-pre-commit.sh'
+COMMIT_MSG_MARKER='repo-commit-msg.sh'
 STALE_MARKER='-lint-staged.sh'
 
 ok=0
@@ -43,14 +46,26 @@ for dir in "${SEARCH_DIRS[@]}"; do
 
 	while IFS= read -r git_dir; do
 		repo=$(git -C "$(dirname "$git_dir")" rev-parse --show-toplevel 2>/dev/null) || continue
-		hook="$git_dir/hooks/pre-commit"
+		# Ask git where hooks live (core.hooksPath moves the folder). The path is relative to the repo root.
+		hooks_dir=$(git -C "$repo" rev-parse --git-path hooks 2>/dev/null) || continue
+		case "$hooks_dir" in
+			/*) ;;
+			*) hooks_dir="$repo/$hooks_dir" ;;
+		esac
+		hook="$hooks_dir/pre-commit"
 
 		if [ ! -f "$hook" ]; then
 			printf "  absent   %s\n" "$repo"
 			absent=$((absent + 1))
 		elif grep -qF -- "$DISPATCHER_MARKER" "$hook"; then
-			printf "  ok       %s\n" "$repo"
-			ok=$((ok + 1))
+			if grep -qF -- "$COMMIT_MSG_MARKER" "$hooks_dir/commit-msg" 2>/dev/null; then
+				printf "  ok       %s\n" "$repo"
+				ok=$((ok + 1))
+			else
+				printf "  missing  %s (no commit-msg hook)\n" "$repo"
+				printf "           Fix: cd %s && bash ~/.claude/scripts/install-repo-hooks.sh\n" "$repo"
+				missing=$((missing + 1))
+			fi
 		elif grep -qF -- "$STALE_MARKER" "$hook"; then
 			printf "  STALE    %s\n" "$repo"
 			printf "           Fix: cd %s && bash ~/.claude/scripts/install-repo-hooks.sh\n" "$repo"

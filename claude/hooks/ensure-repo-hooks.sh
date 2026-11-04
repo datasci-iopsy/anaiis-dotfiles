@@ -4,20 +4,31 @@
 # Triggered by UserPromptSubmit. Exits 0 always (non-blocking).
 # No output on success -- zero context cost.
 #
-# Checks both dispatcher hooks, not just pre-commit: every repo on a dev
-# machine already carried pre-commit when pre-push was introduced, so an
-# early exit on the pre-commit marker alone would mean no existing repo ever
-# received the pre-push hook.
+# Checks all three dispatcher hooks, not just pre-commit: every repo on a dev
+# machine already carried pre-commit when pre-push and commit-msg were
+# introduced, so an early exit on the pre-commit marker alone would mean no
+# existing repo ever received the later hooks.
 
 set -euo pipefail
 
 repo=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 
-hooks="$repo/.git/hooks"
+# Ask git where hooks live: a linked worktree has a `.git` file, not a folder,
+# and core.hooksPath moves the folder. The path is relative to the repo root.
+hooks=$(cd "$repo" && git rev-parse --git-path hooks 2>/dev/null) || exit 0
+case "$hooks" in
+	/*) ;;
+	*) hooks="$repo/$hooks" ;;
+esac
 
-# Already wired up -- nothing to do
+# Already wired up -- nothing to do. Git skips a hook that is not executable,
+# so each hook needs its marker and its execute bit.
 if grep -qF -- 'repo-pre-commit.sh' "$hooks/pre-commit" 2>/dev/null \
-	&& grep -qF -- 'repo-pre-push.sh' "$hooks/pre-push" 2>/dev/null; then
+	&& [ -x "$hooks/pre-commit" ] \
+	&& grep -qF -- 'repo-pre-push.sh' "$hooks/pre-push" 2>/dev/null \
+	&& [ -x "$hooks/pre-push" ] \
+	&& grep -qF -- 'repo-commit-msg.sh' "$hooks/commit-msg" 2>/dev/null \
+	&& [ -x "$hooks/commit-msg" ]; then
 	exit 0
 fi
 

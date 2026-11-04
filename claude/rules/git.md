@@ -1,6 +1,6 @@
 ---
 name: git
-description: Typed claude branches, trivial-edit criteria, Conventional Commit subjects, PR titles, staging by name, user-initiated push, rebase ours/theirs, worktrees
+description: Typed claude branches, trivial-edit criteria, Conventional Commits rubric (types, subject grammar, footers, breaking changes, reverts, opt-in lint), PR titles, staging by name, user-initiated push, rebase ours/theirs, worktrees
 ---
 
 # Git Workflow
@@ -41,13 +41,96 @@ Binary rules, checked in order:
 Before creating any new `claude-*` branch, run `git branch --list 'claude-*'`. If an unmerged branch whose name contains the topic slug exists, ask: "Continue on `<existing>`? (y/n)." Never silently create a duplicate of an unmerged branch.
 
 ## Staging and commits
-- Stage files by name, never `git add -A` or `git add .`.
-- One logical concern per commit; commit autonomously at the end of each work unit without surfacing it or waiting for instruction.
-- Subject: `<type>(<scope>): <description>`. `<type>` from the table above, never `wip` (a `wip` branch still commits with a real type). `<scope>` optional: one lowercase token for the component, tool, or directory touched (`bash-guard`, `dbt`, `deps`). `<description>`: lowercase imperative, no trailing period, under 72 chars, completes "If accepted, this commit will ...".
-- Body only when the diff cannot explain why: problem and rationale in 1 to 3 sentences after a blank line. Ticket only in an optional `Refs: <id>` footer, never the subject.
-- Never `WIP`, `fix`, `changes`, `address review comments`, or a subject that restates the diff without intent.
-- Rebase groups follow the same subject rule.
-- Never amend unless explicitly asked. Never force-push. Never skip hooks (`--no-verify`).
+- Stage files by name. Never use `git add -A` or `git add .`.
+- Make one logical change per commit. Commit at the end of each work unit. Do not surface it and do not wait for an instruction.
+- Never amend unless the user asks. Never force-push. Never skip hooks (`--no-verify`).
+- Rebase groups follow the same subject rules as any commit.
+- Follow the commit rubric below.
+
+## Commit rubric
+
+The rubric is Conventional Commits 1.0.0 with house rules added. The script `claude/scripts/commit-msg-lint.sh` checks the rules that a machine can check. A rule that the script does not check is marked "not enforced".
+
+### Commit types
+
+| Type | SemVer effect | Use for |
+|---|---|---|
+| `feat` | minor | New capability or user-visible change |
+| `fix` | patch | Correct wrong behavior |
+| `perf` | patch | Improve speed or resource use, no other behavior change |
+| `build` | none | Build system, package manager, dependencies |
+| `chore` | none | Tooling, config, maintenance |
+| `ci` | none | CI configuration |
+| `docs` | none | Docs only |
+| `style` | none | Formatting only, no logic change |
+| `refactor` | none | Restructure, no behavior change |
+| `test` | none | Tests only |
+| `revert` | none | Undo an earlier commit |
+
+A `!` after the type, or a `BREAKING CHANGE` footer, makes the change major for SemVer, whatever the type.
+
+### Branch-only prefixes
+
+| Prefix | Use for |
+|---|---|
+| `hotfix` | Urgent production fix. A hotfix commit uses `fix`. |
+| `wip` | Investigation or prototype, not merge-ready. A `wip` branch still commits with a real type. |
+
+Never use a branch-only prefix as a commit type.
+
+### Subject
+
+Write the subject as `<type>[(scope)][!]: <description>`.
+
+- The type and the scope are lowercase.
+- The scope names one component, tool, or directory. It matches `[a-z0-9][a-z0-9._/-]*`. Examples: `bash-guard`, `dbt`, `deps`.
+- The `!` sits immediately before the colon.
+- One space and a non-space character follow the colon.
+- Start the description with a lowercase letter. Code identifiers and proper nouns are the exceptions. Not enforced.
+- Write the description in the imperative. It completes the sentence "If accepted, this commit will ...".
+- Keep the first line to 72 characters or fewer. Do not end it with a period.
+- Do not write `WIP` in the subject.
+- State the intent. Never write `fix`, `changes`, `address review comments`, or a subject that only restates the diff.
+
+### Body and footers
+
+- Put a blank line between the subject and the body.
+- Write a body only when the diff cannot explain why. State the problem and the reason in 1 to 3 sentences.
+- Wrap body lines at 72 characters. Not enforced.
+- Put footers in the last paragraph, after a blank line. A footer has the form `Token: value` or `Token #value`.
+- Write a footer token as `Capitalized-With-Hyphens`, for example `Refs` or `Reviewed-by`. The one exception is `BREAKING CHANGE`, in uppercase.
+- Do not start a line in the last paragraph with a label of two or three words and a colon, for example `Root cause: ...`. The lint reads it as a footer with a bad token. Write `Root-cause: ...` or move the line up.
+- Put a ticket or decision reference in a `Refs: <ID>` footer. Never put it in the subject.
+- Add `Closes: <ID>` only when the PR must close the ticket.
+- Add no `Claude-Session:` trailer and no session link (`https://claude.ai/code/session_*`) to a commit message.
+
+### Breaking changes
+
+- Add `!` before the colon for every breaking change.
+- When one line cannot say what breaks, add the footer `BREAKING CHANGE: <what breaks and how to migrate>`. The token `BREAKING-CHANGE` means the same.
+- A `BREAKING CHANGE` footer needs the `!` in the subject. The lint enforces this.
+
+### Reverts
+
+- Write the subject as `revert: <original subject>`. Shorten the original subject if the line would pass 72 characters.
+- Write the body as `This reverts commit <full SHA>.`
+
+### Exemptions
+
+Git writes some subjects itself. The lint skips them: a subject that starts with `Merge `, the default `Revert "<subject>"`, and the autosquash prefixes `fixup! ` and `squash! `. The lint also ignores lines that start with `#`. Do not write an exempt subject by hand. Use `revert:` for a revert.
+
+### Pull request titles
+
+A PR title follows the subject grammar and ends with the ticket in brackets (see Pull requests). The title carries the `!` when the PR holds a breaking change.
+
+### Lint
+
+- The validator is `claude/scripts/commit-msg-lint.sh`. To check a draft, run `bash ~/.claude/scripts/commit-msg-lint.sh <message-file>`. To print the allowed types, add the `--types` flag instead of a file.
+- The `commit-msg` hook runs the validator only in a repo whose working tree has a `.conventional-commits` file at its root. This repo has that file. Other repos accept any message.
+- If the lint rejects a message, fix the message.
+- `SKIP_COMMIT_LINT=1 git commit` bypasses the lint. Only the user uses it. Claude never uses it.
+
+### Subject examples
 
 ```
 fix(audit-log): normalize tracker timestamps
@@ -55,7 +138,21 @@ feat(attrition): add manager-tenure feature
 refactor(dbt): extract employee-status macro
 docs(runbook): document survey backfill process
 test(ingestion): cover duplicate-event handling
-chore(deps): upgrade dbt-utils
+build(deps): upgrade dbt-utils
+feat(api)!: drop the v1 endpoints
+revert: feat(attrition): add manager-tenure feature
+```
+
+### Full message example
+
+```
+feat(api)!: drop the v1 endpoints
+
+Clients on v1 lose access when the endpoints go away. The v2 endpoints
+return the same data.
+
+BREAKING CHANGE: remove /v1/*. Call /v2/* with the same parameters.
+Refs: D-12
 ```
 
 ## Push

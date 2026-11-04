@@ -1,25 +1,39 @@
 #!/usr/bin/env bash
 # install-repo-hooks.sh -- add standard hooks to the current git repo
 #
-# Installs two dispatcher hooks:
-#   pre-commit -> bash "$HOME/.claude/hooks/repo-pre-commit.sh"  (staged-file linters)
-#   pre-push   -> bash "$HOME/.claude/hooks/repo-pre-push.sh"    (full test suite)
+# Installs three dispatcher hooks:
+#   pre-commit -> bash "$HOME/.claude/hooks/repo-pre-commit.sh"         (staged-file linters)
+#   pre-push   -> bash "$HOME/.claude/hooks/repo-pre-push.sh"           (full test suite)
+#   commit-msg -> bash "$HOME/.claude/hooks/repo-commit-msg.sh" "$1"    (message lint, opt-in)
+#
+# The commit-msg hook checks a message only in a repo whose working tree has a
+# .conventional-commits file at its root. Other repos accept any message.
 #
 # Run once from any project root after cloning on a new machine.
 # Safe to re-run -- migrates stale direct-path pre-commit hooks automatically
-# and adds the pre-push hook to repos that only have pre-commit.
+# and adds the pre-push and commit-msg hooks to repos that lack them.
 #
 # Usage:
 #   cd /path/to/repo
 #   bash ~/.claude/scripts/install-repo-hooks.sh
 
+# SC2016: the dispatcher lines hold literal "$HOME" and "$1" on purpose; each hook expands them.
+# shellcheck disable=SC2016
 set -euo pipefail
 
-HOOK_DIR="$(git rev-parse --git-dir 2>/dev/null || true)/hooks"
-if [ -z "$HOOK_DIR" ] || [ "$HOOK_DIR" = "/hooks" ]; then
+# Ask git where hooks live. In a linked worktree this is the common hooks
+# folder, and it honors core.hooksPath. Git prints the path relative to the
+# current folder, so make it absolute.
+HOOK_DIR="$(git rev-parse --git-path hooks 2>/dev/null || true)"
+if [ -z "$HOOK_DIR" ]; then
 	echo "ERROR: not inside a git repository." >&2
 	exit 1
 fi
+case "$HOOK_DIR" in
+	/*) ;;
+	*) HOOK_DIR="$PWD/$HOOK_DIR" ;;
+esac
+mkdir -p "$HOOK_DIR"
 
 # Marker for the legacy pre-commit form (direct lint-script paths)
 STALE_MARKER='lint-staged.sh'
@@ -27,6 +41,7 @@ STALE_MARKER='lint-staged.sh'
 # The single line each hook calls (paths never change)
 PRE_COMMIT_LINE='bash "$HOME/.claude/hooks/repo-pre-commit.sh"'
 PRE_PUSH_LINE='bash "$HOME/.claude/hooks/repo-pre-push.sh"'
+COMMIT_MSG_LINE='bash "$HOME/.claude/hooks/repo-commit-msg.sh" "$1"'
 
 # ---------------------------------------------------------------------------
 # _migrate: replace old direct-path lint lines with the pre-commit dispatcher.
@@ -99,7 +114,8 @@ _install() {
 
 _install pre-commit "$PRE_COMMIT_LINE" 'repo-pre-commit.sh' lint Pre-commit
 _install pre-push "$PRE_PUSH_LINE" 'repo-pre-push.sh' test Pre-push
+_install commit-msg "$COMMIT_MSG_LINE" 'repo-commit-msg.sh' commit-msg Commit-msg
 
 echo ""
-echo "Done. Pre-commit (lint) and pre-push (test suite) hooks active for this repo."
-echo "Bypass: SKIP_R_LINT=1 | SKIP_RUFF=1 | SKIP_SHFMT=1 | SKIP_SQLFMT=1 git commit   |   SKIP_TESTS=1 git push"
+echo "Done. Pre-commit (lint), pre-push (test suite), and commit-msg (message lint, opt-in) hooks active for this repo."
+echo "Bypass: SKIP_R_LINT=1 | SKIP_RUFF=1 | SKIP_SHFMT=1 | SKIP_SQLFMT=1 | SKIP_COMMIT_LINT=1 git commit   |   SKIP_TESTS=1 git push"
