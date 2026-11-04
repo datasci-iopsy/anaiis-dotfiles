@@ -33,6 +33,7 @@ Rules (`~/.claude/rules/`) constrain Claude's behavior across all tasks. Skills 
 | `rules/citations.md` | Citation integrity: corpus-only sources, no fabrication, web search only on explicit request |
 | `rules/testing.md` | Test-intent discipline: tests must encode why, not just what; fail-to-fail check |
 | `rules/dashboards.md` | Dashboard data provenance, manifest discipline, narrative-data alignment, audience language |
+| `rules/context.md` | Project context, author identity, local overrides, memory tiers (replaces the sections above and below this table) |
 
 ## Machine-local overrides
 Shell-side machine config lives in `~/.bashrc.local` (untracked). For machine-local Claude instructions, create a file under `~/.claude/` and import it from this file with `@~/.claude/<name>.md`; Claude Code does not read any user-level `CLAUDE.local.md` or `settings.local.json`.
