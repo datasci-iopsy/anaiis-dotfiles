@@ -38,12 +38,22 @@ assert() {
 DEAD_TOKENS='install-graphify
 vendor/graphify
 graphify-venv
-submodule update --init'
+submodule update --init
+claude/CLAUDE.md
+~/.claude/CLAUDE.md
+CLAUDE.local.md'
 
 # Files that may name a dead token: this test (it lists them) and the two docs of stream d-docs-sync.
 EXEMPT_FILES='tests/test-no-stale-refs.sh
 AGENTS.md
 README.md'
+
+# Pairs "<file>: <token>" that may stay. The file keeps the exemption for that one token only.
+# install.sh removes the old CLAUDE.md link and names the dead local files in its cleanup advice.
+# The install test builds the old link, so it names the path.
+EXEMPT_HITS='install.sh: claude/CLAUDE.md
+install.sh: CLAUDE.local.md
+tests/test-install-fresh-home.sh: claude/CLAUDE.md'
 
 # stale_hits <repo_dir>: print "<file>: <token>" for each dead token in each tracked text file.
 stale_hits() {
@@ -51,7 +61,9 @@ stale_hits() {
 	while IFS= read -r -d '' f; do
 		printf '%s\n' "$EXEMPT_FILES" | grep -qxF -- "$f" && continue
 		while IFS= read -r tok; do
-			grep -IqF -- "$tok" "$repo/$f" 2>/dev/null && printf '%s: %s\n' "$f" "$tok"
+			grep -IqF -- "$tok" "$repo/$f" 2>/dev/null || continue
+			printf '%s\n' "$EXEMPT_HITS" | grep -qxF -- "$f: $tok" && continue
+			printf '%s: %s\n' "$f" "$tok"
 		done <<EOF
 $DEAD_TOKENS
 EOF
@@ -74,6 +86,21 @@ printf 'git submodule update --init vendor/graphify\n' >"$FIX/clean.sh"
 assert "0.3 scanner reports each token on a line separately" \
 	"clean.sh: vendor/graphify
 clean.sh: submodule update --init" "$(stale_hits "$FIX")"
+# An exemption names one file and one token. The same token in another file, and another token in
+# the same file, must still be flagged.
+FIX2="$(mktemp -d "${TMPDIR:-/tmp}/test-no-stale-refs.XXXXXX")"
+trap 'rm -rf "$FIX" "$FIX2"' EXIT
+git init -q --template= "$FIX2"
+printf 'rm /home/u/.claude/CLAUDE.md\n' >"$FIX2/install.sh"
+printf 'rm /home/u/.claude/CLAUDE.md\n' >"$FIX2/other.sh"
+git -C "$FIX2" add install.sh other.sh
+assert "0.4 an exempt pair is quiet and the same token in another file is flagged" \
+	"other.sh: claude/CLAUDE.md" "$(stale_hits "$FIX2")"
+printf 'bash install-graphify.sh\nsee ~/.claude/CLAUDE.md\n' >>"$FIX2/install.sh"
+assert "0.5 an exemption does not cover another token in the same file" \
+	"install.sh: install-graphify
+install.sh: ~/.claude/CLAUDE.md
+other.sh: claude/CLAUDE.md" "$(stale_hits "$FIX2")"
 
 # ── 1. The graphify step is gone ───────────────────────────────────────────
 echo "# 1. The graphify step is gone"

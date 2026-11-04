@@ -48,11 +48,11 @@ json_hits() {
 echo "# 0. Detectors fail on a tree that still has rtk"
 FIX=$(mktemp -d)
 trap 'rm -rf "$FIX"' EXIT
-printf 'imports\n@RTK.md\n' >"$FIX/CLAUDE.md"
+printf 'imports\n@RTK.md\n' >"$FIX/context.md"
 printf 'clean\n' >"$FIX/clean.md"
 printf '{"hooks":{"PreToolUse":[{"hooks":[{"command":"rtk hook claude"}]}]}}\n' >"$FIX/settings.json"
 printf '{"hooks":{}}\n' >"$FIX/clean.json"
-grep -Iiq rtk "$FIX/CLAUDE.md"
+grep -Iiq rtk "$FIX/context.md"
 assert "0.1 text detector flags an @RTK.md import" 0 $?
 grep -Iiq rtk "$FIX/clean.md"
 assert "0.2 text detector passes a clean file" 1 $?
@@ -66,8 +66,10 @@ echo "# 1. Wiring"
 assert "1.1 no tracked path names rtk" "" "$(git -C "$REPO_DIR" ls-files | grep -i rtk | grep -vx tests/test-no-rtk.sh)"
 assert "1.2 settings.json holds no rtk string" 0 "$(json_hits "$REPO_DIR/claude/settings.json")"
 assert "1.3 install.sh does not mention rtk" "" "$(tracked_hits install.sh)"
-assert "1.4 CLAUDE.md does not mention rtk" "" "$(tracked_hits claude/CLAUDE.md)"
-assert "1.5 Brewfile keeps exactly one brew rtk line" 1 "$(grep -c '^brew "rtk"$' "$REPO_DIR/Brewfile")"
+# The context rule file holds the global project facts that CLAUDE.md held. It must be tracked, or the check below is empty.
+assert "1.4 context.md is tracked" "claude/rules/context.md" "$(git -C "$REPO_DIR" ls-files claude/rules/context.md)"
+assert "1.5 context.md does not mention rtk" "" "$(tracked_hits claude/rules/context.md)"
+assert "1.6 Brewfile keeps exactly one brew rtk line" 1 "$(grep -c '^brew "rtk"$' "$REPO_DIR/Brewfile")"
 
 # ── 2. Rules and docs ──────────────────────────────────────────────────────
 echo "# 2. Rules and docs"
