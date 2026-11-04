@@ -60,15 +60,13 @@ WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
 # make_fixture <dir>: copy the tracked inputs of the doctor into <dir> and index them.
-# -P keeps claude/skills' symlinks as symlinks instead of copying targets. The fixture holds no
-# claude/CLAUDE.md on purpose: the doctor must not need one.
+# -P keeps claude/skills' symlinks as symlinks instead of copying targets.
 make_fixture() {
 	mkdir -p "$1"
 	cp -RP "$REPO_DIR/claude" "$1/claude"
 	cp -RP "$REPO_DIR/bash" "$1/bash"
 	cp -RP "$REPO_DIR/.github" "$1/.github"
 	cp -P "$REPO_DIR/install.sh" "$1/install.sh"
-	rm -f "$1/claude/CLAUDE.md"
 	git init -q --template= "$1"
 	git -C "$1" add claude bash .github install.sh
 }
@@ -85,10 +83,12 @@ run_doctor() {
 # ── 1. Doctor passes on green tree, and the context rule file is in place ──
 echo "# 1. Doctor on green tree"
 run_doctor "$WORK/green.out"
-assert "1.1 doctor exits 0 on a tree with no CLAUDE.md" "0" "$?"
-assert "1.2 context.md is tracked" "claude/rules/context.md" \
+assert "1.1 doctor exits 0 on the green tree" "0" "$?"
+# D-003: a CLAUDE.md below claude/ hid the root AGENTS.md from sessions that start under claude/.
+assert "1.2 no tracked path ends in CLAUDE.md" 0 "$(git -C "$REPO_DIR" ls-files | grep -c 'CLAUDE\.md$')"
+assert "1.3 context.md is tracked" "claude/rules/context.md" \
 	"$(git -C "$REPO_DIR" ls-files claude/rules/context.md)"
-assert "1.3 context.md has a description line in its front matter" 1 \
+assert "1.4 context.md has a description line in its front matter" 1 \
 	"$(sed -n '2,6p' "$REPO_DIR/claude/rules/context.md" | grep -c '^description: .')"
 
 # ── 2. Every drift mutation at once ───────────────────────────────────────

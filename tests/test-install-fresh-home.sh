@@ -4,7 +4,7 @@
 #
 # Why this matters: a new machine must reach a working harness with one command and no manual
 # repair. The first run must not abort (SC-1). The second run must change nothing and must not
-# print a link, add, created, updated, or migrated line (SC-2). Then bootstrap-doctor.sh must
+# print a link, add, created, updated, migrated, or unlink line (SC-2). Then bootstrap-doctor.sh must
 # agree that the shell config and the ~/.claude links are in place, and must name every enabled
 # plugin as missing, because a fresh HOME has no plugin cache.
 #
@@ -81,7 +81,7 @@ run_install() {
 }
 
 # Lines that report a change. Two spaces, then one of the words, then a space or the line end.
-CHANGE_RE='^  (link|add|created|updated|migrated)( |$)'
+CHANGE_RE='^  (link|add|created|updated|migrated|unlink)( |$)'
 
 H="$(mktemp -d "$TMPD/home.XXXXXX")"
 
@@ -99,6 +99,9 @@ assert_eq "1.7 one shared.bash source line in .bashrc" 1 "$(grep -c 'anaiis-dotf
 assert_eq "1.8 gh protocol https: the host key step skips" 1 \
 	"$(printf '%s\n' "$FIRST_OUT" | grep -c '^  skip  gh git protocol is "https"')"
 assert_eq "1.9 gh protocol https: no .ssh folder is created" no "$([ -e "$H/.ssh" ] && echo yes || echo no)"
+assert_eq "1.10 no CLAUDE.md link is created (rules/context.md replaces it)" no \
+	"$([ -L "$H/.claude/CLAUDE.md" ] || [ -e "$H/.claude/CLAUDE.md" ] && echo yes || echo no)"
+assert_eq "1.11 the first run prints nothing about CLAUDE.md" 0 "$(printf '%s\n' "$FIRST_OUT" | grep -c 'CLAUDE\.md')"
 
 echo "--- 2. the links point at the main checkout"
 # install.sh takes the first entry of git worktree list as canonical. Outside git, the repo itself.
@@ -111,7 +114,7 @@ echo "--- 3. the second run changes nothing"
 SNAP1="$(snapshot "$H")"
 run_install
 assert_eq "3.1 exit code is 0" 0 "$RC"
-assert_eq "3.2 no line starts with link, add, created, updated, or migrated" 0 \
+assert_eq "3.2 no line starts with link, add, created, updated, migrated, or unlink" 0 \
 	"$(printf '%s\n' "$OUT" | grep -cE "$CHANGE_RE")"
 assert_eq "3.3 the HOME snapshot is identical" "$SNAP1" "$(snapshot "$H")"
 assert_eq "3.4 the second run ends with Done." 1 "$(printf '%s\n' "$OUT" | grep -c '^Done\.$')"
@@ -140,6 +143,54 @@ for s in $STEP_SUITES; do
 	assert_eq "5.$s is listed in the workflow" 1 "$(grep -c "$s" "$WORKFLOW")"
 	assert_eq "5.$s exists" yes "$([ -f "$REPO_DIR/tests/$s.sh" ] && echo yes || echo no)"
 done
+
+echo "--- 6. the old CLAUDE.md link"
+# Decision D-003: the repo has no CLAUDE.md. Old installs linked one into ~/.claude, and Claude Code
+# reads that path. install.sh removes the link only when its target ends in
+# /anaiis-dotfiles/claude/CLAUDE.md. A real file or a link to another target stays, and the run says so.
+run_links() {
+	OUT="$(HOME="$1" PATH="$TMPD/stub:$PATH" "$BASH" "$INSTALL" --symlinks-only 2>&1)"
+	RC=$?
+}
+new_home() {
+	mktemp -d "$TMPD/home.XXXXXX"
+}
+mentions() { printf '%s\n' "$OUT" | grep -c 'CLAUDE\.md'; }
+
+H6="$(new_home)"
+mkdir -p "$H6/.claude"
+ln -s "$H6/anaiis-dotfiles/claude/CLAUDE.md" "$H6/.claude/CLAUDE.md"
+run_links "$H6"
+assert_eq "6.1 stale link: exit code is 0" 0 "$RC"
+assert_eq "6.2 stale link: the link is removed" no \
+	"$([ -L "$H6/.claude/CLAUDE.md" ] || [ -e "$H6/.claude/CLAUDE.md" ] && echo yes || echo no)"
+assert_eq "6.3 stale link: one unlink line names the link" 1 "$(printf '%s\n' "$OUT" | grep -c "^  unlink $H6/.claude/CLAUDE.md ")"
+assert_eq "6.4 stale link: the other links are still made" yes \
+	"$([ -L "$H6/.claude/settings.json" ] && [ -L "$H6/.claude/rules" ] && echo yes || echo no)"
+SNAP6="$(snapshot "$H6")"
+run_links "$H6"
+assert_eq "6.5 second run: exit code is 0" 0 "$RC"
+assert_eq "6.6 second run: no line mentions CLAUDE.md" 0 "$(mentions)"
+assert_eq "6.7 second run: no change line" 0 "$(printf '%s\n' "$OUT" | grep -cE "$CHANGE_RE")"
+assert_eq "6.8 second run: the HOME snapshot is identical" "$SNAP6" "$(snapshot "$H6")"
+
+H6="$(new_home)"
+mkdir -p "$H6/.claude"
+printf 'mine\n' >"$H6/.claude/CLAUDE.md"
+run_links "$H6"
+assert_eq "6.9 real file: exit code is 0" 0 "$RC"
+assert_eq "6.10 real file: the file and its text stay" mine "$(cat "$H6/.claude/CLAUDE.md")"
+assert_eq "6.11 real file: the run prints one note about it" 1 "$(printf '%s\n' "$OUT" | grep -c '^  note  .*CLAUDE\.md is a real file')"
+
+H6="$(new_home)"
+mkdir -p "$H6/.claude" "$H6/elsewhere"
+printf 'other\n' >"$H6/elsewhere/CLAUDE.md"
+ln -s "$H6/elsewhere/CLAUDE.md" "$H6/.claude/CLAUDE.md"
+run_links "$H6"
+assert_eq "6.12 link elsewhere: exit code is 0" 0 "$RC"
+assert_eq "6.13 link elsewhere: the link target is unchanged" "$H6/elsewhere/CLAUDE.md" "$(readlink "$H6/.claude/CLAUDE.md")"
+assert_eq "6.14 link elsewhere: the target file stays" other "$(cat "$H6/elsewhere/CLAUDE.md")"
+assert_eq "6.15 link elsewhere: the run prints one note about it" 1 "$(printf '%s\n' "$OUT" | grep -c '^  note  .*CLAUDE\.md is a link to ')"
 
 if [ -n "${COV:-}" ]; then
 	cov_end

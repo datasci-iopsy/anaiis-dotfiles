@@ -2,7 +2,8 @@
 # ~/anaiis-dotfiles/install.sh
 # Run once on a new machine (or after moving the repo) to:
 #   1. Create ~/anaiis-dotfiles as a canonical symlink to wherever this repo lives
-#   2. Symlink the Claude policy stack into ~/.claude/
+#   2. Symlink the Claude policy stack into ~/.claude/, and remove the old
+#      CLAUDE.md link from that folder (rules/context.md replaces the file)
 #   3. Wire PATH and source shared.bash into ~/.bashrc
 #   4. Add the GitHub host keys to ~/.ssh/known_hosts (SSH git protocol only)
 # Safe to re-run: idempotent.
@@ -11,7 +12,8 @@ set -euo pipefail
 
 # Usage:
 #   bash install.sh                   full install
-#   bash install.sh --symlinks-only   steps 1 and 2 only; stops before ~/.bashrc,
+#   bash install.sh --symlinks-only   steps 1 and 2 only (the old CLAUDE.md link
+#                                     is removed here too); stops before ~/.bashrc,
 #                                     CLI tools, R style, and Homebrew
 #                                     (what CI runs to build the ~/.claude tree)
 #   bash install.sh --bashrc-only     step 3 only: wire $HOME/.bashrc (and check
@@ -53,6 +55,28 @@ symlink() {
 	else
 		ln -sf "$src" "$dst"
 		echo "  link $dst -> $src"
+	fi
+}
+
+# Remove the old CLAUDE.md link from $HOME/.claude (decision D-003). The repo has no CLAUDE.md now.
+# The function acts only on a symlink whose target ends in /anaiis-dotfiles/claude/CLAUDE.md.
+# It leaves a real file or a link to another target alone. Claude Code still reads such a file, so the
+# function prints a note for each.
+remove_old_claude_md_link() {
+	local link="$HOME/.claude/CLAUDE.md" target
+	if [ -L "$link" ]; then
+		target="$(readlink "$link")"
+		case "$target" in
+			*/anaiis-dotfiles/claude/CLAUDE.md)
+				rm -f "$link"
+				echo "  unlink $link (old link to $target; rules/context.md replaces it)"
+				;;
+			*)
+				echo "  note  $link is a link to $target, not the old dotfiles link. Claude Code still reads it. Left in place."
+				;;
+		esac
+	elif [ -e "$link" ]; then
+		echo "  note  $link is a real file. Claude Code still reads it. Left in place."
 	fi
 }
 
@@ -208,8 +232,8 @@ fi
 echo ""
 echo "=== Claude Code: Config files ==="
 symlink "$CANONICAL/claude/settings.json" "$HOME/.claude/settings.json"
-symlink "$CANONICAL/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 symlink "$CANONICAL/claude/keybindings.json" "$HOME/.claude/keybindings.json"
+remove_old_claude_md_link
 
 echo ""
 echo "=== Claude Code: Directories ==="
