@@ -102,11 +102,13 @@ assert "1.7 .gitignore does not ignore a shared rule file" 1 "$?"
 echo "# 2. Every drift mutation applied at once"
 RULES="$TMP_REPO/claude/rules"
 # A.1: a rule file loses its description, one has no front matter, one has an empty description,
-# one has a description but never closes its front matter
+# one has a description but never closes its front matter, two have an empty quoted description
 sed '/^description:/d' "$RULES/tools.md" >"$RULES/tools.md.tmp" && mv "$RULES/tools.md.tmp" "$RULES/tools.md"
 printf '# Plain\n\nNo front matter here.\n' >"$RULES/no-front-matter.md"
 printf -- '---\nname: blank\ndescription:   \n---\n\n# Blank\n' >"$RULES/blank-description.md"
 printf -- '---\nname: open\ndescription: has text but no closing delimiter\n\n# Open\n' >"$RULES/unclosed-front-matter.md"
+printf -- '---\nname: dq\ndescription: %s\n---\n\n# Dq\n' '""' >"$RULES/empty-double-quoted.md"
+printf -- '---\nname: sq\ndescription: %s\n---\n\n# Sq\n' "''" >"$RULES/empty-single-quoted.md"
 # A.2: a rule file that names a rules file which does not exist
 printf '\nSee also: `rules/nonexistent-rule.md`.\n' >>"$RULES/git.md"
 # C.3: behavioral.md loses its numbered H2 imperatives
@@ -136,6 +138,8 @@ assert_contains "2.2 doctor names the rule file that lost its description (A.1)"
 assert_contains "2.3 doctor names the rule file with no front matter (A.1)" "no description: no-front-matter.md" "$OUT"
 assert_contains "2.4 doctor names the rule file with an empty description (A.1)" "no description: blank-description.md" "$OUT"
 assert_contains "2.4b doctor names the rule file with unclosed front matter (A.1)" "no description: unclosed-front-matter.md" "$OUT"
+assert_contains "2.4c doctor names the rule file with an empty double-quoted description (A.1)" "no description: empty-double-quoted.md" "$OUT"
+assert_contains "2.4d doctor names the rule file with an empty single-quoted description (A.1)" "no description: empty-single-quoted.md" "$OUT"
 assert_contains "2.5 doctor names the cross-reference check (A.2)" "A.2 cross-reference resolves" "$OUT"
 assert_contains "2.6 doctor names the file and the missing rules file (A.2)" "git.md references missing rules/nonexistent-rule.md" "$OUT"
 assert_contains "2.7 doctor reports the imperative count (C.3)" "C.3 H2 imperatives" "$OUT"
