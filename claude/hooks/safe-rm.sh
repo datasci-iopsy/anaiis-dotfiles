@@ -51,7 +51,8 @@
 # the saved state before it returns, on the failure paths too. The aliases stay defined, so the next
 # statement of the command still sees them. An alias that adds a flag outside the allowed set, such as
 # alias rm='rm -i', reaches the function as an extra word, and the function refuses it by name.
-__sr_ea="$(shopt -p expand_aliases)"
+# shopt -p returns 1 when the option is off. The || : keeps that status from stopping a shell with set -e.
+__sr_ea="$(shopt -p expand_aliases)" || :
 shopt -u expand_aliases
 
 # __safe_rm_restore: put the saved alias-expansion state back and drop the helper variable.

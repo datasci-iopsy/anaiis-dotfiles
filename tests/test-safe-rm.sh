@@ -433,6 +433,14 @@ ALIAS_FAIL2_OUT="$(env -i PATH="$TREE/onlymkdir" HOME="$HOMEF" TMPDIR="$TMPR" __
 echo "src=$? ea=$(shopt -p expand_aliases) left=${__sr_ea+set}"' 2>/dev/null)"
 assert_eq "16.6b the same when no rm program exists (the other failure path)" \
 	"src=1 ea=shopt -s expand_aliases left=" "$ALIAS_FAIL2_OUT"
+# shopt -p prints the state and returns 1 when the option is off. Under set -e that status would stop the load.
+ERREXIT_OUT="$(env -i PATH="$STUB:/usr/bin:/bin" HOME="$HOMEF" TMPDIR="$TMPR" __SAFE_RM_CWD="$CWD" __SAFE_RM_SCRATCH="$SCRATCH" SAFE_RM="$SAFE_RM" \
+	BASH_ENV="${BASH_ENV:-}" BASH_XTRACEFD="${BASH_XTRACEFD:-}" PS4="${PS4:-+ }" \
+	"$BASH" -c 'set -e
+. "$SAFE_RM"
+echo "src=$? ea=$(shopt -p expand_aliases) fn=$(declare -F rm mkdir | tr "\n" ,)"' 2>/dev/null)"
+assert_eq "16.13 the file loads under set -e with alias expansion off, and the off state is restored" \
+	"src=0 ea=shopt -u expand_aliases fn=rm,mkdir," "$ERREXIT_OUT"
 expect_log "16.7 -rfv is an allowed cluster" 'rm -rfv "$SCRATCH/a"' "-rfv -- $PSCRATCH/a"
 expect_log "16.8 -fr is an allowed cluster" 'rm -fr "$SCRATCH/a"' "-fr -- $PSCRATCH/a"
 expect_mk_log "16.9 -vp is an allowed cluster" 'mkdir -vp "$SCRATCH/vp"' "-vp -- $PSCRATCH/vp"
