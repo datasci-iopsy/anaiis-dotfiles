@@ -4,10 +4,10 @@
 # Triggered by UserPromptSubmit. Exits 0 always (non-blocking).
 # No output on success -- zero context cost.
 #
-# Checks both dispatcher hooks, not just pre-commit: every repo on a dev
-# machine already carried pre-commit when pre-push was introduced, so an
-# early exit on the pre-commit marker alone would mean no existing repo ever
-# received the pre-push hook.
+# Checks all three dispatcher hooks, not just pre-commit: every repo on a dev
+# machine already carried pre-commit when pre-push and commit-msg were
+# introduced, so an early exit on the pre-commit marker alone would mean no
+# existing repo ever received the later hooks.
 
 set -euo pipefail
 
@@ -23,7 +23,8 @@ esac
 
 # Already wired up -- nothing to do
 if grep -qF -- 'repo-pre-commit.sh' "$hooks/pre-commit" 2>/dev/null \
-	&& grep -qF -- 'repo-pre-push.sh' "$hooks/pre-push" 2>/dev/null; then
+	&& grep -qF -- 'repo-pre-push.sh' "$hooks/pre-push" 2>/dev/null \
+	&& grep -qF -- 'repo-commit-msg.sh' "$hooks/commit-msg" 2>/dev/null; then
 	exit 0
 fi
 

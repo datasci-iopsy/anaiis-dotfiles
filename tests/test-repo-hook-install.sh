@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # tests/test-repo-hook-install.sh -- the repo hook dispatchers and their
 # installer: which git stage runs the full test suite, and whether
-# install-repo-hooks.sh / ensure-repo-hooks.sh put both hooks in place.
+# install-repo-hooks.sh / ensure-repo-hooks.sh put all three hooks in place
+# (pre-commit, pre-push, commit-msg), in a plain repo, a linked worktree, and a
+# repo with core.hooksPath.
 #
 # Contract under test (issue #12): commits run only the staged-file linters;
 # the full tests/run-all.sh run happens at pre-push. Every repo that already
-# has the pre-commit dispatcher must gain the pre-push one on re-run.
+# has the pre-commit dispatcher must gain the pre-push and commit-msg ones on
+# re-run. The commit-msg lint itself is tested in test-commit-msg-lint.sh.
 #
 # Hermetic: dispatchers resolve their scripts through $HOME/.claude, so each
 # case runs with HOME pointed at a throwaway tree whose .claude/{scripts,hooks}
@@ -112,6 +115,12 @@ assert_eq "2.1 pre-commit hook carries its dispatcher marker" "1" \
 assert_eq "2.2 pre-push hook carries its dispatcher marker" "1" \
 	"$(grep -cF 'repo-pre-push.sh' "$R2/.git/hooks/pre-push" 2>/dev/null || echo 0)"
 assert_eq "2.3 pre-push hook is executable" "1" "$([ -x "$R2/.git/hooks/pre-push" ] && echo 1 || echo 0)"
+# The commit-msg hook (opt-in lint) is the third dispatcher. Fail-to-fail: 2.4
+# fails if the installer omits the hook or writes another line; 2.5 fails if
+# it skips chmod +x.
+assert_eq "2.4 commit-msg hook carries its dispatcher line, passing the message file" "1" \
+	"$(grep -cFx 'bash "$HOME/.claude/hooks/repo-commit-msg.sh" "$1"' "$R2/.git/hooks/commit-msg" 2>/dev/null || echo 0)"
+assert_eq "2.5 commit-msg hook is executable" "1" "$([ -x "$R2/.git/hooks/commit-msg" ] && echo 1 || echo 0)"
 
 # ── 3. Pre-commit-only repo gains pre-push; pre-commit untouched ──────────
 # Fail-to-fail: 3.1 fails if the installer's early "dispatcher already
@@ -130,7 +139,9 @@ assert_eq "3.1 pre-push hook added alongside an existing pre-commit" "1" \
 assert_eq "3.2 existing pre-commit hook is byte-identical after re-run" "$BEFORE" \
 	"$(shasum "$R3/.git/hooks/pre-commit" | cut -d' ' -f1)"
 RERUN=$(cd "$R3" && HOME="$TMP_HOME" bash "$INSTALLER" 2>&1)
-assert_eq "3.3 re-run with both hooks present reports ok twice" "2" "$(printf '%s\n' "$RERUN" | grep -c '^  ok ')"
+assert_eq "3.3 re-run with all three hooks present reports ok three times" "3" "$(printf '%s\n' "$RERUN" | grep -c '^  ok ')"
+assert_eq "3.4 commit-msg hook added alongside an existing pre-commit" "1" \
+	"$(grep -cF 'repo-commit-msg.sh' "$R3/.git/hooks/commit-msg" 2>/dev/null || echo 0)"
 
 # ── 4. ensure-repo-hooks.sh installs a missing pre-push ───────────────────
 # Fail-to-fail: 4.1 fails if ensure-repo-hooks.sh exits early on the
@@ -163,6 +174,24 @@ assert_eq "5.1 marker-present pre-commit hook is executable after re-run" "1" \
 	"$([ -x "$R5/.git/hooks/pre-commit" ] && echo 1 || echo 0)"
 assert_eq "5.2 appended-to pre-push hook is executable after re-run" "1" \
 	"$([ -x "$R5/.git/hooks/pre-push" ] && echo 1 || echo 0)"
+# The same two paths for commit-msg, plus: an existing custom commit-msg hook
+# keeps its own lines when the dispatcher line is appended. Fail-to-fail: 5.3
+# fails if the marker-present branch omits chmod +x; 5.4 fails if the append
+# branch replaces the file or drops the dispatcher.
+R5B="$WORK/r5b"
+make_repo "$R5B"
+printf '#!/usr/bin/env bash\nbash "$HOME/.claude/hooks/repo-commit-msg.sh" "$1"\n' >"$R5B/.git/hooks/commit-msg"
+chmod -x "$R5B/.git/hooks/commit-msg"
+(cd "$R5B" && HOME="$TMP_HOME" bash "$INSTALLER" >/dev/null 2>&1)
+assert_eq "5.3 marker-present commit-msg hook is executable after re-run" "1" \
+	"$([ -x "$R5B/.git/hooks/commit-msg" ] && echo 1 || echo 0)"
+R5C="$WORK/r5c"
+make_repo "$R5C"
+printf '#!/usr/bin/env bash\necho custom-msg-guard\n' >"$R5C/.git/hooks/commit-msg"
+chmod +x "$R5C/.git/hooks/commit-msg"
+(cd "$R5C" && HOME="$TMP_HOME" bash "$INSTALLER" >/dev/null 2>&1)
+assert_eq "5.4 custom commit-msg hook keeps its line and gains the dispatcher" "1 1" \
+	"$(grep -cF 'echo custom-msg-guard' "$R5C/.git/hooks/commit-msg") $(grep -cF 'repo-commit-msg.sh' "$R5C/.git/hooks/commit-msg")"
 
 # ── 6. Installer from a linked worktree ───────────────────────────────────
 # In a linked worktree, `.git` is a file and `git rev-parse --git-dir` names a
@@ -181,10 +210,10 @@ assert_eq "6.2 pre-commit hook lands in the common hooks folder" "1" \
 	"$(grep -cF 'repo-pre-commit.sh' "$R6/.git/hooks/pre-commit" 2>/dev/null || echo 0)"
 assert_eq "6.3 pre-push hook lands in the common hooks folder" "1" \
 	"$(grep -cF 'repo-pre-push.sh' "$R6/.git/hooks/pre-push" 2>/dev/null || echo 0)"
-BEFORE6=$(shasum "$R6/.git/hooks/pre-commit" "$R6/.git/hooks/pre-push" 2>/dev/null | cut -d' ' -f1 | tr '\n' ' ')
+BEFORE6=$(shasum "$R6/.git/hooks/pre-commit" "$R6/.git/hooks/pre-push" "$R6/.git/hooks/commit-msg" 2>/dev/null | cut -d' ' -f1 | tr '\n' ' ')
 RERUN6=$(cd "$W6" && HOME="$TMP_HOME" bash "$INSTALLER" 2>&1)
-assert_eq "6.4 second run from the worktree reports ok twice and changes nothing" "2 $BEFORE6" \
-	"$(printf '%s\n' "$RERUN6" | grep -c '^  ok ') $(shasum "$R6/.git/hooks/pre-commit" "$R6/.git/hooks/pre-push" | cut -d' ' -f1 | tr '\n' ' ')"
+assert_eq "6.4 second run from the worktree reports ok three times and changes nothing" "3 $BEFORE6" \
+	"$(printf '%s\n' "$RERUN6" | grep -c '^  ok ') $(shasum "$R6/.git/hooks/pre-commit" "$R6/.git/hooks/pre-push" "$R6/.git/hooks/commit-msg" | cut -d' ' -f1 | tr '\n' ' ')"
 mkdir -p "$WORK/norepo"
 NOREPO_OUT=$(cd "$WORK/norepo" && GIT_CEILING_DIRECTORIES="$WORK" HOME="$TMP_HOME" bash "$INSTALLER" 2>&1)
 NOREPO_RC=$?
@@ -212,8 +241,8 @@ git -C "$R7" worktree add -q -b wt7 "$W7"
 ERR7=$(cd "$W7" && HOME="$TMP_HOME" bash "$ENSURE" 2>&1 >/dev/null)
 RC7=$?
 assert_eq "7.1 ensure-repo-hooks exits 0 with empty stderr from a worktree" "0 " "$RC7 $ERR7"
-assert_eq "7.2 ensure-repo-hooks wired both hooks in the common folder" "1 1" \
-	"$(grep -cF 'repo-pre-commit.sh' "$R7/.git/hooks/pre-commit" 2>/dev/null || echo 0) $(grep -cF 'repo-pre-push.sh' "$R7/.git/hooks/pre-push" 2>/dev/null || echo 0)"
+assert_eq "7.2 ensure-repo-hooks wired all three hooks in the common folder" "1 1 1" \
+	"$(grep -cF 'repo-pre-commit.sh' "$R7/.git/hooks/pre-commit" 2>/dev/null || echo 0) $(grep -cF 'repo-pre-push.sh' "$R7/.git/hooks/pre-push" 2>/dev/null || echo 0) $(grep -cF 'repo-commit-msg.sh' "$R7/.git/hooks/commit-msg" 2>/dev/null || echo 0)"
 # Second run with a HOME that has no installer: a silent run proves the early exit.
 ERR7B=$(cd "$W7" && HOME="$WORK/no-such-home" bash "$ENSURE" 2>&1 >/dev/null)
 assert_eq "7.3 second run from the worktree exits before it calls the installer" "" "$ERR7B"
@@ -274,6 +303,35 @@ git -C "$AUDIT_DIR2/wt-main" worktree add -q -b wt9 "$AUDIT_DIR2/wt-linked"
 AUDIT_OUT=$(cd "$WORK" && HOOK_SEARCH_DIRS="$AUDIT_DIR2" bash "$AUDIT" 2>&1)
 assert_eq "9.2 audit counts a repo with a linked worktree once" "1 0" \
 	"$(printf '%s\n' "$AUDIT_OUT" | grep -c '^  ok ') $(printf '%s\n' "$AUDIT_OUT" | grep -c 'wt-linked')"
+
+AUDIT_DIR3="$WORK/auditdir3"
+mkdir -p "$AUDIT_DIR3"
+make_repo "$AUDIT_DIR3/no-msg"
+printf '#!/usr/bin/env bash\nbash "$HOME/.claude/hooks/repo-pre-commit.sh"\n' >"$AUDIT_DIR3/no-msg/.git/hooks/pre-commit"
+printf '#!/usr/bin/env bash\nbash "$HOME/.claude/hooks/repo-pre-push.sh"\n' >"$AUDIT_DIR3/no-msg/.git/hooks/pre-push"
+AUDIT_OUT=$(cd "$WORK" && HOOK_SEARCH_DIRS="$AUDIT_DIR3" bash "$AUDIT" 2>&1)
+AUDIT_RC=$?
+assert_eq "9.3 audit flags a repo that lacks the commit-msg hook (line starts with 'missing')" "1 1" \
+	"$AUDIT_RC $(printf '%s\n' "$AUDIT_OUT" | grep -cE '^[[:space:]]*missing ')"
+(cd "$AUDIT_DIR3/no-msg" && HOME="$TMP_HOME" bash "$INSTALLER" >/dev/null 2>&1)
+AUDIT_OUT=$(cd "$WORK" && HOOK_SEARCH_DIRS="$AUDIT_DIR3" bash "$AUDIT" 2>&1)
+AUDIT_RC=$?
+assert_eq "9.4 audit reports the same repo ok once the installer added commit-msg" "0 1" \
+	"$AUDIT_RC $(printf '%s\n' "$AUDIT_OUT" | grep -c '^  ok ')"
+
+# ── 10. Existing repos receive the commit-msg hook ────────────────────────
+# A repo that already has pre-commit and pre-push (every repo set up before the
+# lint existed) must gain commit-msg from the auto-installer. Fail-to-fail: 10.1
+# fails if ensure-repo-hooks.sh leaves its early exit at two markers.
+echo "# 10. Auto-installer on a repo with pre-commit and pre-push"
+R10="$WORK/r10"
+make_repo "$R10"
+printf '#!/usr/bin/env bash\nbash "$HOME/.claude/hooks/repo-pre-commit.sh"\n' >"$R10/.git/hooks/pre-commit"
+printf '#!/usr/bin/env bash\nbash "$HOME/.claude/hooks/repo-pre-push.sh"\n' >"$R10/.git/hooks/pre-push"
+chmod +x "$R10/.git/hooks/pre-commit" "$R10/.git/hooks/pre-push"
+(cd "$R10" && HOME="$TMP_HOME" bash "$ENSURE" >/dev/null 2>&1)
+assert_eq "10.1 ensure-repo-hooks installs commit-msg when the other two exist" "1" \
+	"$(grep -cF 'repo-commit-msg.sh' "$R10/.git/hooks/commit-msg" 2>/dev/null || echo 0)"
 
 # ── Summary ───────────────────────────────────────────────────────────────
 if [ -n "${COV:-}" ]; then

@@ -210,10 +210,89 @@ assert_eq "O.4 no argument exits 2" "2" "$?"
 "$BASH" "$LINT" "$WORK/no-such-file" >/dev/null 2>&1
 assert_eq "O.5 a missing message file exits 2" "2" "$?"
 
+# ── The commit-msg hook (opt-in, D-005) ───────────────────────────────────
+# A real `git commit` in a throwaway repo, with the hooks that
+# install-repo-hooks.sh writes. HOME is a throwaway tree whose ~/.claude links
+# point at this checkout. The repo is opted in by a tracked .conventional-commits
+# file at its root.
+. "$REPO_DIR/tests/lib/fresh-home.sh"
+TMP_HOME="$(TMPDIR="$WORK" fresh_home_new "$REPO_DIR")"
+INSTALLER="$REPO_DIR/claude/scripts/install-repo-hooks.sh"
+
+# make_hooked_repo <dir> <opt-in 0|1>: initial commits first, then the hooks, so
+# setup itself is never linted.
+make_hooked_repo() {
+	local dir="$1" opt_in="$2"
+	git init -q "$dir"
+	git -C "$dir" config user.email "test@test.com"
+	git -C "$dir" config user.name "Test"
+	git -C "$dir" commit -q --allow-empty -m init
+	if [ "$opt_in" = 1 ]; then
+		printf '# This file opts the repo in to commit message lint.\n' >"$dir/.conventional-commits"
+		git -C "$dir" add .conventional-commits
+		git -C "$dir" commit -q -m "chore: opt in to commit lint"
+	fi
+	(cd "$dir" && HOME="$TMP_HOME" bash "$INSTALLER" >/dev/null 2>&1)
+}
+
+# try_commit <dir> <message> [VAR=value]: an empty commit from <dir> through the real hooks.
+# Sets COMMIT_RC and COMMIT_ERR.
+try_commit() {
+	local dir="$1" msg="$2"
+	shift 2
+	COMMIT_ERR=$(cd "$dir" && env HOME="$TMP_HOME" "$@" git commit -q --allow-empty -m "$msg" 2>&1)
+	COMMIT_RC=$?
+}
+
+echo "# Hook: opt-in enforcement through git commit"
+# Fail-to-fail: H.1 fails if the hook is not installed or does not run the
+# validator; H.3 fails if the marker check is removed; H.4 fails if the bypass
+# check is removed; H.6 fails if a missing validator blocks the commit.
+RH1="$WORK/rh1"
+make_hooked_repo "$RH1" 1
+try_commit "$RH1" "bad message"
+assert_eq "H.1 an opted-in repo rejects a bad message (exit 1, rule text)" "1 1" \
+	"$COMMIT_RC $(printf '%s\n' "$COMMIT_ERR" | grep -c '^commit-msg-lint: R1 ')"
+try_commit "$RH1" "feat(x): add y"
+assert_eq "H.2 an opted-in repo accepts a good message" "0" "$COMMIT_RC"
+RH3="$WORK/rh3"
+make_hooked_repo "$RH3" 0
+try_commit "$RH3" "bad message"
+BAD_RC=$COMMIT_RC
+try_commit "$RH3" "feat(x): add y"
+assert_eq "H.3 a repo without the marker accepts a bad and a good message" "0 0" "$BAD_RC $COMMIT_RC"
+try_commit "$RH1" "bad message" SKIP_COMMIT_LINT=1
+assert_eq "H.4 SKIP_COMMIT_LINT=1 bypasses the lint" "0" "$COMMIT_RC"
+try_commit "$RH1" "bad message" SKIP_COMMIT_LINT=0
+assert_eq "H.5 SKIP_COMMIT_LINT=0 does not bypass (the flag follows the other SKIP_ flags: it must be 1)" "1" "$COMMIT_RC"
+# A HOME that has the hook but not the validator. The other two hooks are removed
+# so that only commit-msg can block.
+NO_TOOLS_HOME="$WORK/no-tools-home"
+mkdir -p "$NO_TOOLS_HOME/.claude"
+ln -s "$REPO_DIR/claude/hooks" "$NO_TOOLS_HOME/.claude/hooks"
+RH6="$WORK/rh6"
+make_hooked_repo "$RH6" 1
+rm -f "$RH6/.git/hooks/pre-commit" "$RH6/.git/hooks/pre-push"
+try_commit "$RH6" "bad message" HOME="$NO_TOOLS_HOME"
+assert_eq "H.6 a missing validator never blocks a commit" "0" "$COMMIT_RC"
+RH7="$WORK/rh7"
+git -C "$RH1" worktree add -q -b wt-h7 "$RH7"
+try_commit "$RH7" "bad message"
+WT_BAD_RC=$COMMIT_RC
+try_commit "$RH7" "fix(x): add y"
+assert_eq "H.7 a linked worktree of an opted-in repo is enforced" "1 0" "$WT_BAD_RC $COMMIT_RC"
+try_commit "$RH1" $'Merge branch \'x\' into main'
+assert_eq "H.8 git's own Merge subject passes through the hook" "0" "$COMMIT_RC"
+# Called outside a git repo, the hook finds no repo root and exits 0.
+mkdir -p "$WORK/norepo"
+printf 'bad message\n' >"$WORK/norepo/msg"
+(cd "$WORK/norepo" && GIT_CEILING_DIRECTORIES="$WORK" HOME="$TMP_HOME" "$BASH" "$REPO_DIR/claude/hooks/repo-commit-msg.sh" "$WORK/norepo/msg" >/dev/null 2>&1)
+assert_eq "H.9 outside a git repo the hook exits 0" "0" "$?"
+
 # ── Summary ───────────────────────────────────────────────────────────────
 if [ -n "${COV:-}" ]; then
 	cov_end
-	cov_report "$LINT"
+	cov_report "$LINT" "$REPO_DIR/claude/hooks/repo-commit-msg.sh"
 fi
 echo
 echo "test-commit-msg-lint: $PASS passed, $FAIL failed"

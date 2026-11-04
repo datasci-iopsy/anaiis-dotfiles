@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # install-repo-hooks.sh -- add standard hooks to the current git repo
 #
-# Installs two dispatcher hooks:
-#   pre-commit -> bash "$HOME/.claude/hooks/repo-pre-commit.sh"  (staged-file linters)
-#   pre-push   -> bash "$HOME/.claude/hooks/repo-pre-push.sh"    (full test suite)
+# Installs three dispatcher hooks:
+#   pre-commit -> bash "$HOME/.claude/hooks/repo-pre-commit.sh"         (staged-file linters)
+#   pre-push   -> bash "$HOME/.claude/hooks/repo-pre-push.sh"           (full test suite)
+#   commit-msg -> bash "$HOME/.claude/hooks/repo-commit-msg.sh" "$1"    (message lint, opt-in)
+#
+# The commit-msg hook checks a message only in a repo that has a tracked
+# .conventional-commits file at its root. Other repos accept any message.
 #
 # Run once from any project root after cloning on a new machine.
 # Safe to re-run -- migrates stale direct-path pre-commit hooks automatically
-# and adds the pre-push hook to repos that only have pre-commit.
+# and adds the pre-push and commit-msg hooks to repos that lack them.
 #
 # Usage:
 #   cd /path/to/repo
@@ -35,6 +39,7 @@ STALE_MARKER='lint-staged.sh'
 # The single line each hook calls (paths never change)
 PRE_COMMIT_LINE='bash "$HOME/.claude/hooks/repo-pre-commit.sh"'
 PRE_PUSH_LINE='bash "$HOME/.claude/hooks/repo-pre-push.sh"'
+COMMIT_MSG_LINE='bash "$HOME/.claude/hooks/repo-commit-msg.sh" "$1"'
 
 # ---------------------------------------------------------------------------
 # _migrate: replace old direct-path lint lines with the pre-commit dispatcher.
@@ -107,7 +112,8 @@ _install() {
 
 _install pre-commit "$PRE_COMMIT_LINE" 'repo-pre-commit.sh' lint Pre-commit
 _install pre-push "$PRE_PUSH_LINE" 'repo-pre-push.sh' test Pre-push
+_install commit-msg "$COMMIT_MSG_LINE" 'repo-commit-msg.sh' commit-msg Commit-msg
 
 echo ""
-echo "Done. Pre-commit (lint) and pre-push (test suite) hooks active for this repo."
-echo "Bypass: SKIP_R_LINT=1 | SKIP_RUFF=1 | SKIP_SHFMT=1 | SKIP_SQLFMT=1 git commit   |   SKIP_TESTS=1 git push"
+echo "Done. Pre-commit (lint), pre-push (test suite), and commit-msg (message lint, opt-in) hooks active for this repo."
+echo "Bypass: SKIP_R_LINT=1 | SKIP_RUFF=1 | SKIP_SHFMT=1 | SKIP_SQLFMT=1 | SKIP_COMMIT_LINT=1 git commit   |   SKIP_TESTS=1 git push"
