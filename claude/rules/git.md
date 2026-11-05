@@ -187,7 +187,7 @@ Refs: D-12
 
 Use a worktree when any one of these four holds. Check them in order. When you create the worktree, name the criterion that held.
 
-1. **Live config.** The change touches a path that the `~/.claude/` links reach (`claude/hooks/`, `claude/scripts/`, `claude/rules/`, `claude/skills/`, `claude/commands/`, `claude/agents/`, `claude/memory/`, `claude/settings.json`, `claude/keybindings.json`), the file `.lintr`, the file `bash/shared.bash`, or a file under `bin/` (on PATH from the main checkout). Why: the links point at the main checkout, so an edit in place changes the running harness before the tests pass. A worktree stays inert until it merges.
+1. **Live config.** The change touches a path that the `~/.claude/` links reach (`claude/hooks/`, `claude/scripts/`, `claude/rules/`, `claude/skills/`, `claude/commands/`, `claude/agents/`, `claude/settings.json`, `claude/keybindings.json`), the file `.lintr`, the file `bash/shared.bash`, or a file under `bin/` (on PATH from the main checkout). Why: the links point at the main checkout, so an edit in place changes the running harness before the tests pass. A worktree stays inert until it merges.
 2. **Foreign changes.** `git status --short` in the main checkout lists a change that is not part of the task. Why: a branch in place carries that change into the commits.
 3. **Parallel streams.** Two or more sessions or branches work at the same time. Why: one checkout holds one branch.
 4. **The user asks** for a worktree ("worktree", "in parallel", "while I keep working on <branch>").

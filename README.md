@@ -217,7 +217,7 @@ The installer asks git where the hooks folder is (`git rev-parse --git-path hook
 
 Memory, compaction, and session history are three separate layers:
 
-- **Memory files** (`claude/memory/` global tier, `~/.claude/projects/<key>/memory/` project tier): stable facts explicitly saved; persist across sessions; delivered to the model by `session-start-context.sh` (a SessionStart hook, matchers `startup|resume|clear|compact`) via `hookSpecificOutput.additionalContext`. This is the channel that actually reaches Claude, not `systemMessage`, which is display-only and never delivered to the model, a bug that went undetected for months before the 2026-07-15 memory-system review.
+- **Memory files** (`~/.claude/memory/` global tier, `~/.claude/projects/<key>/memory/` project tier): stable facts explicitly saved; persist across sessions; delivered to the model by `session-start-context.sh` (a SessionStart hook, matchers `startup|resume|clear|compact`) via `hookSpecificOutput.additionalContext`. This is the channel that actually reaches Claude, not `systemMessage`, which is display-only and never delivered to the model, a bug that went undetected for months before the 2026-07-15 memory-system review.
 - **Compaction**: triggered manually (`/compact`) or automatically by the harness at 60% context (`CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=60` in `shared.bash`; policy in `rules/session.md`). The compactor summarizes the conversation itself and does not read memory files to decide what to keep.
 - **Session history**: full JSONL transcript on disk, persists until pruned.
 
