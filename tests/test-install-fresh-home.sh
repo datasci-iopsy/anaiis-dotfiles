@@ -156,6 +156,14 @@ assert_eq "4.8 summary counts the missing plugins and the check 7 gap" "doctor: 
 if [ "$((ENABLED + GAP))" -gt 0 ]; then WANT_RC=1; else WANT_RC=0; fi
 assert_eq "4.9 exit code follows the missing count" "$WANT_RC" "$RC"
 assert_eq "4.10 the claude version check passes against the stub" 1 "$(okl '^ok claude version 2.1.318$')"
+# GAP counts only the two check 7 outcomes a bare main checkout causes: no pin, no pin prefix. It
+# does not count an invalid pin (not an executable file, or an unapproved major), because folding
+# that into GAP would let a broken pin pass 4.6 and 4.8. This block checks the pin only when one
+# is set, and reports nothing when the main checkout holds no pin yet.
+PIN="$(jq -r '.env.CLAUDE_CODE_SHELL // empty' "$H/.claude/settings.json")"
+if [ -n "$PIN" ]; then
+	assert_eq "4.11 the set pin is an executable approved bash" 1 "$(okl "^ok harness bash $PIN ")"
+fi
 
 echo "--- 5. the CI step runs this stream's suites on bash 3.2"
 STEP_SUITES="test-brew-sync test-maintenance-check test-install-bashrc test-install-hostkeys test-bootstrap-doctor test-no-stale-refs test-install-fresh-home"
