@@ -129,7 +129,7 @@ assert_eq "4.2 LICENSE names Version 2.0, January 2004" 1 \
 	"$(grep -c 'Version 2\.0, January 2004' "$REPO_DIR/LICENSE" 2>/dev/null)"
 assert_eq "4.3 NOTICE holds one copyright line for the holder" "Copyright 2026 Anaiis LLC" \
 	"$(grep '^Copyright ' "$REPO_DIR/NOTICE" 2>/dev/null)"
-assert_eq "4.4 NOTICE holds no placeholder" 0 "$(grep -c '[<>]' "$REPO_DIR/NOTICE" 2>/dev/null || true)"
+assert_eq "4.4 NOTICE holds no placeholder" 0 "$(grep -c '[][<>]' "$REPO_DIR/NOTICE" 2>/dev/null || true)"
 assert_eq "4.5 README.md has a License section that excludes the plugins" "yes" \
 	"$(sed -n '/^## License$/,/^## /p' "$REPO_DIR/README.md" | grep -q 'anaiis-plugins' && echo yes || echo no)"
 
