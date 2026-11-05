@@ -99,6 +99,10 @@ OUT="$(employer_hits "$FIX" "$FIX/terms.txt")"
 assert_eq "0.2 a term is found without case, and a blank terms line matches nothing" "notes.txt:2" "$OUT"
 assert_eq "0.3 the hit output does not hold the term" 0 "$(printf '%s\n' "$OUT" | grep -ci 'fake-employer')"
 
+printf '%s\n' 'old home: github.com/DataSci-IOPSY/Anaiis-Dotfiles' >"$FIX/repo.txt"
+git -C "$FIX" add repo.txt
+assert_eq "0.4 a mention of the old repo is found without case" "repo.txt:1" "$(old_repo_hits "$FIX")"
+
 # ── 1. The old repo is not named ───────────────────────────────────────────
 echo "# 1. No tracked file names the old repo"
 assert_eq "1.1 no tracked file holds $OLD_REPO" "" "$(old_repo_hits "$REPO_DIR")"
