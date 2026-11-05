@@ -102,6 +102,9 @@ assert "0.3 the fixture lacks an untracked script" no "$([ -e "$WORK/fixture-che
 echo "# 1. Doctor on green tree"
 run_doctor "$WORK/green.out"
 assert "1.1 doctor exits 0 on the green tree" "0" "$?"
+# Check I enforces the configuration homes policy (rules/environment.md). The green tree must pass both parts.
+assert_contains "1.1b the green tree holds no dial key in settings.json (I.1)" "PASS  I.1" "$(cat "$WORK/green.out")"
+assert_contains "1.1c the green tree shares no variable between shared.bash and the env block (I.2)" "PASS  I.2" "$(cat "$WORK/green.out")"
 # D-003: a CLAUDE.md below claude/ hid the root AGENTS.md from sessions that start under claude/.
 assert "1.2 no tracked path ends in CLAUDE.md" 0 "$(git -C "$REPO_DIR" ls-files | grep -c 'CLAUDE\.md$')"
 assert "1.3 context.md is tracked" "claude/rules/context.md" \
@@ -197,6 +200,58 @@ cp -RP "$REPO_DIR/claude" "$REPO4/claude"
 GIT_CEILING_DIRECTORIES="$WORK" RULES_DOCTOR_REPO_DIR="$REPO4" bash "$DOCTOR" >"$WORK/nogit.out" 2>&1
 assert "4.1 doctor exits non-zero when it cannot list tracked files" "1" "$?"
 assert_contains "4.2 doctor names the prerequisite failure (F.*)" "F.* prerequisites" "$(cat "$WORK/nogit.out")"
+
+# ── 5. Configuration homes (check I) ──────────────────────────────────────
+# Why: a settings env entry overwrites the same variable exported in the shell, so a name in both
+# homes silently kills the shell value and every alias that sets it. /model and /effort write dial
+# keys into the symlinked settings.json, which dirties the repo for no gain. Seeded on fresh copies,
+# so these faults do not depend on the section 2 mutations.
+echo "# 5. Configuration homes"
+if [ "$HAVE_JQ" -eq 1 ]; then
+	REPO5="$WORK/repo5"
+	make_fixture "$REPO_DIR" "$REPO5"
+	# CLAUDE_CODE_EFFORT_LEVEL is exported in bash/shared.bash and set by four aliases.
+	jq '.model = "opus" | .modelSettings = {"opus": {"effortLevel": "high"}} | .env.CLAUDE_CODE_EFFORT_LEVEL = "high"' \
+		"$REPO5/claude/settings.json" >"$WORK/s5.json" && mv "$WORK/s5.json" "$REPO5/claude/settings.json"
+	RULES_DOCTOR_REPO_DIR="$REPO5" bash "$DOCTOR" >"$WORK/homes.out" 2>&1
+	assert "5.1 doctor exits non-zero on a dial key and a shared variable" "1" "$?"
+	OUT5=$(cat "$WORK/homes.out")
+	assert_contains "5.2 doctor names the dial key model (I.1)" "settings.json holds the dial key model" "$OUT5"
+	assert_contains "5.3 doctor names the dial key modelSettings (I.1)" "settings.json holds the dial key modelSettings" "$OUT5"
+	assert_contains "5.4 doctor names the shared variable (I.2)" "CLAUDE_CODE_EFFORT_LEVEL is set in bash/shared.bash and in the env block" "$OUT5"
+
+	# A name that shared.bash does not set may live in the env block: the shell pin is wiring.
+	REPO6="$WORK/repo6"
+	make_fixture "$REPO_DIR" "$REPO6"
+	jq '.env.CLAUDE_CODE_SHELL = "/opt/homebrew/bin/bash"' "$REPO6/claude/settings.json" >"$WORK/s6.json" \
+		&& mv "$WORK/s6.json" "$REPO6/claude/settings.json"
+	RULES_DOCTOR_REPO_DIR="$REPO6" bash "$DOCTOR" >"$WORK/pin.out" 2>&1
+	assert "5.5 doctor exits 0 when the env block holds a name that shared.bash does not set" "0" "$?"
+	assert_contains "5.6 doctor passes I.2 for that name" "PASS  I.2" "$(cat "$WORK/pin.out")"
+else
+	echo "  SKIP  5.1-5.6 jq not available"
+fi
+
+# ── 6. Criterion 1 of the worktree rule names every path that install.sh links ──
+# Why: a linked path changes the running harness the moment a file in it changes. A linked path
+# that criterion 1 does not name gets edited in place, before any test runs. A path counts as named
+# when criterion 1 lists the path itself or a folder above it. The check reads the real files only.
+echo "# 6. Live config criterion"
+CRIT="$(grep -F '**Live config.**' "$REPO_DIR/claude/rules/git.md")"
+MISSED=""
+for src in $(sed -n 's/^symlink "\$CANONICAL\/\([^"]*\)".*/\1/p' "$REPO_DIR/install.sh"); do
+	p="$src"
+	named=no
+	while [ -n "$p" ] && [ "$p" != "." ]; do
+		if printf '%s' "$CRIT" | grep -qF -e "\`$p\`" -e "\`$p/\`"; then
+			named=yes
+			break
+		fi
+		p="$(dirname "$p")"
+	done
+	[ "$named" = yes ] || MISSED="$MISSED $src"
+done
+assert "6.1 criterion 1 names every path that install.sh links" "" "${MISSED# }"
 
 # ── Summary ───────────────────────────────────────────────────────────────
 echo

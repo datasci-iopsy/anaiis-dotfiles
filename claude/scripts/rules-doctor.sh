@@ -25,6 +25,9 @@
 #      A rule must state its threshold, not defer to judgment.
 #   H. Secrets denial: settings.json denies the protected Read/Write paths
 #      and does not auto-approve Bash(cat:*), which would bypass them.
+#   I. Configuration homes (rules/environment.md): settings.json holds no
+#      dial key (model, effortLevel, modelSettings), and no variable is set
+#      in both bash/shared.bash and the settings env block.
 #
 # Usage: bash ~/.claude/scripts/rules-doctor.sh
 
@@ -289,6 +292,43 @@ if command -v jq >/dev/null 2>&1 && [ -f "$SETTINGS" ]; then
 	fi
 else
 	fail "H.* prerequisites" "jq missing or settings.json absent"
+fi
+
+# ── I. Configuration homes ──────────────────────────────────────────────────
+# Policy: rules/environment.md, section "Configuration homes". Two of its rules are checkable.
+# I.1: /model and /effort write the dial keys into the symlinked settings.json, which dirties the
+# repo for no gain: the shell variable beats the key at the next start.
+# I.2: an env entry overwrites the same variable exported in the shell, so the shell value, and
+# every alias that sets it as a prefix, stops working.
+echo "## I. Configuration homes"
+if command -v jq >/dev/null 2>&1 && [ -f "$SETTINGS" ]; then
+	DIAL_FOUND=0
+	for key in model effortLevel modelSettings; do
+		if jq -e --arg k "$key" 'has($k)' "$SETTINGS" >/dev/null 2>&1; then
+			DIAL_FOUND=$((DIAL_FOUND + 1))
+			fail "I.1 settings.json holds no dial key" "settings.json holds the dial key $key; set the default in bash/shared.bash and remove the key"
+		fi
+	done
+	if [ "$DIAL_FOUND" -eq 0 ]; then
+		ok "I.1 settings.json holds no dial key (model, effortLevel, modelSettings)"
+	fi
+	SHARED_BASH="$REPO_DIR/bash/shared.bash"
+	if [ -f "$SHARED_BASH" ]; then
+		SHARED_NAMES=0
+		while IFS= read -r name; do
+			if grep -qE "^[[:space:]]*export ${name}=|^[[:space:]]*alias [^=]+='${name}=" "$SHARED_BASH"; then
+				SHARED_NAMES=$((SHARED_NAMES + 1))
+				fail "I.2 no variable in both homes" "$name is set in bash/shared.bash and in the env block of settings.json; the env value overwrites the shell value"
+			fi
+		done < <(jq -r '(.env // {}) | keys[]' "$SETTINGS")
+		if [ "$SHARED_NAMES" -eq 0 ]; then
+			ok "I.2 no variable is set in both bash/shared.bash and the env block"
+		fi
+	else
+		fail "I.* prerequisites" "bash/shared.bash absent"
+	fi
+else
+	fail "I.* prerequisites" "jq missing or settings.json absent"
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────

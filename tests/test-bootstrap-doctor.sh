@@ -23,6 +23,22 @@ DOCTOR="${DOCTOR:-$REPO_DIR/claude/scripts/bootstrap-doctor.sh}"
 PASS=0
 FAIL=0
 
+# The approved bash majors are the one line APPROVED_BASH_MAJORS in the doctor. The stub bash prints the
+# first approved major by default, and the wrong-major cases use one below and one above the list. An
+# older doctor has no such line: the check 7 cases then fail, as they must.
+APPROVED="$(sed -n 's/^APPROVED_BASH_MAJORS="\(.*\)"$/\1/p' "$DOCTOR")"
+APPROVED="${APPROVED:-5}"
+FIRST=""
+LOW=""
+HIGH=""
+for m in $APPROVED; do
+	[ -n "$FIRST" ] || {
+		FIRST="$m"
+		LOW=$((m - 1))
+	}
+	HIGH=$((m + 1))
+done
+
 assert_eq() {
 	local name="$1" expected="$2" actual="$3"
 	if [ "$expected" = "$actual" ]; then
@@ -71,6 +87,18 @@ cat >"$TMPD/stub/claude" <<'EOF'
 echo "$STUB_CLAUDE_VERSION"
 EOF
 chmod +x "$TMPD/stub/claude"
+cat >"$TMPD/stub/bash" <<'EOF'
+#!/bin/sh
+# POSIX sh, for the same reason as the stub gh. The pin in the fixture settings.json points here by
+# absolute path. Accepts exactly: -c <script>. The doctor asks for the major version of bash.
+# STUB_BASH_V is the major to print. It may be empty. The doctor always sets it.
+[ "$1" = "-c" ] || {
+	echo "stub bash: unexpected arguments: $*" >&2
+	exit 64
+}
+printf '%s' "$STUB_BASH_V"
+EOF
+chmod +x "$TMPD/stub/bash"
 
 # make_bin <dir> <tool>...: a PATH folder that links the named real tools. The stubs are "gh" and "claude".
 make_bin() {
@@ -94,7 +122,15 @@ make_bin "$TMPD/bin-noclaude" dirname basename readlink grep jq ssh-keygen gh
 # ---- Fixture HOME -----------------------------------------------------------
 ssh-keygen -q -t ed25519 -N '' -C '' -f "$TMPD/hostkey" >/dev/null
 KEYTEXT="$(awk '{print $1, $2}' "$TMPD/hostkey.pub")"
-SETTINGS_JSON='{"enabledPlugins": {"alpha@mk1": true, "beta@mk2": true, "off@mk3": false}}'
+# A healthy settings.json: two enabled plugins and one disabled, a pin to the stub bash, and two
+# commands (a hook and the status line) that start with the pin prefix.
+STUB_PIN="$TMPD/stub/bash"
+# shellcheck disable=SC2016 # ${...} stays literal: it is the text that settings.json holds
+SETTINGS_JSON="$(jq -cn --arg pin "$STUB_PIN" --arg cmd '${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/a.sh' '{
+	enabledPlugins: {"alpha@mk1": true, "beta@mk2": true, "off@mk3": false},
+	env: {CLAUDE_CODE_SHELL: $pin},
+	hooks: {Stop: [{hooks: [{type: "command", command: $cmd}]}]},
+	statusLine: {type: "command", command: $cmd}}')"
 NAMES="settings.json keybindings.json rules commands skills agents hooks scripts memory"
 
 # build_home: print the path of a new, healthy HOME. The repo sits elsewhere and ~/anaiis-dotfiles
@@ -127,7 +163,7 @@ build_home() {
 # CLAUDE_V (default: a new version) sets the line that the stub claude prints for --version.
 doctor() {
 	OUT="$(HOME="$1" PATH="${BIN_DIR:-$TMPD/bin}" STUB_PROTOCOL="${PROTO-ssh}" \
-		STUB_CLAUDE_VERSION="${CLAUDE_V-2.1.318 (Claude Code)}" "$BASH" "$DOCTOR" 2>&1)"
+		STUB_CLAUDE_VERSION="${CLAUDE_V-2.1.318 (Claude Code)}" STUB_BASH_V="${STUB_BASH_V-$FIRST}" "$BASH" "$DOCTOR" 2>&1)"
 	RC=$?
 }
 
@@ -169,9 +205,9 @@ doctor "$H0"
 assert_eq "0.1 exit code 0" 0 "$RC"
 assert_eq "0.2 no MISSING line" 0 "$(miss_count)"
 assert_eq "0.3 summary line" "doctor: 0 missing" "$(printf '%s\n' "$OUT" | tail -n 1)"
-# 2 bashrc + 1 login + 9 links + 2 enabled plugins + 1 host key + 1 claude version.
-# The disabled plugin is not listed.
-assert_eq "0.4 sixteen ok lines" 16 "$(ok_count)"
+# 2 bashrc + 1 login + 9 links + 2 enabled plugins + 1 host key + 1 claude version
+# + 1 harness bash pin + 1 hook command prefix. The disabled plugin is not listed.
+assert_eq "0.4 eighteen ok lines" 18 "$(ok_count)"
 assert_eq "0.5 the disabled plugin is not checked" 0 "$(printf '%s\n' "$OUT" | grep -c 'off@mk3' || true)"
 assert_eq "0.6 the HOME is unchanged" "$SNAP0" "$(snapshot "$H0")"
 
@@ -314,7 +350,7 @@ printf '{"enabledPlugins": {"alpha@mk1": ' >"$H/anaiis-dotfiles/claude/settings.
 expect_one "4.2 settings.json is not valid JSON" "$H" \
 	"MISSING plugin list (~/.claude/settings.json is not valid JSON): repair the file, then run this script again"
 H="$(build_home)"
-printf '{"enabledPlugins": {}}\n' >"$H/anaiis-dotfiles/claude/settings.json"
+jq -n --arg pin "$STUB_PIN" '{enabledPlugins: {}, env: {CLAUDE_CODE_SHELL: $pin}}' >"$H/anaiis-dotfiles/claude/settings.json"
 doctor "$H"
 assert_eq "4.3 no enabled plugin: exit 0" 0 "$RC"
 assert_eq "4.4 an ok line says none are enabled" 1 "$(printf '%s\n' "$OUT" | grep -c '^ok plugins (none enabled)')"
@@ -344,18 +380,18 @@ assert_eq "5.7 no gh: exit 0 without a host key" 0 "$RC"
 assert_eq "5.8 no gh: the ok line says so" 1 "$(printf '%s\n' "$OUT" | grep -c '^ok github.com host key (not needed: gh not found)')"
 
 echo "--- 6. Claude Code version"
-# AGENTS.md support starts at 2.1.277. Each case below fails a different wrong comparison: a lexical
-# compare of the patch (1000 against 277), a compare of the patch alone, or a compare of the minor alone.
+# onFailure support starts at 2.1.295. Each case below fails a different wrong comparison: a lexical
+# compare of the patch (1000 against 295), a compare of the patch alone, or a compare of the minor alone.
 FIX_CLAUDE='update Claude Code'
 H="$(build_home)"
-CLAUDE_V="2.1.276 (Claude Code)" expect_one "6.1 one patch below the minimum" "$H" "MISSING claude version: $FIX_CLAUDE"
+CLAUDE_V="2.1.294 (Claude Code)" expect_one "6.1 one patch below the minimum" "$H" "MISSING claude version: $FIX_CLAUDE"
 CLAUDE_V="2.0.999 (Claude Code)" expect_one "6.2 an older minor with a high patch" "$H" "MISSING claude version: $FIX_CLAUDE"
 CLAUDE_V="1.9.9999 (Claude Code)" expect_one "6.3 an older major" "$H" "MISSING claude version: $FIX_CLAUDE"
 CLAUDE_V="" expect_one "6.4 the output is empty" "$H" "MISSING claude version: $FIX_CLAUDE"
 CLAUDE_V="not a version" expect_one "6.5 the output is not a version" "$H" "MISSING claude version: $FIX_CLAUDE"
 CLAUDE_V="2.1 (Claude Code)" expect_one "6.6 the version has two parts" "$H" "MISSING claude version: $FIX_CLAUDE"
-CLAUDE_V="2.1.277.1 (Claude Code)" expect_one "6.7 the version has four parts" "$H" "MISSING claude version: $FIX_CLAUDE"
-for v in 2.1.277 2.1.1000 2.2.0 3.0.0 2.1.318; do
+CLAUDE_V="2.1.295.1 (Claude Code)" expect_one "6.7 the version has four parts" "$H" "MISSING claude version: $FIX_CLAUDE"
+for v in 2.1.295 2.1.1000 2.2.0 3.0.0 2.1.318; do
 	CLAUDE_V="$v (Claude Code)" doctor "$H"
 	assert_eq "6.8 $v is accepted: exit 0" 0 "$RC"
 	assert_eq "6.8 $v is accepted: the ok line names it" 1 "$(printf '%s\n' "$OUT" | grep -c "^ok claude version $v\$")"
@@ -364,16 +400,56 @@ BIN_DIR="$TMPD/bin-noclaude" doctor "$H"
 assert_eq "6.9 no claude: exit 0" 0 "$RC"
 assert_eq "6.10 no claude: the ok line says so" 1 "$(printf '%s\n' "$OUT" | grep -c '^ok claude version (not needed: claude not found)')"
 
-echo "--- 7. a fresh HOME reports every gap and changes nothing"
+echo "--- 7. harness bash (check 7)"
+# Why: the harness runs on one approved Homebrew bash major. A pin in settings.json (env.CLAUDE_CODE_SHELL)
+# selects the shell of the Bash tool, and every hook command starts with the pin prefix. A lost pin, a
+# bash 4, or a bash 6 that nobody approved must show up as a gap. The wrong majors come from
+# APPROVED_BASH_MAJORS (see the top of this file), so approving another major needs no edit here.
+FIX_PIN='set env.CLAUDE_CODE_SHELL in ~/anaiis-dotfiles/claude/settings.json to the Homebrew bash path, for example /opt/homebrew/bin/bash'
+FIX_MAJOR='install an approved bash (brew install bash), or approve this major by editing APPROVED_BASH_MAJORS in ~/anaiis-dotfiles/claude/scripts/bootstrap-doctor.sh'
+# shellcheck disable=SC2016 # ${...} stays literal: it is the text that the doctor prints
+FIX_PREFIX='start each command in ~/anaiis-dotfiles/claude/settings.json with ${CLAUDE_CODE_SHELL:-bash} (a bare bash follows PATH)'
+# edit_settings <home> <jq filter>: rewrite the fixture settings.json.
+edit_settings() {
+	jq "$2" "$1/anaiis-dotfiles/claude/settings.json" >"$TMPD/edit.json" && mv "$TMPD/edit.json" "$1/anaiis-dotfiles/claude/settings.json"
+}
+
+H="$(build_home)"
+doctor "$H"
+assert_eq "7.1 healthy: the pin line names the path and the major" 1 "$(printf '%s\n' "$OUT" | grep -c "^ok harness bash $STUB_PIN (major $FIRST)\$")"
+assert_eq "7.2 healthy: the prefix line counts the commands" 1 "$(printf '%s\n' "$OUT" | grep -c '^ok hook commands start with the pin prefix (2)$')"
+H="$(build_home)"
+edit_settings "$H" 'del(.env)'
+expect_one "7.3 the pin is absent" "$H" "MISSING harness bash pin (env.CLAUDE_CODE_SHELL absent in ~/.claude/settings.json): $FIX_PIN"
+H="$(build_home)"
+edit_settings "$H" ".env.CLAUDE_CODE_SHELL = \"$TMPD/no-such-bash\""
+expect_one "7.4 the pin path is not an executable file" "$H" "MISSING harness bash pin ($TMPD/no-such-bash is not an executable file): $FIX_PIN"
+H="$(build_home)"
+STUB_BASH_V="$LOW" expect_one "7.5 the pin runs a major below the approved list" "$H" \
+	"MISSING harness bash $STUB_PIN (major $LOW, approved: $APPROVED): $FIX_MAJOR"
+STUB_BASH_V="$HIGH" expect_one "7.6 the pin runs a major above the approved list" "$H" \
+	"MISSING harness bash $STUB_PIN (major $HIGH, approved: $APPROVED): $FIX_MAJOR"
+STUB_BASH_V="" expect_one "7.7 the pin prints no major" "$H" \
+	"MISSING harness bash $STUB_PIN (major unknown, approved: $APPROVED): $FIX_MAJOR"
+H="$(build_home)"
+# shellcheck disable=SC2016 # $HOME stays literal: it is the text that settings.json holds
+edit_settings "$H" '.hooks.Stop[0].hooks += [{"type": "command", "command": "bash $HOME/.claude/hooks/b.sh"}]'
+expect_one "7.8 one of three commands starts with a bare bash" "$H" "MISSING hook commands without the pin prefix (1 of 3): $FIX_PREFIX"
+H="$(build_home)"
+printf '{"enabledPlugins": {"alpha@mk1": ' >"$H/anaiis-dotfiles/claude/settings.json"
+doctor "$H"
+assert_eq "7.9 settings.json is not valid JSON: check 7 adds no line to the plugin gap" 1 "$(miss_count)"
+
+echo "--- 8. a fresh HOME reports every gap and changes nothing"
 HF="$(mktemp -d "$TMPD/home.XXXXXX")"
 mkdir -p "$HF/.claude"
 SNAPF="$(snapshot "$HF")"
 doctor "$HF"
-assert_eq "7.1 exit code 1" 1 "$RC"
-# 1 bashrc + 1 login + 9 links + 1 plugin list + 1 host key
-assert_eq "7.2 thirteen MISSING lines" 13 "$(miss_count)"
-assert_eq "7.3 summary counts the same gaps" "doctor: 13 missing" "$(printf '%s\n' "$OUT" | tail -n 1)"
-assert_eq "7.4 the HOME is unchanged" "$SNAPF" "$(snapshot "$HF")"
+assert_eq "8.1 exit code 1" 1 "$RC"
+# 1 bashrc + 1 login + 9 links + 1 plugin list + 1 host key. Check 7 adds none: no settings.json to read.
+assert_eq "8.2 thirteen MISSING lines" 13 "$(miss_count)"
+assert_eq "8.3 summary counts the same gaps" "doctor: 13 missing" "$(printf '%s\n' "$OUT" | tail -n 1)"
+assert_eq "8.4 the HOME is unchanged" "$SNAPF" "$(snapshot "$HF")"
 
 if [ -n "${COV:-}" ]; then
 	cov_end

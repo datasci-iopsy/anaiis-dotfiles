@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # pre-compact.sh, capture session state before context compaction
 #
 # Fires on both triggers:

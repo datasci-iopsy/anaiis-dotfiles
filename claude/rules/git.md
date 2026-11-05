@@ -1,6 +1,6 @@
 ---
 name: git
-description: Typed claude branches, trivial-edit criteria, Conventional Commits rubric (types, subject grammar, footers, breaking changes, reverts, opt-in lint), PR titles, staging by name, user-initiated push, rebase ours/theirs, worktrees
+description: Typed claude branches, trivial-edit criteria, Conventional Commits rubric (types, subject grammar, footers, breaking changes, reverts, opt-in lint), PR titles, staging by name, user-initiated push, rebase ours/theirs, criteria for a worktree or a branch in place
 ---
 
 # Git Workflow
@@ -36,6 +36,8 @@ Binary rules, checked in order:
    4. No new file created and no new named symbol (function, class, method, import, or dependency) introduced.
    5. The changed file is not under `tests/`, `claude/hooks/`, or `claude/skills/`, and does not end in `.json`, `.yaml`, `.toml`, or `.envrc`.
 3. **Any other edit:** create a `claude-<type>/<ticket>-<desc>` branch from the current user feature branch, inheriting `<ticket>` from that branch name when present.
+
+Before applying any branching rule, check the criteria in "Worktree or branch in place". A worktree makes its own branch with `git worktree add -b`.
 
 ## Branch reuse
 Before creating any new `claude-*` branch, run `git branch --list 'claude-*'`. If an unmerged branch whose name contains the topic slug exists, ask: "Continue on `<existing>`? (y/n)." Never silently create a duplicate of an unmerged branch.
@@ -181,8 +183,22 @@ Refs: D-12
 - Never include session links (`https://claude.ai/code/session_*`) in PR titles, bodies, or descriptions.
 - CodeRabbit triage runs via `/anaiis-coderabbit` from a `claude-*` branch, never from `main`.
 
-## Worktrees (parallel work only)
-- Create a worktree only when the user explicitly asks for one ("worktree", "in parallel", "while I keep working on <branch>"). The default for all other work is a branch in place.
+## Worktree or branch in place
+
+Use a worktree when any one of these four holds. Check them in order. When you create the worktree, name the criterion that held.
+
+1. **Live config.** The change touches a path that the `~/.claude/` links reach (`claude/hooks/`, `claude/scripts/`, `claude/rules/`, `claude/skills/`, `claude/commands/`, `claude/agents/`, `claude/memory/`, `claude/settings.json`, `claude/keybindings.json`), the file `.lintr`, the file `bash/shared.bash`, or a file under `bin/` (on PATH from the main checkout). Why: the links point at the main checkout, so an edit in place changes the running harness before the tests pass. A worktree stays inert until it merges.
+2. **Foreign changes.** `git status --short` in the main checkout lists a change that is not part of the task. Why: a branch in place carries that change into the commits.
+3. **Parallel streams.** Two or more sessions or branches work at the same time. Why: one checkout holds one branch.
+4. **The user asks** for a worktree ("worktree", "in parallel", "while I keep working on <branch>").
+
+If none holds, use a branch in place (see "Branching decision"). In the dotfiles repo, criterion 1 holds for nearly all work, so a worktree is the default there.
+
+- Path: the `AGENTS.md` of the project names it. The dotfiles repo uses `tmp/worktrees/<id>`. A project with no such line uses `../<repo>.worktrees/<id>`. `<id>` is the short name of the work.
+- Create it with `git -C <main-checkout> worktree add <path> -b claude-<type>/<ticket>-<desc> <base>`. The `-b` flag makes the branch. `<base>` is the current branch, or `main` when the current branch is `main`.
+- Gitignored inputs such as `spec/` and `tasks/` exist only in the main checkout. Read and write them there by absolute path.
+- An uncommitted foreign change (criterion 2) stays in the main checkout. Do not commit it to the task branch unless the task changes the same path or the user asks. In that case, for a tracked path, save the change with `git diff HEAD --binary -- <path>`, apply it in the worktree, and commit it on its own. For an untracked path, copy the file by hand, add it in the worktree, and commit it on its own. Then tell the user to clear the path in the main checkout before `git pull`, because the merge touches the same file. For a tracked path, the command is `git restore --staged --worktree <path>`. For an untracked path, the user deletes the file.
+- Merging, pushing, and removing the worktree stay with the user (see "Push" and "Branch cleanup").
 - When a worktree is in use: verify its path and branch with `git worktree list` before referencing either; `git checkout main` fails inside a worktree (return via `cd` to the repo root or ExitWorktree); after leaving, confirm the active branch with `git branch --show-current`.
 
 ## Branch cleanup
