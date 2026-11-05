@@ -305,6 +305,18 @@ assert_eq "9.5 a regular file: exit code is 0" 0 "$RC"
 assert_eq "9.6 a regular file: the file and its text stay" mine "$(cat "$H9/.claude/memory")"
 assert_eq "9.7 a regular file: one SKIP line names it" 1 "$(printf '%s\n' "$OUT" | grep -c "^  SKIP $H9/.claude/memory ")"
 
+echo "--- 10. a link to another folder is replaced, not followed"
+# Without ln -n, ln follows a link to a folder and makes a stray link inside that folder
+# (an integration run made claude/rules/rules in a worktree this way).
+H10="$(mktemp -d "$TMPD/home.XXXXXX")"
+OTHER10="$(mktemp -d "$TMPD/other.XXXXXX")"
+mkdir -p "$H10/.claude"
+ln -s "$OTHER10" "$H10/.claude/rules"
+run_links "$H10"
+assert_eq "10.1 exit code is 0" 0 "$RC"
+assert_eq "10.2 ~/.claude/rules now resolves into the main checkout" "$MAIN/claude/rules" "$(cd "$H10/.claude/rules" && pwd -P)"
+assert_eq "10.3 the other folder holds no new entry" "" "$(ls -A "$OTHER10")"
+
 if [ -n "${COV:-}" ]; then
 	cov_end
 	cov_report "$INSTALL" "$DOCTOR"

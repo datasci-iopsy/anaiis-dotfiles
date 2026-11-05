@@ -55,7 +55,8 @@ symlink() {
 	elif [ -e "$dst" ] && [ ! -L "$dst" ]; then
 		echo "  SKIP $dst (real file exists, back it up and remove it first)"
 	else
-		ln -sf "$src" "$dst"
+		# -n: replace a link to a folder; do not make a new link inside that folder.
+		ln -sfn "$src" "$dst"
 		echo "  link $dst -> $src"
 	fi
 }
