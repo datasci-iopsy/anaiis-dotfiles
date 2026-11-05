@@ -113,6 +113,8 @@ assert_eq "1.6 a bot noreply address is accepted" accepted \
 	"$(try_commit "$R" GIT_AUTHOR_EMAIL='41898282+github-actions[bot]@users.noreply.github.com' git commit -q --allow-empty -m c16)"
 assert_eq "1.7 a look-alike domain is rejected" rejected \
 	"$(try_commit "$R" GIT_AUTHOR_EMAIL='octo@users.noreply.github.com.evil.io' git commit -q --allow-empty -m c17)"
+# Pre-commit refused the commit, so --amend would fold the next change into the previous commit.
+assert_eq "1.8 a staged reject does not give the --amend hint" 0 "$(grep -c -- '--amend' "$WORK/last.out")"
 
 echo "=== 2. committer email at commit time ==="
 assert_eq "2.1 a private committer email with a noreply author is rejected" rejected \
@@ -173,6 +175,7 @@ assert_eq "8.6 a new branch with an unpushed private-email commit is rejected" 1
 	"$(run_push "$R" "refs/heads/topic $TOP refs/heads/topic $ZERO")"
 assert_eq "8.7 a remote sha that the clone lacks falls back to the remote refs" 1 \
 	"$(run_push "$R" "refs/heads/main $TOP refs/heads/main 1111111111111111111111111111111111111111")"
+assert_eq "8.8 a push reject gives the --amend hint for the listed commits" 1 "$(grep -c -- '--amend' "$WORK/last.out")"
 
 echo
 echo "=== Results: $PASS passed, $FAIL failed ==="

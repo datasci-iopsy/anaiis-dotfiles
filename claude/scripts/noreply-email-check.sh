@@ -72,9 +72,15 @@ EOF
 esac
 
 if [ "$bad" -eq 1 ]; then
-	printf 'This repo requires one (.require-noreply-email). Fix the identity, then redo the commit:\n' >&2
+	printf 'This repo requires one (.require-noreply-email). Fix the identity:\n' >&2
 	printf '  git config user.email <id>+<login>@users.noreply.github.com\n' >&2
-	printf '  git commit --amend --reset-author --no-edit\n' >&2
+	if [ "$MODE" = staged ]; then
+		# Git did not make this commit, so --amend would change the previous commit.
+		printf 'Then run git commit again.\n' >&2
+	else
+		printf 'Then redo each commit listed above. For the last commit:\n' >&2
+		printf '  git commit --amend --reset-author --no-edit\n' >&2
+	fi
 	printf 'Bypass for one command (owner only): SKIP_EMAIL_CHECK=1\n' >&2
 fi
 exit "$bad"
