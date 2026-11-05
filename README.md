@@ -171,13 +171,13 @@ The doctor only reads. It prints `ok <what>` for each passing check and `MISSING
 |---|---|---|
 | 1 | `~/.bashrc` exists and holds the PATH line and the `shared.bash` source line | `bash ~/anaiis-dotfiles/install.sh --bashrc-only` |
 | 2 | The login shell file (the first of `~/.bash_profile`, `~/.bash_login`, `~/.profile`) mentions `~/.bashrc` | Add the line that the message prints (`install.sh --bashrc-only` when no login file exists) |
-| 3 | Each of nine `~/.claude` links resolves into `~/anaiis-dotfiles/claude` | `bash ~/anaiis-dotfiles/install.sh --symlinks-only` |
+| 3 | Each of eight `~/.claude` links resolves into `~/anaiis-dotfiles/claude`, and `~/.claude/memory` is a local folder (a `WARN` line that does not count as missing when the folder is absent or still a link) | `bash ~/anaiis-dotfiles/install.sh --symlinks-only` |
 | 4 | Each plugin that `enabledPlugins` sets to `true` has a folder in `~/.claude/plugins/cache/` | Start Claude Code once, run `/reload-plugins`, read the Errors tab of `/plugin` |
 | 5 | When `gh` uses the SSH protocol, `~/.ssh/known_hosts` holds a `github.com` key | `bash ~/anaiis-dotfiles/install.sh --hostkeys-only` |
 | 6 | When `claude` is on PATH, its version is at least 2.1.295 (the first version that supports `onFailure` for `PreToolUse` guards) | Update Claude Code |
 | 7 | `settings.json` pins `env.CLAUDE_CODE_SHELL` to an executable bash whose major version is in `APPROVED_BASH_MAJORS`, and every command in it starts with `${CLAUDE_CODE_SHELL:-bash}` | Set the pin, install an approved bash, or approve the major (see "Bash baseline") |
 
-The nine links in check 3 are `settings.json`, `keybindings.json`, `rules`, `commands`, `skills`, `agents`, `hooks`, `scripts`, and `memory`. Check 4 needs `jq`. Without `jq` the doctor prints `MISSING jq (needed to read the plugin list): brew install jq`.
+The eight links in check 3 are `settings.json`, `keybindings.json`, `rules`, `commands`, `skills`, `agents`, `hooks`, and `scripts`. Check 4 needs `jq`. Without `jq` the doctor prints `MISSING jq (needed to read the plugin list): brew install jq`.
 
 Do not use `claude plugin list` as the check. The doctor reads the plugin cache folders (check 4). A plugin shows MISSING until Claude Code has fetched it, so run the doctor after step 4.
 
