@@ -68,12 +68,10 @@ skip() {
 # ── A. Global tier ────────────────────────────────────────────────────────
 echo "## A. Global tier"
 # A real folder is the normal state. A link to a folder still works: install.sh converts it.
-if [ -d "$GLOBAL_DIR" ] && [ -f "$GLOBAL_DIR/MEMORY.md" ]; then
-	ok "A.1 global memory is a folder with a MEMORY.md index"
-elif [ -d "$GLOBAL_DIR" ]; then
-	fail "A.1 global memory is a folder with a MEMORY.md index" "no MEMORY.md in $GLOBAL_DIR"
+if [ -d "$GLOBAL_DIR" ]; then
+	ok "A.1 global memory is a folder"
 else
-	fail "A.1 global memory is a folder with a MEMORY.md index" "missing: $GLOBAL_DIR (run install.sh)"
+	fail "A.1 global memory is a folder" "missing: $GLOBAL_DIR (run install.sh)"
 fi
 if [ -f "$GLOBAL_DIR/MEMORY.md" ]; then
 	ok "A.2 global MEMORY.md index exists"
