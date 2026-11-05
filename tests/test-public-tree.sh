@@ -42,7 +42,8 @@ OLD_REPO='datasci-iopsy/anaiis-dotfiles'
 EMAIL_RE='[][A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
 
 # One extended regular expression per line. Each must match the whole address.
-# n@RTK.md: tests/test-no-rtk.sh writes printf '...\n@RTK.md', an import line and not an address.
+# n@<name>.md: the n of a \n escape before an @<name>.md import line, not an address. A test writes
+# one. The entry is a pattern: the test that guards a removed tool forbids its name here.
 # octo@...evil.io: the look-alike fixture of the email guard test, kept exact on purpose.
 EMAIL_ALLOW='([0-9]+\+)?[A-Za-z0-9-]+(\[bot\])?@users\.noreply\.github\.com
 noreply@github\.com
@@ -51,7 +52,7 @@ git@github\.com
 test@test\.com
 t@t\.com
 octo@users\.noreply\.github\.com\.evil\.io
-n@RTK\.md'
+n@[A-Za-z0-9_-]+\.md'
 
 # old_repo_hits <repo_dir>: print "<file>:<line>" for each tracked line that names the old repo.
 old_repo_hits() {
@@ -83,7 +84,7 @@ printf '%s\n' \
 	'author 123456+octo@users.noreply.github.com' \
 	'bot 41898282+github-actions[bot]@users.noreply.github.com' \
 	'mail noreply@github.com and ana@example.com' \
-	"printf 'imports\\n@RTK.md\\n'" \
+	"printf 'imports\\n@NOTES.md\\n'" \
 	'plugin ponytail@ponytail, commit as eval@local' >"$FIX/ok.txt"
 printf '%s\n' 'clean line' 'contact jane.doe@corp-internal.com' \
 	'look-alike x@users.noreply.github.com.evil.io' >"$FIX/bad.txt"
