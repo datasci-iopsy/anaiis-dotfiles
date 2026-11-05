@@ -469,8 +469,6 @@ A `Brewfile` at the repo root tracks all formulae, casks, and taps. Three comman
 # New machine: install everything in the Brewfile
 bash ~/anaiis-dotfiles/claude/scripts/brew-sync.sh install
 
-
-`brew bundle` installs the `uv` entries, such as `shandy-sqlfmt`, with `uv tool install`. uv tools are per user: they go in `~/.local/bin` of each profile, not in the shared Homebrew prefix. Each profile runs the install once. Doctor check 8 prints a `WARN` line when sqlfmt is absent.
 # Check for drift (packages installed but not in Brewfile, or missing)
 bash ~/anaiis-dotfiles/claude/scripts/brew-sync.sh check
 
