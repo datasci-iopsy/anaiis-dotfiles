@@ -60,11 +60,10 @@ old_repo_hits() {
 }
 
 # email_hits <repo_dir>: print "<file>:<line>:<address>" for each address outside the allowlist.
+# sed anchors each allowlist pattern to the address field, so a pattern must match the whole address.
 email_hits() {
-	local hit
-	git -C "$1" grep -I -n -o -E -e "$EMAIL_RE" -- . ":(exclude)$SELF" | while IFS= read -r hit; do
-		printf '%s\n' "${hit##*:}" | grep -qxE -e "$EMAIL_ALLOW" || printf '%s\n' "$hit"
-	done
+	git -C "$1" grep -I -n -o -E -e "$EMAIL_RE" -- . ":(exclude)$SELF" \
+		| grep -vE -f <(printf '%s\n' "$EMAIL_ALLOW" | sed 's/.*/^[^:]*:[0-9]+:(&)$/')
 }
 
 # employer_hits <repo_dir> <terms_file>: print "<file>:<line>" for each tracked line that holds a
