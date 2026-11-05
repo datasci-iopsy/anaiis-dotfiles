@@ -71,6 +71,7 @@ jobs:
             test-install-hostkeys \
             test-bootstrap-doctor \
             test-no-stale-refs \
+            test-noreply-email-check \
             test-install-fresh-home; do
             echo "=== /bin/bash tests/$t.sh ==="
             /bin/bash "tests/$t.sh" || exit 1
