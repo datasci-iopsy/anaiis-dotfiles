@@ -253,6 +253,24 @@ for src in $(sed -n 's/^symlink "\$CANONICAL\/\([^"]*\)".*/\1/p' "$REPO_DIR/inst
 done
 assert "6.1 criterion 1 names every path that install.sh links" "" "${MISSED# }"
 
+# ── 7. The dotfiles set no git identity ──────────────────────────────────
+# Why: a settings env value overwrites the same variable in every session, so a GIT_AUTHOR_* or
+# GIT_COMMITTER_* key beats the git config of each machine and each repo. Each machine sets its own
+# identity in its git config. A doc that still says the env block sets the identity misleads a reader.
+# The phrases come from the docs that said so before the keys went away.
+echo "# 7. No git identity in the env block"
+if [ "$HAVE_JQ" -eq 1 ]; then
+	assert "7.1 the env block holds no GIT_AUTHOR_* or GIT_COMMITTER_* key" "" \
+		"$(jq -r '.env // {} | keys[] | select(startswith("GIT_AUTHOR_") or startswith("GIT_COMMITTER_"))' \
+			"$REPO_DIR/claude/settings.json" | tr '\n' ' ')"
+else
+	echo "  SKIP  7.1 jq not available"
+fi
+assert "7.2 no tracked doc says the env block sets the git identity" "" \
+	"$(git -C "$REPO_DIR" grep -l -F -e 'git identity)' -e 'These variables set the git author' \
+		-e 'Git author identity is set via' -e 'commit authorship is set via env vars' \
+		-- ':(exclude)tests/test-rules-integrity.sh' | tr '\n' ' ')"
+
 # ── Summary ───────────────────────────────────────────────────────────────
 echo
 echo "──────────────────────────────────────────────"
