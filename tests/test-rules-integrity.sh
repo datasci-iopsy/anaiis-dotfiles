@@ -232,6 +232,27 @@ else
 	echo "  SKIP  5.1-5.6 jq not available"
 fi
 
+# ── 6. Criterion 1 of the worktree rule names every path that install.sh links ──
+# Why: a linked path changes the running harness the moment a file in it changes. A linked path
+# that criterion 1 does not name gets edited in place, before any test runs. A path counts as named
+# when criterion 1 lists the path itself or a folder above it. The check reads the real files only.
+echo "# 6. Live config criterion"
+CRIT="$(grep -F '**Live config.**' "$REPO_DIR/claude/rules/git.md")"
+MISSED=""
+for src in $(sed -n 's/^symlink "\$CANONICAL\/\([^"]*\)".*/\1/p' "$REPO_DIR/install.sh"); do
+	p="$src"
+	named=no
+	while [ -n "$p" ] && [ "$p" != "." ]; do
+		if printf '%s' "$CRIT" | grep -qF -e "\`$p\`" -e "\`$p/\`"; then
+			named=yes
+			break
+		fi
+		p="$(dirname "$p")"
+	done
+	[ "$named" = yes ] || MISSED="$MISSED $src"
+done
+assert "6.1 criterion 1 names every path that install.sh links" "" "${MISSED# }"
+
 # ── Summary ───────────────────────────────────────────────────────────────
 echo
 echo "──────────────────────────────────────────────"

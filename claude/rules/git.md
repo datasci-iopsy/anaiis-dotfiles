@@ -187,7 +187,7 @@ Refs: D-12
 
 Use a worktree when any one of these four holds. Check them in order. When you create the worktree, name the criterion that held.
 
-1. **Live config.** The change touches a path that the `~/.claude/` links reach (`claude/hooks/`, `claude/scripts/`, `claude/rules/`, `claude/skills/`, `claude/commands/`, `claude/agents/`, `claude/memory/`, `claude/settings.json`) or the file `bash/shared.bash`. Why: the links point at the main checkout, so an edit in place changes the running harness before the tests pass. A worktree stays inert until it merges.
+1. **Live config.** The change touches a path that the `~/.claude/` links reach (`claude/hooks/`, `claude/scripts/`, `claude/rules/`, `claude/skills/`, `claude/commands/`, `claude/agents/`, `claude/memory/`, `claude/settings.json`, `claude/keybindings.json`), the file `.lintr`, the file `bash/shared.bash`, or a file under `bin/` (on PATH from the main checkout). Why: the links point at the main checkout, so an edit in place changes the running harness before the tests pass. A worktree stays inert until it merges.
 2. **Foreign changes.** `git status --short` in the main checkout lists a change that is not part of the task. Why: a branch in place carries that change into the commits.
 3. **Parallel streams.** Two or more sessions or branches work at the same time. Why: one checkout holds one branch.
 4. **The user asks** for a worktree ("worktree", "in parallel", "while I keep working on <branch>").
@@ -197,7 +197,7 @@ If none holds, use a branch in place (see "Branching decision"). In the dotfiles
 - Path: the `AGENTS.md` of the project names it. The dotfiles repo uses `tmp/worktrees/<id>`. A project with no such line uses `../<repo>.worktrees/<id>`. `<id>` is the short name of the work.
 - Create it with `git -C <main-checkout> worktree add <path> -b claude-<type>/<ticket>-<desc> <base>`. The `-b` flag makes the branch. `<base>` is the current branch, or `main` when the current branch is `main`.
 - Gitignored inputs such as `spec/` and `tasks/` exist only in the main checkout. Read and write them there by absolute path.
-- An uncommitted foreign change (criterion 2) does not enter the worktree. For a tracked path, save all changes with `git diff HEAD --binary -- <path>`. For an untracked path, copy the file by hand. In the worktree, apply the diff or add the copied file. Commit it on its own. Then tell the user to run `git restore <path>` in the main checkout before `git pull`, because the merge touches the same file.
+- An uncommitted foreign change (criterion 2) does not enter the worktree. For a tracked path, save all changes with `git diff HEAD --binary -- <path>`. For an untracked path, copy the file by hand. In the worktree, apply the diff or add the copied file. Commit it on its own. Then tell the user to clear the path in the main checkout before `git pull`, because the merge touches the same file. For a tracked path, the command is `git restore --staged --worktree <path>`. For an untracked path, the user deletes the file.
 - Merging, pushing, and removing the worktree stay with the user (see "Push" and "Branch cleanup").
 - When a worktree is in use: verify its path and branch with `git worktree list` before referencing either; `git checkout main` fails inside a worktree (return via `cd` to the repo root or ExitWorktree); after leaving, confirm the active branch with `git branch --show-current`.
 
