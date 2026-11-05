@@ -63,6 +63,7 @@ anaiis-dotfiles/
 ├── tests/
 │   ├── fixtures/                   Test fixture files
 │   ├── lib/                        Test helpers: fresh-home.sh (throwaway HOME), cov.sh (approximate line coverage from xtrace)
+│   ├── e2e-git-identity.sh         Opt-in (`E2E=1`) check in real `claude -p` sessions that the settings env block leaves the git identity of the repo in place
 │   ├── e2e-nested-session.sh       Opt-in (`E2E=1`) hook checks in real nested `claude -p` sessions; `E2E_OLD_REF=<ref>` replays them against older hooks
 │   ├── measure-memory-injection.sh  Memory injection overhead measurement
 │   ├── measure-userpromptsubmit.sh  Hook-latency measurement (run when chain grows)
