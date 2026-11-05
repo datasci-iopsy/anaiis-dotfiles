@@ -126,7 +126,7 @@ assert_exit "2.3 allows edit on claude-* branch (exit 0)" "0" "$RC"
 echo "# 3. block message suggests branching first"
 run_block_hook "main" >/dev/null 2>/tmp/block-hook.stderr || true
 STDERR=$(cat /tmp/block-hook.stderr)
-assert_contains "3.1 message still gives the in-place branch command""git checkout -b claude-<type>/<ticket>-<short-description>" "$STDERR"
+assert_contains "3.1 message still gives the in-place branch command" "git checkout -b claude-<type>/<ticket>-<short-description>" "$STDERR"
 assert_contains "3.2 message points to the worktree criteria in rules/git.md" "Worktree or branch in place" "$STDERR"
 assert_contains "3.2b message names the three reasons for a worktree" "live config, foreign changes, or parallel streams" "$STDERR"
 assert_contains "3.3 message gives the full worktree command that rules/git.md requires" \
