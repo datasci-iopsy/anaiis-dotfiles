@@ -126,10 +126,15 @@ assert_exit "2.3 allows edit on claude-* branch (exit 0)" "0" "$RC"
 echo "# 3. block message suggests branching first"
 run_block_hook "main" >/dev/null 2>/tmp/block-hook.stderr || true
 STDERR=$(cat /tmp/block-hook.stderr)
-assert_contains "3.1 message suggests branch first" "git checkout -b claude-<type>/<ticket>-<short-description>" "$STDERR"
+assert_contains "3.1 message still gives the in-place branch command""git checkout -b claude-<type>/<ticket>-<short-description>" "$STDERR"
 assert_contains "3.2 message points to the worktree criteria in rules/git.md" "Worktree or branch in place" "$STDERR"
 assert_contains "3.2b message names the three reasons for a worktree" "live config, foreign changes, or parallel streams" "$STDERR"
-assert_contains "3.3 message mentions git worktree add" "git worktree add" "$STDERR"
+assert_contains "3.3 message gives the full worktree command that rules/git.md requires" \
+	"git -C <main-checkout> worktree add <path> -b claude-<type>/<ticket>-<desc> <base>" "$STDERR"
+# In the dotfiles repo a worktree is the default, so the message names it before the in-place branch.
+WT_LINE=$(printf '%s\n' "$STDERR" | grep -n 'worktree add' | head -n 1 | cut -d: -f1)
+BR_LINE=$(printf '%s\n' "$STDERR" | grep -n 'git checkout -b' | head -n 1 | cut -d: -f1)
+assert_exit "3.4 message names the worktree before the in-place branch" "0" "$([ "${WT_LINE:-99}" -lt "${BR_LINE:-0}" ] && echo 0 || echo 1)"
 
 # ── 4. block-edit-on-main plans exemption ────────────────────────────────
 echo "# 4. plans/ exemption"

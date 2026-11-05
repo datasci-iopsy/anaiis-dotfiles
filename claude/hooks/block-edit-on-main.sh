@@ -34,8 +34,9 @@ if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
 	fi
 
 	echo "[block-edit-on-main] BLOCKED: refusing to edit '${FILE}' on branch '${BRANCH}'." >&2
-	echo "Branch first: git checkout -b claude-<type>/<ticket>-<short-description>" >&2
-	echo "Worktree (live config, foreign changes, or parallel streams; see rules/git.md, section 'Worktree or branch in place'): git worktree add <path> -b claude-<type>/<ticket>-<topic>" >&2
+	echo "Check rules/git.md, section 'Worktree or branch in place', first. Use a worktree for live config, foreign changes, or parallel streams:" >&2
+	echo "  git -C <main-checkout> worktree add <path> -b claude-<type>/<ticket>-<desc> <base>" >&2
+	echo "Branch in place, only when no worktree criterion holds: git checkout -b claude-<type>/<ticket>-<short-description>" >&2
 	exit 2
 fi
 
