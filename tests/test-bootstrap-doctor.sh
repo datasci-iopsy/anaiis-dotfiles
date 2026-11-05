@@ -131,16 +131,17 @@ SETTINGS_JSON="$(jq -cn --arg pin "$STUB_PIN" --arg cmd '${CLAUDE_CODE_SHELL:-ba
 	env: {CLAUDE_CODE_SHELL: $pin},
 	hooks: {Stop: [{hooks: [{type: "command", command: $cmd}]}]},
 	statusLine: {type: "command", command: $cmd}}')"
-NAMES="settings.json keybindings.json rules commands skills agents hooks scripts memory"
+NAMES="settings.json keybindings.json rules commands skills agents hooks scripts"
 
 # build_home: print the path of a new, healthy HOME. The repo sits elsewhere and ~/anaiis-dotfiles
-# links to it, as install.sh arranges when the clone is not at the canonical path.
+# links to it, as install.sh arranges when the clone is not at the canonical path. ~/.claude/memory is
+# a real folder, as install.sh leaves it. The doctor does not read its files.
 build_home() {
 	local h repo name
 	h="$(mktemp -d "$TMPD/home.XXXXXX")"
 	repo="$h.repo"
-	mkdir -p "$repo/claude" "$h/.claude" "$h/.ssh"
-	for name in rules commands skills agents hooks scripts memory; do
+	mkdir -p "$repo/claude" "$h/.claude/memory" "$h/.ssh"
+	for name in rules commands skills agents hooks scripts; do
 		mkdir -p "$repo/claude/$name"
 	done
 	printf '%s\n' "$SETTINGS_JSON" >"$repo/claude/settings.json"
@@ -205,11 +206,13 @@ doctor "$H0"
 assert_eq "0.1 exit code 0" 0 "$RC"
 assert_eq "0.2 no MISSING line" 0 "$(miss_count)"
 assert_eq "0.3 summary line" "doctor: 0 missing" "$(printf '%s\n' "$OUT" | tail -n 1)"
-# 2 bashrc + 1 login + 9 links + 2 enabled plugins + 1 host key + 1 claude version
+# 2 bashrc + 1 login + 8 links + 1 memory folder + 2 enabled plugins + 1 host key + 1 claude version
 # + 1 harness bash pin + 1 hook command prefix. The disabled plugin is not listed.
 assert_eq "0.4 eighteen ok lines" 18 "$(ok_count)"
 assert_eq "0.5 the disabled plugin is not checked" 0 "$(printf '%s\n' "$OUT" | grep -c 'off@mk3' || true)"
 assert_eq "0.6 the HOME is unchanged" "$SNAP0" "$(snapshot "$H0")"
+assert_eq "0.7 a real memory folder is ok" 1 "$(printf '%s\n' "$OUT" | grep -c '^ok ~/.claude/memory (local folder)$' || true)"
+assert_eq "0.8 no WARN line" 0 "$(printf '%s\n' "$OUT" | grep -c '^WARN ' || true)"
 
 echo "--- 1. shell config"
 H="$(build_home)"
@@ -296,7 +299,7 @@ printf 'source "$HOME/.bashrc.local"\n. ~/.bashrc\n' >"$H/.bash_profile"
 doctor "$H"
 assert_eq "2.9 a .bashrc.local line does not hide a real .bashrc line: exit 0" 0 "$RC"
 
-echo "--- 3. the nine ~/.claude links"
+echo "--- 3. the eight ~/.claude links"
 for name in $NAMES; do
 	H="$(build_home)"
 	rm "$H/.claude/$name"
@@ -446,10 +449,30 @@ mkdir -p "$HF/.claude"
 SNAPF="$(snapshot "$HF")"
 doctor "$HF"
 assert_eq "8.1 exit code 1" 1 "$RC"
-# 1 bashrc + 1 login + 9 links + 1 plugin list + 1 host key. Check 7 adds none: no settings.json to read.
-assert_eq "8.2 thirteen MISSING lines" 13 "$(miss_count)"
-assert_eq "8.3 summary counts the same gaps" "doctor: 13 missing" "$(printf '%s\n' "$OUT" | tail -n 1)"
+# 1 bashrc + 1 login + 8 links + 1 plugin list + 1 host key. Check 7 adds none: no settings.json to read.
+assert_eq "8.2 twelve MISSING lines" 12 "$(miss_count)"
+assert_eq "8.3 summary counts the same gaps" "doctor: 12 missing" "$(printf '%s\n' "$OUT" | tail -n 1)"
 assert_eq "8.4 the HOME is unchanged" "$SNAPF" "$(snapshot "$HF")"
+assert_eq "8.5 the absent memory folder is a WARN, not a gap" 1 "$(printf '%s\n' "$OUT" | grep -c '^WARN ~/.claude/memory (absent): ' || true)"
+
+echo "--- 9. the local memory folder"
+# The repo stops tracking claude/memory/, so ~/.claude/memory is a real folder on each machine. A new
+# machine has no memory yet, so an absent folder is a WARN. A link is the state before install.sh
+# converts it, so it is a WARN too. Neither counts as missing.
+warn_lines() { printf '%s\n' "$OUT" | grep '^WARN ' || true; }
+H="$(build_home)"
+rm -r "$H/.claude/memory"
+doctor "$H"
+assert_eq "9.1 absent: exit code 0" 0 "$RC"
+assert_eq "9.2 absent: the one WARN line" "WARN ~/.claude/memory (absent): $FIX_LINKS" "$(warn_lines)"
+assert_eq "9.3 absent: summary line" "doctor: 0 missing" "$(printf '%s\n' "$OUT" | tail -n 1)"
+H="$(build_home)"
+mv "$H/.claude/memory" "$H/anaiis-dotfiles/claude/memory"
+ln -s "$H/anaiis-dotfiles/claude/memory" "$H/.claude/memory"
+doctor "$H"
+assert_eq "9.4 old link: exit code 0" 0 "$RC"
+assert_eq "9.5 old link: the one WARN line" "WARN ~/.claude/memory (a link, not a local folder): $FIX_LINKS" "$(warn_lines)"
+assert_eq "9.6 old link: no ok line for the folder" 0 "$(printf '%s\n' "$OUT" | grep -c '^ok ~/.claude/memory' || true)"
 
 if [ -n "${COV:-}" ]; then
 	cov_end

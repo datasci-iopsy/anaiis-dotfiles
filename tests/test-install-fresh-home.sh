@@ -114,6 +114,9 @@ assert_eq "1.9 gh protocol https: no .ssh folder is created" no "$([ -e "$H/.ssh
 assert_eq "1.10 no CLAUDE.md link is created (rules/context.md replaces it)" no \
 	"$([ -L "$H/.claude/CLAUDE.md" ] || [ -e "$H/.claude/CLAUDE.md" ] && echo yes || echo no)"
 assert_eq "1.11 the first run prints nothing about CLAUDE.md" 0 "$(printf '%s\n' "$FIRST_OUT" | grep -c 'CLAUDE\.md')"
+assert_eq "1.12 ~/.claude/memory is a real folder, not a link" yes \
+	"$([ -d "$H/.claude/memory" ] && [ ! -L "$H/.claude/memory" ] && echo yes || echo no)"
+assert_eq "1.13 the new memory folder holds a MEMORY.md index" yes "$([ -f "$H/.claude/memory/MEMORY.md" ] && echo yes || echo no)"
 
 echo "--- 2. the links point at the main checkout"
 # install.sh takes the first entry of git worktree list as canonical. Outside git, the repo itself.
@@ -150,7 +153,8 @@ okl() { printf '%s\n' "$OUT" | grep -c "$1"; }
 assert_eq "4.1 ok for the PATH line" 1 "$(okl '^ok ~/.bashrc PATH line$')"
 assert_eq "4.2 ok for the shared.bash line" 1 "$(okl '^ok ~/.bashrc shared.bash line$')"
 assert_eq "4.3 ok for the login shell file" 1 "$(okl '^ok ~/.bash_profile mentions ~/.bashrc$')"
-assert_eq "4.4 ok for all nine links" 9 "$(okl '^ok ~/.claude/[a-z.]* -> ~/anaiis-dotfiles/claude$')"
+assert_eq "4.4 ok for all eight links" 8 "$(okl '^ok ~/.claude/[a-z.]* -> ~/anaiis-dotfiles/claude$')"
+assert_eq "4.12 ok for the local memory folder" 1 "$(okl '^ok ~/.claude/memory (local folder)$')"
 assert_eq "4.5 one MISSING line per enabled plugin" "$ENABLED" "$(okl '^MISSING plugin ')"
 assert_eq "4.6 no other MISSING line (check 7 adds GAP lines)" "$((ENABLED + GAP))" "$(okl '^MISSING ')"
 assert_eq "4.7 the host key is not needed for https" 1 "$(okl '^ok github.com host key (not needed: gh protocol is https)$')"
@@ -254,6 +258,64 @@ assert_eq "7.6 context.md added, run again: exit code is 0" 0 "$RC"
 assert_eq "7.7 context.md added, run again: the link is removed" no \
 	"$([ -L "$H7/.claude/CLAUDE.md" ] || [ -e "$H7/.claude/CLAUDE.md" ] && echo yes || echo no)"
 assert_eq "7.8 context.md added, run again: one unlink line names the link" 1 "$(printf '%s\n' "$OUT" | grep -c "^  unlink $H7/.claude/CLAUDE.md ")"
+
+echo "--- 8. a memory link becomes a local folder with the same data"
+# The repo stops tracking claude/memory/. After that, a git pull deletes the data behind a link, so
+# install.sh copies the data into a real folder and then removes the link. It never deletes data.
+H8="$(mktemp -d "$TMPD/home.XXXXXX")"
+SRC8="$TMPD/fx8-memory"
+mkdir -p "$H8/.claude" "$SRC8"
+printf '# Global Memory Index\n\n- [Profile](user_profile.md): fixture\n' >"$SRC8/MEMORY.md"
+printf -- '---\nname: user-profile\ndescription: fixture\ntype: user\n---\n\nfixture body\n' >"$SRC8/user_profile.md"
+ln -s "$SRC8" "$H8/.claude/memory"
+run_links "$H8"
+assert_eq "8.1 link: exit code is 0" 0 "$RC"
+assert_eq "8.2 link: the path is now a real folder" yes \
+	"$([ -d "$H8/.claude/memory" ] && [ ! -L "$H8/.claude/memory" ] && echo yes || echo no)"
+assert_eq "8.3 link: the folder holds the same files, byte for byte" "" "$(diff -r "$SRC8" "$H8/.claude/memory" 2>&1)"
+assert_eq "8.5 link: the old target keeps its two files" 2 "$(find "$SRC8" -mindepth 1 | wc -l | tr -d ' ')"
+assert_eq "8.6 link: one migrated line names the path" 1 "$(printf '%s\n' "$OUT" | grep -c "^  migrated $H8/.claude/memory ")"
+assert_eq "8.7 link: no temp folder is left next to it" "" "$(find "$H8/.claude" -maxdepth 1 -name 'memory.*')"
+SNAP8="$(snapshot "$H8")"
+run_links "$H8"
+assert_eq "8.8 second run: exit code is 0" 0 "$RC"
+assert_eq "8.9 second run: one ok line for the local folder" 1 \
+	"$(printf '%s\n' "$OUT" | grep -c "^  ok   $H8/.claude/memory (local folder)$")"
+assert_eq "8.10 second run: no change line" 0 "$(printf '%s\n' "$OUT" | grep -cE "$CHANGE_RE")"
+assert_eq "8.11 second run: the HOME snapshot is identical" "$SNAP8" "$(snapshot "$H8")"
+
+echo "--- 9. a dangling memory link"
+# The data is gone, so install.sh cannot copy it. It names the git command that recovers the index.
+H9="$(mktemp -d "$TMPD/home.XXXXXX")"
+mkdir -p "$H9/.claude"
+ln -s "$TMPD/no-such-memory" "$H9/.claude/memory"
+run_links "$H9"
+assert_eq "9.1 dangling: exit code is 0" 0 "$RC"
+assert_eq "9.2 dangling: the path is now a real folder" yes \
+	"$([ -d "$H9/.claude/memory" ] && [ ! -L "$H9/.claude/memory" ] && echo yes || echo no)"
+assert_eq "9.3 dangling: the folder is empty" "" "$(find "$H9/.claude/memory" -mindepth 1 2>&1)"
+assert_eq "9.4 dangling: one WARN line names the recovery command" 1 \
+	"$(printf '%s\n' "$OUT" | grep -c "^  WARN $H9/.claude/memory .*git -C .* show HEAD:claude/memory/MEMORY\.md")"
+
+H9="$(mktemp -d "$TMPD/home.XXXXXX")"
+mkdir -p "$H9/.claude"
+printf 'mine\n' >"$H9/.claude/memory"
+run_links "$H9"
+assert_eq "9.5 a regular file: exit code is 0" 0 "$RC"
+assert_eq "9.6 a regular file: the file and its text stay" mine "$(cat "$H9/.claude/memory")"
+assert_eq "9.7 a regular file: one SKIP line names it" 1 "$(printf '%s\n' "$OUT" | grep -c "^  SKIP $H9/.claude/memory ")"
+
+echo "--- 10. a link to another folder is replaced, not followed"
+# Without ln -n, ln follows a link to a folder and makes a stray link inside that folder
+# (an integration run made claude/rules/rules in a worktree this way).
+H10="$(mktemp -d "$TMPD/home.XXXXXX")"
+OTHER10="$(mktemp -d "$TMPD/other.XXXXXX")"
+mkdir -p "$H10/.claude"
+ln -s "$OTHER10" "$H10/.claude/rules"
+run_links "$H10"
+assert_eq "10.1 exit code is 0" 0 "$RC"
+assert_eq "10.2 ~/.claude/rules now resolves into the main checkout" "$MAIN/claude/rules" "$(cd "$H10/.claude/rules" && pwd -P)"
+assert_eq "10.3 the other folder holds no new entry" "" "$(ls -A "$OTHER10")"
 
 if [ -n "${COV:-}" ]; then
 	cov_end

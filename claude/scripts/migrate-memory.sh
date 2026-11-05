@@ -43,7 +43,6 @@ SCRIPT_REAL="$(realpath "${BASH_SOURCE[0]}")"
 DOTFILES="$(cd "$(dirname "$SCRIPT_REAL")/../.." && pwd)"
 PROJECTS_DIR="$HOME/.claude/projects"
 GLOBAL_DIR="$HOME/.claude/memory"
-GLOBAL_TEMPLATES="$DOTFILES/claude/memory-templates/global"
 
 # Heuristic for which memory files are user-level (live once globally).
 USER_LEVEL_PATTERNS=(
@@ -103,14 +102,12 @@ action() {
 	fi
 }
 
-# ── 1. Bootstrap global tier from templates if absent ─────────────────────
+# ── 1. Create the global tier with an empty index if absent ───────────────
 if [ ! -d "$GLOBAL_DIR" ]; then
-	action "create $GLOBAL_DIR (from templates)"
+	action "create $GLOBAL_DIR (empty MEMORY.md index)"
 	if ! $DRY_RUN; then
 		mkdir -p "$GLOBAL_DIR"
-		if [ -d "$GLOBAL_TEMPLATES" ]; then
-			cp "$GLOBAL_TEMPLATES"/*.md "$GLOBAL_DIR/" 2>/dev/null || true
-		fi
+		printf '# Global Memory Index\n' >"$GLOBAL_DIR/MEMORY.md"
 	fi
 fi
 

@@ -20,10 +20,15 @@
 #   SKIP_JSON_LINT=1  git commit  -- skip JSON format check
 #   SKIP_SHFMT=1      git commit  -- skip shell format check
 #   SKIP_SQLFMT=1     git commit  -- skip SQL format check
+#   SKIP_EMAIL_CHECK=1 git commit -- skip the noreply email check (owner only)
 
 set -euo pipefail
 
 SCRIPTS="$HOME/.claude/scripts"
+
+# Identity first: in a repo with .require-noreply-email, reject a commit whose
+# author or committer email is not a GitHub noreply address.
+bash "$SCRIPTS/noreply-email-check.sh" staged
 
 bash "$SCRIPTS/r-lint-staged.sh"
 bash "$SCRIPTS/ruff-lint-staged.sh"
