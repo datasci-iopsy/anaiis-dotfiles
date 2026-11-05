@@ -131,7 +131,7 @@ assert_eq "4.3 NOTICE holds one copyright line for the holder" "Copyright 2026 A
 	"$(grep '^Copyright ' "$REPO_DIR/NOTICE" 2>/dev/null)"
 assert_eq "4.4 NOTICE holds no placeholder" 0 "$(grep -c '[][<>]' "$REPO_DIR/NOTICE" 2>/dev/null || true)"
 assert_eq "4.5 README.md has a License section that excludes the plugins" "yes" \
-	"$(sed -n '/^## License$/,/^## /p' "$REPO_DIR/README.md" | grep -q 'anaiis-plugins' && echo yes || echo no)"
+	"$(sed -n '/^## License$/,/^## /p' "$REPO_DIR/README.md" | grep -q 'anaiis-plugins.*not part of this repo' && echo yes || echo no)"
 
 printf '\ntest-public-tree: %s passed, %s failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
