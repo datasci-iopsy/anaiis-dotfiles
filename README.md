@@ -525,4 +525,4 @@ install.packages(c("lintr", "styler", "languageserver"))
 
 Anaiis LLC licenses this repo under the Apache License 2.0. The full text is in `LICENSE`.
 If you redistribute this work, keep the attribution notice in `NOTICE`, as section 4(d) of the license requires.
-The license covers this repo only. `anaiis-plugins` and any other plugin system have their own license and are not part of this repo.
+The license covers this repo only. `anaiis-plugins` and any other plugin marketplace this repo registers are not part of this repo and are not covered by this license; see each source repo for its terms.
