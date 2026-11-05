@@ -57,6 +57,7 @@ n@[A-Za-z0-9_-]+\.md'
 # old_repo_hits <repo_dir>: print "<file>:<line>" for each tracked line that names the old repo.
 old_repo_hits() {
 	git -C "$1" grep -I -n -i -F -e "$OLD_REPO" -- . ":(exclude)$SELF" | cut -d: -f1,2
+	git -C "$1" ls-files | grep -i -F -e "$OLD_REPO" | sed 's/$/:path/'
 }
 
 # email_hits <repo_dir>: print "<file>:<line>:<address>" for each address outside the allowlist.
@@ -69,8 +70,11 @@ email_hits() {
 # employer_hits <repo_dir> <terms_file>: print "<file>:<line>" for each tracked line that holds a
 # term. Lines of only spaces in the terms file are dropped: " " would match most lines.
 # cut drops the line text, so the term never reaches the output.
+# A tracked path that holds a term is reported as "path-index:<n>", the line of git ls-files, so the
+# path (which would show the term) never reaches the output.
 employer_hits() {
 	grep -v '^[[:space:]]*$' "$2" | git -C "$1" grep -I -n -i -F -f - | cut -d: -f1,2
+	git -C "$1" ls-files | grep -n -i -F -f <(grep -v '^[[:space:]]*$' "$2") | cut -d: -f1 | sed 's/^/path-index:/'
 }
 
 # ── 0. Each scanner reports a planted hit (fail-to-fail) ───────────────────
@@ -102,6 +106,19 @@ assert_eq "0.3 the hit output does not hold the term" 0 "$(printf '%s\n' "$OUT" 
 printf '%s\n' 'old home: github.com/DataSci-IOPSY/Anaiis-Dotfiles' >"$FIX/repo.txt"
 git -C "$FIX" add repo.txt
 assert_eq "0.4 a mention of the old repo is found without case" "repo.txt:1" "$(old_repo_hits "$FIX")"
+
+mkdir -p "$FIX/zz-fake-employer-notes" "$FIX/datasci-iopsy"
+printf '%s\n' 'harmless' >"$FIX/zz-fake-employer-notes/x.md"
+printf '%s\n' 'harmless' >"$FIX/datasci-iopsy/anaiis-dotfiles-notes.md"
+git -C "$FIX" add zz-fake-employer-notes datasci-iopsy
+OUT="$(employer_hits "$FIX" "$FIX/terms.txt")"
+assert_eq "0.5 a term in a tracked path is reported by index, not by name" \
+	"notes.txt:2
+path-index:$(git -C "$FIX" ls-files | grep -n -i -F zz-fake-employer | cut -d: -f1)" "$OUT"
+assert_eq "0.6 the path hit output does not hold the term" 0 "$(printf '%s\n' "$OUT" | grep -ci 'fake-employer')"
+assert_eq "0.7 the old repo in a tracked path is found" \
+	"repo.txt:1
+datasci-iopsy/anaiis-dotfiles-notes.md:path" "$(old_repo_hits "$FIX")"
 
 # ── 1. The old repo is not named ───────────────────────────────────────────
 echo "# 1. No tracked file names the old repo"
