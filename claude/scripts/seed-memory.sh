@@ -2,9 +2,8 @@
 # Seeds Claude PROJECT-tier memory files for the current project from
 # templates. Run from the project root after cloning on a new machine.
 #
-# The GLOBAL memory tier needs no seeding: it is git-tracked in the dotfiles
-# repo at claude/memory/ and symlinked to ~/.claude/memory by install.sh.
-# Verify with: [ -L ~/.claude/memory ]
+# The GLOBAL memory tier needs no seeding: install.sh makes ~/.claude/memory
+# a local folder with a MEMORY.md index. Verify with: [ -d ~/.claude/memory ]
 #
 # Usage: bash ~/.claude/scripts/seed-memory.sh
 
@@ -13,15 +12,6 @@ set -euo pipefail
 SCRIPT_REAL="$(realpath "${BASH_SOURCE[0]}")"
 DOTFILES="$(cd "$(dirname "$SCRIPT_REAL")/../.." && pwd)"
 TEMPLATES="$DOTFILES/claude/memory-templates"
-
-if [ ! -L "$HOME/.claude/memory" ]; then
-	echo "warning: ~/.claude/memory is not a symlink into the dotfiles repo." >&2
-	echo "         Run install.sh (and merge any local files into claude/memory/ first)." >&2
-elif ! _mem_target="$(realpath "$HOME/.claude/memory" 2>/dev/null)" \
-	|| [ "$_mem_target" != "$DOTFILES/claude/memory" ]; then
-	echo "warning: ~/.claude/memory symlink does not point to $DOTFILES/claude/memory." >&2
-	echo "         Resolved: ${_mem_target:-unresolvable}. Run install.sh to fix." >&2
-fi
 
 # ── Project tier ───────────────────────────────────────────────────────────
 PROJECT_PATH="$(pwd)"
