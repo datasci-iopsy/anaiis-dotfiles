@@ -155,6 +155,8 @@ The old CodeRabbit wrapper for the `claude` command was removed on 2026-05-11. `
 
 ### 4. Start Claude Code and reload the plugins
 
+**Warning.** Install Homebrew bash before the first start. `settings.json` pins `/opt/homebrew/bin/bash`, and every `PreToolUse` guard blocks when that file is absent. Claude Code then denies each Read, Write, Edit, and Bash call, including the call that would install bash. Run `brew install bash` in a terminal outside Claude Code. The same command recovers a machine that is locked out. To install every Brewfile entry, run `bash ~/anaiis-dotfiles/claude/scripts/brew-sync.sh install`.
+
 Start Claude Code once in a trusted folder. Then run `/reload-plugins` inside Claude Code. The plugins and their marketplaces come from `claude/settings.json` (`enabledPlugins`, `extraKnownMarketplaces`). If a plugin does not load, read the Errors tab of `/plugin`. A GitHub clone over SSH needs the host key from step 2.
 
 ### 5. Run the doctor
