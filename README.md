@@ -63,6 +63,7 @@ anaiis-dotfiles/
 ├── tests/
 │   ├── fixtures/                   Test fixture files
 │   ├── lib/                        Test helpers: fresh-home.sh (throwaway HOME), cov.sh (approximate line coverage from xtrace)
+│   ├── e2e-local-memory.sh         Opt-in (`E2E=1`) check that a real `claude -p` session loads global memory from a local `~/.claude/memory` folder
 │   ├── e2e-nested-session.sh       Opt-in (`E2E=1`) hook checks in real nested `claude -p` sessions; `E2E_OLD_REF=<ref>` replays them against older hooks
 │   ├── measure-memory-injection.sh  Memory injection overhead measurement
 │   ├── measure-userpromptsubmit.sh  Hook-latency measurement (run when chain grows)
