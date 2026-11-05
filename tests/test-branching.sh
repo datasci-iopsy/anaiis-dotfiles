@@ -127,7 +127,8 @@ echo "# 3. block message suggests branching first"
 run_block_hook "main" >/dev/null 2>/tmp/block-hook.stderr || true
 STDERR=$(cat /tmp/block-hook.stderr)
 assert_contains "3.1 message suggests branch first" "git checkout -b claude-<type>/<ticket>-<short-description>" "$STDERR"
-assert_contains "3.2 message offers worktree for parallel work only" "parallel work only" "$STDERR"
+assert_contains "3.2 message points to the worktree criteria in rules/git.md" "Worktree or branch in place" "$STDERR"
+assert_contains "3.2b message names the three reasons for a worktree" "live config, foreign changes, or parallel streams" "$STDERR"
 assert_contains "3.3 message mentions git worktree add" "git worktree add" "$STDERR"
 
 # ── 4. block-edit-on-main plans exemption ────────────────────────────────

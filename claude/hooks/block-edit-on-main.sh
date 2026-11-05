@@ -35,7 +35,7 @@ if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
 
 	echo "[block-edit-on-main] BLOCKED: refusing to edit '${FILE}' on branch '${BRANCH}'." >&2
 	echo "Branch first: git checkout -b claude-<type>/<ticket>-<short-description>" >&2
-	echo "Worktree (explicit parallel work only): git worktree add ../<repo>.worktrees/<topic> -b claude-<type>/<ticket>-<topic>" >&2
+	echo "Worktree (live config, foreign changes, or parallel streams; see rules/git.md, section 'Worktree or branch in place'): git worktree add <path> -b claude-<type>/<ticket>-<topic>" >&2
 	exit 2
 fi
 
