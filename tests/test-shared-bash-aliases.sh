@@ -111,8 +111,11 @@ done
 
 echo "--- fail-to-fail: broken copies of shared.bash are reported"
 # 2.1: one opus alias names another model than the export.
-sed '/^alias claude-opus-turbo=/s/claude-opus-5-5/claude-opus-4-6/' "$SHARED_BASH" >"$TMPD/stale-alias.bash"
-assert_eq "2.1 an alias with a stale model id is reported" "claude-opus-turbo: model 'claude-opus-4-6', expected 'claude-opus-5-5'" \
+opus_id="$(dump "$(command -v bash)" "$SHARED_BASH" | sed -n 's/^EXPORT ANTHROPIC_DEFAULT_OPUS_MODEL=//p')"
+stale_id="claude-opus-4-6"
+[ "$stale_id" = "$opus_id" ] && stale_id="claude-opus-4-7"
+sed "/^alias claude-opus-turbo=/s/$opus_id/$stale_id/" "$SHARED_BASH" >"$TMPD/stale-alias.bash"
+assert_eq "2.1 an alias with a stale model id is reported" "claude-opus-turbo: model '$stale_id', expected '$opus_id'" \
 	"$(check_rows "$(command -v bash)" "$TMPD/stale-alias.bash")"
 # 2.2: the export moves on and the aliases stay behind.
 sed 's/^export ANTHROPIC_DEFAULT_OPUS_MODEL=.*/export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-9-9"/' "$SHARED_BASH" >"$TMPD/stale-export.bash"
@@ -126,8 +129,8 @@ assert_eq "2.2 a bumped export leaves three opus aliases reported" 3 \
 assert_eq "2.3 an alias without a row is reported" "claude-extra: defined but has no row in this test" \
 	"$(check_rows "$(command -v bash)" "$TMPD/extra-alias.bash")"
 # 2.4: an alias without the --model flag would not beat the exported ANTHROPIC_MODEL.
-sed "/^alias claude-opus=/s/ --model claude-opus-5-5//" "$SHARED_BASH" >"$TMPD/no-flag.bash"
-assert_eq "2.4 an alias without --model is reported" "claude-opus: model '', expected 'claude-opus-5-5'" \
+sed "/^alias claude-opus=/s/ --model $opus_id//" "$SHARED_BASH" >"$TMPD/no-flag.bash"
+assert_eq "2.4 an alias without --model is reported" "claude-opus: model '', expected '$opus_id'" \
 	"$(check_rows "$(command -v bash)" "$TMPD/no-flag.bash")"
 
 echo ""
