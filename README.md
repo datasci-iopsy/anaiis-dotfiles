@@ -89,6 +89,7 @@ anaiis-dotfiles/
 │   ├── test-migrate-memory-guard.sh  migrate-memory.sh dry-run-default and template-stub-refusal assertions
 │   ├── test-no-stale-refs.sh       No tracked file names a removed thing; README.md and AGENTS.md name only tracked repo paths
 │   ├── test-post-edit-lint-dispatch.sh  PostToolUse lint hook dispatch tests
+│   ├── test-public-tree.sh         No tracked file names the old repo, a private email address, or an employer term
 │   ├── test-r-lint-staged.sh       r-lint-staged.sh assertions
 │   ├── test-repo-hook-install.sh   install-repo-hooks.sh and ensure-repo-hooks.sh: three hooks in a plain repo, a linked worktree, and a core.hooksPath repo
 │   ├── test-rules-integrity.sh     rules-doctor.sh passes a green tree and names each targeted check when every drift is applied at once
