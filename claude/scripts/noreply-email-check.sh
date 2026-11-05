@@ -28,63 +28,53 @@ ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 [ -f "$ROOT/.require-noreply-email" ] || exit 0
 
 NOREPLY_RE='^([0-9]+\+)?[A-Za-z0-9][A-Za-z0-9-]*(\[bot\])?@users\.noreply\.github\.com$'
+bad=0
 
-is_noreply() {
-	[ "$1" = "noreply@github.com" ] && return 0
-	[[ "$1" =~ $NOREPLY_RE ]]
-}
-
-reject() { # <what> <address>
+check() { # <what> <address>: report the address and set bad=1 when it is not noreply
+	[ "$2" = "noreply@github.com" ] && return 0
+	[[ "$2" =~ $NOREPLY_RE ]] && return 0
 	printf 'noreply-email-check: %s uses "%s", which is not a GitHub noreply address.\n' "$1" "$2" >&2
-	printf 'This repo requires one (.require-noreply-email). Fix the identity, then redo the commit:\n' >&2
-	printf '  git config user.email <id>+<login>@users.noreply.github.com\n' >&2
-	printf '  git commit --amend --reset-author --no-edit\n' >&2
-	printf 'Bypass for one command (owner only): SKIP_EMAIL_CHECK=1\n' >&2
+	bad=1
 }
 
 case "$MODE" in
 	staged)
-		bad=0
 		for field in GIT_AUTHOR_IDENT GIT_COMMITTER_IDENT; do
-			ident="$(git var "$field" 2>/dev/null || true)"
-			email="${ident#*<}"
-			email="${email%%>*}"
-			if [ -z "$ident" ] || ! is_noreply "$email"; then
-				reject "the next commit's $field" "$email"
-				bad=1
-			fi
+			# An unknown identity gives an empty email, which check rejects.
+			email="$(git var "$field" 2>/dev/null || true)"
+			email="${email#*<}"
+			check "the next commit's $field" "${email%%>*}"
 		done
-		exit "$bad"
 		;;
 	push)
-		ZERO=0000000000000000000000000000000000000000
-		bad=0
+		ZERO_SHA=0000000000000000000000000000000000000000
 		while read -r _local_ref local_sha _remote_ref remote_sha; do
-			[ -n "${local_sha:-}" ] || continue
-			[ "$local_sha" = "$ZERO" ] && continue
-			if [ "$remote_sha" != "$ZERO" ] && git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
-				commits="$(git log --format='%H %ae %ce' "$remote_sha..$local_sha")"
-			else
-				commits="$(git log --format='%H %ae %ce' "$local_sha" --not --remotes)"
+			case "$local_sha" in "" | "$ZERO_SHA") continue ;; esac
+			# Skip what the remote has: its old tip when this clone holds it, else every remote ref.
+			known=--remotes
+			if [ "$remote_sha" != "$ZERO_SHA" ] && git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+				known="$remote_sha"
 			fi
+			commits="$(git log --format='%H %ae %ce' "$local_sha" --not "$known")"
 			while read -r sha ae ce; do
-				[ -n "${sha:-}" ] || continue
-				if ! is_noreply "$ae"; then
-					reject "commit ${sha:0:12} (author)" "$ae"
-					bad=1
-				fi
-				if ! is_noreply "$ce"; then
-					reject "commit ${sha:0:12} (committer)" "$ce"
-					bad=1
-				fi
+				[ -n "$sha" ] || continue
+				check "commit ${sha:0:12} (author)" "$ae"
+				check "commit ${sha:0:12} (committer)" "$ce"
 			done <<EOF
 $commits
 EOF
 		done
-		exit "$bad"
 		;;
 	*)
 		echo "Usage: noreply-email-check.sh <staged|push>" >&2
 		exit 2
 		;;
 esac
+
+if [ "$bad" -eq 1 ]; then
+	printf 'This repo requires one (.require-noreply-email). Fix the identity, then redo the commit:\n' >&2
+	printf '  git config user.email <id>+<login>@users.noreply.github.com\n' >&2
+	printf '  git commit --amend --reset-author --no-edit\n' >&2
+	printf 'Bypass for one command (owner only): SKIP_EMAIL_CHECK=1\n' >&2
+fi
+exit "$bad"
