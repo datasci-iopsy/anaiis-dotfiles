@@ -46,7 +46,6 @@ done
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SETTINGS="${SETTINGS:-$REPO_DIR/claude/settings.json}"
 MODEL="${E2E_MODEL:-haiku}"
-CLAUDE="$(command -v claude)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -68,7 +67,7 @@ start_case() {
 	git -C "$d/repo" config user.email "$LOCAL_EMAIL"
 	jq --argjson extra "$2" '{env: ((.env // {}) + $extra)}' "$SETTINGS" >"$d/settings.json"
 	(cd "$d/repo" && env -u GIT_AUTHOR_NAME -u GIT_AUTHOR_EMAIL -u GIT_COMMITTER_NAME -u GIT_COMMITTER_EMAIL \
-		"$CLAUDE" -p --setting-sources project --settings "$d/settings.json" --model "$MODEL" \
+		claude -p --setting-sources project --settings "$d/settings.json" --model "$MODEL" \
 		--no-session-persistence --allowedTools "Bash" --output-format stream-json --verbose \
 		"Use the Bash tool to run exactly this command and nothing else: $TOOL_CMD   Then reply done." \
 		>"$d/stream.jsonl" 2>"$d/stderr.txt") &
