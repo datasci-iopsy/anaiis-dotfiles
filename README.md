@@ -32,6 +32,8 @@ anaiis-dotfiles/
 ├── install.sh                      Symlinks claude/* into ~/.claude/; wires the shell config; adds GitHub host keys
 ├── README.md                       This file
 ├── AGENTS.md                       Project instructions for Claude Code sessions in this repo
+├── LICENSE                         Apache License 2.0
+├── NOTICE                          Attribution notice that Apache-2.0 section 4(d) makes a redistributor keep
 ├── Brewfile                        Homebrew formulae, casks, taps; the daily refresh in shared.bash only adds entries
 ├── .conventional-commits           Opt-in marker: turns on the commit message lint in this repo
 ├── .require-noreply-email          Opt-in marker: commits here must use a GitHub noreply email
@@ -516,3 +518,11 @@ install.packages(c("lintr", "styler", "languageserver"))
 2. Add a `symlink` line to `install.sh`.
 3. Run `install.sh` once to create the new symlink.
 4. Commit and push.
+
+---
+
+## License
+
+Anaiis LLC licenses this repo under the Apache License 2.0. The full text is in `LICENSE`.
+If you redistribute this work, keep the attribution notice in `NOTICE`, as section 4(d) of the license requires.
+The license covers this repo only. `anaiis-plugins` and any other plugin system have their own license and are not part of this repo.
