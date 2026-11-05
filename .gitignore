@@ -26,7 +26,7 @@ Brewfile.lock.json
 # Misc
 _archive
 
-# Ephemeral planning artifacts (persisted in ~/.claude/plans/ instead)
+# Planning artifacts: spec/ and tasks/ exist only in the main checkout (see claude/rules/work-tracking.md)
 spec/
 tasks/
 
