@@ -14,14 +14,14 @@
 # transcript state because each state is a distinct regression fixture.
 #
 # Hermetic by construction. The doctor derives its repo root from its own
-# path and its global tier from $HOME/.claude/memory, and check A.1 requires
-# the second to be a symlink into the first. So every run here points the
-# doctor at a throwaway copy of claude/memory and claude/hooks (via
-# MEMORY_DOCTOR_REPO_DIR) under a throwaway HOME whose .claude/memory links
-# into that copy, with MEMORY_DOCTOR_TRANSCRIPTS_DIR set on every run. The
-# real ~/.claude tree, the real git-tracked claude/memory/, and this
-# machine's session transcripts are never read or written, so results are
-# identical on a loaded dev machine and on a clean CI runner.
+# path and its global tier from $HOME/.claude/memory. So every run here
+# points the doctor at a throwaway copy of claude/hooks (via
+# MEMORY_DOCTOR_REPO_DIR) under a throwaway HOME whose .claude/memory is a
+# real folder built from a synthetic fixture, with
+# MEMORY_DOCTOR_TRANSCRIPTS_DIR set on every run. The real ~/.claude tree,
+# the repo's claude/memory/, and this machine's session transcripts are
+# never read or written, so results are identical on a loaded dev machine
+# and on a clean CI runner.
 #
 # Usage: bash tests/test-memory-doctor-guardrails.sh
 
@@ -67,10 +67,8 @@ assert_not_contains() {
 }
 
 # ── Fixture: throwaway repo copy + throwaway HOME ──────────────────────────
-# Resolve the fixture root with pwd -P once: macOS mktemp returns a
-# /var/folders path that resolves to /private/var, and the doctor's A.1
-# compares the resolved symlink target against $REPO_DIR/claude/memory as a
-# string, so both sides must already be in resolved form.
+# Resolve the fixture root with pwd -P once, so every path below is in
+# resolved form (macOS mktemp returns a /var/folders path under /private/var).
 WORK="$(cd "$(mktemp -d)" && pwd -P)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -79,13 +77,22 @@ TMP_HOME="$WORK/home"
 TMP_TRANSCRIPTS="$WORK/transcripts"
 OUT_DIR="$WORK/out"
 mkdir -p "$TMP_REPO/claude" "$TMP_HOME/.claude/projects" "$TMP_TRANSCRIPTS" "$OUT_DIR"
-cp -R "$REPO_DIR/claude/memory" "$TMP_REPO/claude/memory"
 cp -R "$REPO_DIR/claude/hooks" "$TMP_REPO/claude/hooks"
-ln -s "$TMP_REPO/claude/memory" "$TMP_HOME/.claude/memory"
 
 GLOBAL_DIR="$TMP_HOME/.claude/memory"
 INDEX="$GLOBAL_DIR/MEMORY.md"
 PROJECTS_DIR="$TMP_HOME/.claude/projects"
+
+# make_global: build the global tier as a real folder from a synthetic
+# fixture that passes every check: one topical file with full frontmatter,
+# linked from the index, small enough for the payload budget.
+make_global() {
+	mkdir -p "$GLOBAL_DIR"
+	printf '# Global Memory Index\n\n- [Fixture fact](feedback_fixture_fact.md): a synthetic fact\n' >"$INDEX"
+	printf -- '---\nname: fixture-fact\ndescription: a synthetic fact\nmetadata:\n  type: feedback\n---\n\nfixture body\n' \
+		>"$GLOBAL_DIR/feedback_fixture_fact.md"
+}
+make_global
 
 # run_doctor <outfile> [transcripts-dir]: every doctor invocation goes
 # through here so no run can fall back to the real HOME, repo, or transcripts.
@@ -97,24 +104,34 @@ run_doctor() {
 		bash "$DOCTOR" >"$out" 2>&1
 }
 
-# Reset the throwaway memory copy to the real tree's content. The HOME-side
-# symlink points at the directory path, so replacing the directory's
-# contents keeps the link valid.
+# Reset the global tier to the synthetic fixture.
 restore_global() {
-	rm -rf "$TMP_REPO/claude/memory"
-	cp -R "$REPO_DIR/claude/memory" "$TMP_REPO/claude/memory"
+	rm -rf "$GLOBAL_DIR"
+	make_global
 }
 
 # ── 0. Doctor passes on the green tree ────────────────────────────────────
 echo "# 0. Doctor on green tree"
 run_doctor "$OUT_DIR/green.out"
 assert "0.1 doctor exits 0 on green tree" "0" "$?"
+assert "0.2 the global tier is a real folder, not a link" "yes" \
+	"$([ -d "$GLOBAL_DIR" ] && [ ! -L "$GLOBAL_DIR" ] && echo yes || echo no)"
+assert_contains "0.3 A.1 passes for a real folder" "  PASS  A.1 " "$(cat "$OUT_DIR/green.out")"
+# A profile that has not run install.sh yet still has a link. A.1 accepts a
+# link to a folder that holds MEMORY.md, wherever the link points.
+mv "$GLOBAL_DIR" "$WORK/linked-memory"
+ln -s "$WORK/linked-memory" "$GLOBAL_DIR"
+run_doctor "$OUT_DIR/link.out"
+assert "0.4 doctor exits 0 when the global tier is a link" "0" "$?"
+assert_contains "0.5 A.1 passes for a link" "  PASS  A.1 " "$(cat "$OUT_DIR/link.out")"
+rm "$GLOBAL_DIR"
+mv "$WORK/linked-memory" "$GLOBAL_DIR"
 
 # ── 1. Every drift fixture at once (checks I, J.1, J.2, K, L, M) ──────────
 echo "# 1. Every drift fixture applied at once"
-# I: a project-tier file sharing a basename with a global file. GLOBAL_DIR
-# is a symlink; use a glob, not find (BSD find won't descend into a symlink
-# given as its own starting argument).
+# I: a project-tier file sharing a basename with a global file. Use a glob,
+# not find: BSD find does not descend into a symlink given as its own
+# starting argument, and GLOBAL_DIR can be a link on an old profile.
 T1_PROJ=$(mktemp -d)
 T1_KEY=$(printf '%s' "$T1_PROJ" | tr '/.' '-')
 T1_MEM="$PROJECTS_DIR/$T1_KEY/memory"

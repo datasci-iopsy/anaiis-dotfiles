@@ -9,7 +9,7 @@
 # script is grep-able from a higher-level test or schedule.
 #
 # Checks:
-#   A. Global tier is a symlink resolving into the dotfiles repo, and indexed.
+#   A. Global tier is a folder (a local folder, or an old link) with a MEMORY.md index.
 #   B. Each topical file has valid frontmatter (name, description, and a
 #      type field either top-level or nested under metadata:).
 #   C. Each project memory dir has a handoffs/ subdir; bounded ≤5.
@@ -37,8 +37,7 @@ set -u
 SCRIPT_REAL="$(realpath "${BASH_SOURCE[0]}")"
 # MEMORY_DOCTOR_REPO_DIR is a test-only override (like
 # MEMORY_DOCTOR_TRANSCRIPTS_DIR below): tests point the doctor at a throwaway
-# copy of claude/memory and claude/hooks so checks J-L can mutate the global
-# tier without touching the real git-tracked directory. Unset in normal use.
+# copy of claude/hooks. Unset in normal use.
 REPO_DIR="${MEMORY_DOCTOR_REPO_DIR:-$(cd "$(dirname "$SCRIPT_REAL")/../.." && pwd)}"
 PROJECTS_DIR="$HOME/.claude/projects"
 GLOBAL_DIR="$HOME/.claude/memory"
@@ -68,13 +67,13 @@ skip() {
 
 # ── A. Global tier ────────────────────────────────────────────────────────
 echo "## A. Global tier"
-if [ -L "$GLOBAL_DIR" ] && [ "$(cd "$GLOBAL_DIR" 2>/dev/null && pwd -P)" = "$REPO_DIR/claude/memory" ]; then
-	ok "A.1 global memory is a symlink into the dotfiles repo"
+# A real folder is the normal state. A link to a folder still works: install.sh converts it.
+if [ -d "$GLOBAL_DIR" ] && [ -f "$GLOBAL_DIR/MEMORY.md" ]; then
+	ok "A.1 global memory is a folder with a MEMORY.md index"
 elif [ -d "$GLOBAL_DIR" ]; then
-	fail "A.1 global memory is a symlink into the dotfiles repo" \
-		"real directory at $GLOBAL_DIR; merge its contents into claude/memory/ and replace with: ln -sfn $REPO_DIR/claude/memory $GLOBAL_DIR"
+	fail "A.1 global memory is a folder with a MEMORY.md index" "no MEMORY.md in $GLOBAL_DIR"
 else
-	fail "A.1 global memory is a symlink into the dotfiles repo" "missing: $GLOBAL_DIR (run install.sh)"
+	fail "A.1 global memory is a folder with a MEMORY.md index" "missing: $GLOBAL_DIR (run install.sh)"
 fi
 if [ -f "$GLOBAL_DIR/MEMORY.md" ]; then
 	ok "A.2 global MEMORY.md index exists"
