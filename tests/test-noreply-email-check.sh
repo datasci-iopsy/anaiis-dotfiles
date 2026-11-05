@@ -89,11 +89,10 @@ try_commit() {
 # run_push <dir> <stdin lines>: call the pre-push dispatcher the way git does;
 # print its exit status. Output goes to $WORK/last.out.
 run_push() {
-	local dir="$1" lines="$2" rc
+	local dir="$1" lines="$2"
 	rm -f "$dir/.suite-ran"
 	(cd "$dir" && printf '%s\n' "$lines" | HOME="$TMP_HOME" bash "$PRE_PUSH" origin url) >"$WORK/last.out" 2>&1
-	rc=$?
-	echo "$rc"
+	echo "$?"
 }
 
 R="$WORK/marked"
@@ -104,8 +103,8 @@ make_repo "$N" 0
 echo "=== 1. author email at commit time ==="
 assert_eq "1.1 a private author email is rejected" rejected \
 	"$(try_commit "$R" GIT_AUTHOR_EMAIL="$BAD" git commit -q --allow-empty -m c11)"
-assert_eq "1.2 the message names the address" 1 "$(grep -c "$BAD" "$WORK/last.out" | tr -d ' ' | sed 's/^[1-9][0-9]*$/1/')"
-assert_eq "1.3 the message gives the fix" 1 "$(grep -c 'git config user.email' "$WORK/last.out" | tr -d ' ' | sed 's/^[1-9][0-9]*$/1/')"
+assert_eq "1.2 the message names the address" 1 "$(grep -cF -- "$BAD" "$WORK/last.out")"
+assert_eq "1.3 the message gives the fix" 1 "$(grep -c 'git config user.email' "$WORK/last.out")"
 assert_eq "1.4 the <id>+<login> noreply shape is accepted" accepted \
 	"$(try_commit "$R" GIT_AUTHOR_EMAIL="$NR" git commit -q --allow-empty -m c14)"
 assert_eq "1.5 the <login> noreply shape is accepted" accepted \
@@ -162,7 +161,7 @@ try_commit "$R" git commit -q --allow-empty -m c82 >/dev/null
 TOP="$(git -C "$R" rev-parse HEAD)"
 assert_eq "8.1 a range that holds one private-email commit is rejected" 1 \
 	"$(run_push "$R" "refs/heads/main $TOP refs/heads/main $BASE")"
-assert_eq "8.2 the reject message names the address" 1 "$(grep -c "$BAD" "$WORK/last.out" | tr -d ' ' | sed 's/^[1-9][0-9]*$/1/')"
+assert_eq "8.2 the reject message names the address" 1 "$(grep -cF -- "$BAD" "$WORK/last.out")"
 assert_eq "8.3 a deletion line alone is skipped" 0 \
 	"$(run_push "$R" "(delete) $ZERO refs/heads/old $BADSHA")"
 git -C "$R" update-ref refs/remotes/origin/main "$BADSHA"
