@@ -30,7 +30,7 @@ Place each value in the first home that fits:
 |---|---|---|---|
 | 1 | A secret | The credential tiers above | Settings files hold no secret |
 | 2 | Machine-local (project IDs, local paths) | `~/.bashrc.local` | Git does not track it |
-| 3 | Wiring that must hold in every launch path (the shell of the Bash tool and of the hooks, git identity) | The `env` block of `claude/settings.json` | The block applies however `claude` starts. It overwrites a stale shell value. |
+| 3 | Wiring that must hold in every launch path (the shell of the Bash tool and of the hooks) | The `env` block of `claude/settings.json` | The block applies however `claude` starts. It overwrites a stale shell value. |
 | 4 | A dial that you change per task or per session (model, effort, output size, compaction level, timeouts, plugin level) | `bash/shared.bash`: an `export` for the default, an `alias` for each variant | The shell value beats the dedicated key. An alias overrides the export for one process. No file changes. |
 | 5 | A preference with no shell variable (theme, tui, notifications), or structured config (hooks, permissions, plugins) | Keys in `claude/settings.json` | `/config` changes it on purpose. Commit it when you meant it. |
 
@@ -39,3 +39,4 @@ Rules:
 - A name never appears in both `bash/shared.bash` (an `export` or an alias prefix) and the `env` block. The `env` value overwrites the shell value, so the shell value and every alias that sets it stop working. `rules-doctor.sh` check I.2 enforces this.
 - `claude/settings.json` holds no `model`, `effortLevel`, or `modelSettings` key. `/model` and `/effort` write them into the symlinked file. Press `s` in the `/model` picker and in the `/effort` slider to apply a choice to the session only. `rules-doctor.sh` check I.1 enforces this.
 - While `CLAUDE_CODE_EFFORT_LEVEL` is exported, `/effort` and `--effort` have no effect. Use an alias to change the effort for one launch.
+- The git identity has no home in this table. Each machine sets `user.name` and `user.email` in its own git config. The `env` block sets no `GIT_AUTHOR_*` or `GIT_COMMITTER_*` variable, because a value there overrides the git config of every repo. `tests/test-rules-integrity.sh` (section 7) enforces this.

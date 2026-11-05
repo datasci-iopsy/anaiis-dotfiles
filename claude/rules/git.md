@@ -205,4 +205,4 @@ If none holds, use a branch in place (see "Branching decision"). In the dotfiles
 - The `list-merged-claude-branches.sh` hook emits a daily advisory of merged Claude branches with the delete command. Never auto-delete; the user runs the command. Never delete an unmerged branch.
 
 ## Identity
-- Git author identity is set via `GIT_AUTHOR_NAME`/`GIT_COMMITTER_NAME` in the `env` block of `claude/settings.json`. The `attribution.commit` setting controls only `Co-Authored-By` trailers, not the author name.
+- The dotfiles set no git identity. Each machine sets `user.name` and `user.email` in its own git config. The `env` block of `claude/settings.json` sets no `GIT_AUTHOR_*` or `GIT_COMMITTER_*` variable. The `attribution.commit` setting controls only `Co-Authored-By` trailers, not the author name.

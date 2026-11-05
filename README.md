@@ -4,7 +4,7 @@
 
 **Shell config.** `bash/shared.bash` is the tracked, portable shell config (PATH, aliases, tool inits, prompt). It is sourced by `~/.bashrc`, which is machine-local and not tracked. The wiring on each machine follows a three-file hierarchy. The files load in this order: `~/.bash_profile` (entry point only, sources `~/.bashrc`) -> `~/.bashrc` (sources `shared.bash`, then `~/.bashrc.local`) -> `~/.bashrc.local` (secrets and machine overrides, gitignored). Never add config to `~/.bash_profile` directly; put portable things in `shared.bash` and machine-local secrets in `~/.bashrc.local`. `install.sh` writes the PATH line and the `shared.bash` source line into `~/.bashrc`. It does not add a line that sources `~/.bashrc.local`. Add that line yourself, after the `shared.bash` line, for example `[ -f "$HOME/.bashrc.local" ] && . "$HOME/.bashrc.local"`. Without it, nothing loads `~/.bashrc.local`.
 
-**Configuration homes.** Dials (model, effort, limits, plugin levels) live in `bash/shared.bash` as exports and aliases. Wiring that must hold in every launch path (the shell pin, git identity) lives in the `env` block of `claude/settings.json`. Preferences and structured config live in the other `settings.json` keys. A name never appears in both `shared.bash` and the `env` block, because the `env` value overwrites the shell value. `claude/settings.json` holds no `model`, `effortLevel`, or `modelSettings` key. `rules/environment.md` (section "Configuration homes") has the table and the reasons, and `rules-doctor.sh` check I enforces the two rules that a machine can check.
+**Configuration homes.** Dials (model, effort, limits, plugin levels) live in `bash/shared.bash` as exports and aliases. Wiring that must hold in every launch path (the shell pin) lives in the `env` block of `claude/settings.json`. The git identity is not set here: each machine sets it in its git config (step 6 of "Setup on a new machine"). Preferences and structured config live in the other `settings.json` keys. A name never appears in both `shared.bash` and the `env` block, because the `env` value overwrites the shell value. `claude/settings.json` holds no `model`, `effortLevel`, or `modelSettings` key. `rules/environment.md` (section "Configuration homes") has the table and the reasons, and `rules-doctor.sh` check I enforces the two rules that a machine can check.
 
 **Instruction files.** `AGENTS.md` is the only instruction file in this repo. No `CLAUDE.md` is tracked. The global instructions live in `claude/rules/context.md` and the other rule files, which Claude Code loads from `~/.claude/rules/`.
 
@@ -21,7 +21,7 @@ git clone git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/anaiis-dotfiles
 bash ~/anaiis-dotfiles/install.sh
 ```
 
-That installs the Claude policy stack, wires `~/.bashrc`, and adds the GitHub host keys when `gh` uses SSH. Then follow steps 3 to 5 of "Setup on a new machine" below. Open a new terminal, start Claude Code once, run `/reload-plugins`, and run the doctor.
+That installs the Claude policy stack, wires `~/.bashrc`, and adds the GitHub host keys when `gh` uses SSH. Then follow steps 3 to 6 of "Setup on a new machine" below. Open a new terminal, start Claude Code once, run `/reload-plugins`, run the doctor, and set the git identity.
 
 ---
 
@@ -102,7 +102,7 @@ anaiis-dotfiles/
 
 ## Setup on a new machine
 
-Do the steps in this order. Steps 1 to 5 prepare the machine. Steps 6 and 7 apply to each project.
+Do the steps in this order. Steps 1 to 6 prepare the machine. Steps 7 and 8 apply to each project.
 
 ### 1. Clone
 
@@ -181,7 +181,18 @@ The nine links in check 3 are `settings.json`, `keybindings.json`, `rules`, `com
 
 Do not use `claude plugin list` as the check. The doctor reads the plugin cache folders (check 4). A plugin shows MISSING until Claude Code has fetched it, so run the doctor after step 4.
 
-### 6. Per-project memory bootstrap
+### 6. Set the git identity
+
+The dotfiles set no git identity. Set it once in the global git config of each machine:
+
+```bash
+git config --global user.name "<name>"
+git config --global user.email "<id>+<login>@users.noreply.github.com"
+```
+
+`<id>` is the numeric id of your GitHub account, and `<login>` is its login. Claude Code sessions use the same git config: `claude/settings.json` sets no `GIT_AUTHOR_*` or `GIT_COMMITTER_*` variable, and a value there would override the git config of every repo. To use another identity in one repo, run the same commands there without `--global`. In this repo, a pre-commit check rejects a commit whose email is not a GitHub noreply address. The `attribution` block of `claude/settings.json` controls only the `Co-Authored-By` trailer, not the author.
+
+### 7. Per-project memory bootstrap
 
 Run once from each project root you'll use Claude in:
 
@@ -192,7 +203,7 @@ bash ~/.claude/scripts/seed-memory.sh
 
 In Claude Code, `/seed-project` runs the same script. Then edit `~/.claude/projects/<encoded-path>/memory/project_current_phase.md`.
 
-### 7. Repo hooks: pre-commit lint, pre-push tests, commit-msg lint
+### 8. Repo hooks: pre-commit lint, pre-push tests, commit-msg lint
 
 Three dispatcher hooks go into every repo:
 
@@ -432,21 +443,6 @@ Run at any time to see session counts, token totals (comma-formatted), agent spa
 bash ~/.claude/scripts/usage-report.sh --since 2026-05-01
 bash ~/.claude/scripts/usage-report.sh --since 2026-04-01 --until 2026-04-30 --json
 ```
-
----
-
-## Git author identity
-
-Claude-driven commit authorship is set via env vars in `claude/settings.json`:
-
-```json
-"env": {
-    "GIT_AUTHOR_NAME": "datasci-iopsy",
-    "GIT_COMMITTER_NAME": "datasci-iopsy"
-}
-```
-
-These override `git config`. The `attribution.commit` field (currently `""`) controls Co-Authored-By trailers only, it does not affect author name.
 
 ---
 
