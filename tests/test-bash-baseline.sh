@@ -149,6 +149,15 @@ echo "--- 6. a harness hook starts its child scripts with the running bash"
 BARE_CHILDREN="$(grep -n 'bash "\$' "$REPO_DIR"/claude/hooks/*.sh | grep -v -e '/repo-[a-z-]*\.sh:' || true)"
 assert_eq "6.1 no harness hook starts a child script with a bare bash" "" "$BARE_CHILDREN"
 
+echo "--- 7. the e2e suite does not pass when no case ran"
+# Why: when claude cannot finish, every case records NOT RUN. An exit code of 0 would report success
+# with no shell tested. A stub claude that exits 1 stands for a claude that cannot run.
+mkdir -p "$TMPD/stub-claude"
+printf '#!/bin/sh\nexit 1\n' >"$TMPD/stub-claude/claude"
+chmod +x "$TMPD/stub-claude/claude"
+E2E=1 PATH="$TMPD/stub-claude:$PATH" bash "$REPO_DIR/tests/e2e-bash-shell.sh" >/dev/null 2>&1
+assert_eq "7.1 the e2e suite exits 1 when every case is NOT RUN" 1 "$?"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

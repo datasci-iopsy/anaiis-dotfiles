@@ -32,7 +32,7 @@
 #
 # Result per case: PASS, FAIL, or NOT RUN. NOT RUN means claude could not run or the model did not make
 # the expected tool call; it is never counted as a pass. WEAK means a control run also showed an approved
-# major, so the case does not detect a lost pin. The exit code is 1 on any FAIL or WEAK.
+# major, so the case does not detect a lost pin. The exit code is 1 on any FAIL, WEAK, or NOT RUN.
 
 set -u
 
@@ -211,4 +211,4 @@ else
 fi
 
 printf '\ne2e-bash-shell: %s passed, %s failed, %s weak, %s not run\n' "$PASS" "$FAIL" "$WEAK" "$NOTRUN"
-[ "$FAIL" -eq 0 ] && [ "$WEAK" -eq 0 ]
+[ "$FAIL" -eq 0 ] && [ "$WEAK" -eq 0 ] && [ "$NOTRUN" -eq 0 ]
