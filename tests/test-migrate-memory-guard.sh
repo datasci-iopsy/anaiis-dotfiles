@@ -131,6 +131,22 @@ assert_eq "T3: curated global profile survives the clobber scenario under --appl
 	"$(cat "$T3_HOME/.claude/memory/user_profile.md")" "$CURATED_CONTENT"
 rm -rf "$T3_HOME" "$T3_PROJ"
 
+# ---- T4: an absent global folder gets an empty index, not a template copy ---
+
+echo
+echo "--- T4: an absent global folder is created with an empty MEMORY.md index"
+
+T4_HOME=$(mktemp -d)
+mkdir -p "$T4_HOME/.claude"
+HOME="$T4_HOME" bash "$SCRIPT" >/dev/null 2>&1 || true
+assert_eq "T4: the dry run creates no folder" \
+	"$([ -e "$T4_HOME/.claude/memory" ] && echo yes || echo no)" "no"
+HOME="$T4_HOME" bash "$SCRIPT" --apply >/dev/null 2>&1 || true
+assert_eq "T4: --apply creates a real folder with a MEMORY.md index" \
+	"$([ -d "$T4_HOME/.claude/memory" ] && [ ! -L "$T4_HOME/.claude/memory" ] \
+		&& [ -f "$T4_HOME/.claude/memory/MEMORY.md" ] && echo yes || echo no)" "yes"
+rm -rf "$T4_HOME"
+
 # ---- Summary ----------------------------------------------------------------
 
 echo
