@@ -17,7 +17,7 @@
 **Install in 60 seconds.**
 
 ```bash
-git clone git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/anaiis-dotfiles
+git clone git@github.com:anaiis-io/anaiis-dotfiles.git ~/anaiis-dotfiles
 bash ~/anaiis-dotfiles/install.sh
 ```
 
@@ -107,7 +107,7 @@ Do the steps in this order. Steps 1 to 5 prepare the machine. Steps 6 and 7 appl
 ### 1. Clone
 
 ```bash
-git clone git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/anaiis-dotfiles
+git clone git@github.com:anaiis-io/anaiis-dotfiles.git ~/anaiis-dotfiles
 ```
 
 ### 2. Run the installer
