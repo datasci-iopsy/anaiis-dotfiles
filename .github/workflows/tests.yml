@@ -32,19 +32,21 @@ jobs:
       # namerefs (Bash 4.3+), so a runner whose PATH bash is 3.2 renders
       # nothing there. Prepending the brew prefix makes later steps, and the
       # `bash <script>` calls inside the suites, pick up the newer bash.
+      # The step installs bash when the pinned path in claude/settings.json
+      # (env.CLAUDE_CODE_SHELL) is absent, and fails when the path is still
+      # absent afterwards. When Homebrew ships a bash major above
+      # APPROVED_BASH_MAJORS (claude/scripts/bootstrap-doctor.sh), tests/
+      # test-bash-baseline.sh fails on purpose until the owner approves it.
       - name: Install tools missing from the runner image
         run: |
           for tool in shfmt shellcheck; do
             command -v "$tool" >/dev/null 2>&1 || brew install "$tool"
           done
-          bash_major="$(bash -c 'printf "%s" "${BASH_VERSINFO[0]}"')"
-          bash_minor="$(bash -c 'printf "%s" "${BASH_VERSINFO[1]}"')"
-          if [ "$bash_major" -lt 4 ] ||
-             { [ "$bash_major" -eq 4 ] && [ "$bash_minor" -lt 3 ]; }; then
-            brew install bash
-          fi
+          pin="$(jq -r '.env.CLAUDE_CODE_SHELL // empty' claude/settings.json)"
+          [ -x "$pin" ] || brew install bash
+          [ -x "$pin" ] || { echo "the pin '$pin' is not executable after brew install bash"; exit 1; }
           echo "$(brew --prefix)/bin" >>"$GITHUB_PATH"
-          "$(brew --prefix)/bin/bash" --version | head -1
+          "$pin" --version | head -1
 
       # Several hooks and the memory doctor resolve ~/.claude/* at runtime;
       # the installer's CI mode builds only that symlink tree.
