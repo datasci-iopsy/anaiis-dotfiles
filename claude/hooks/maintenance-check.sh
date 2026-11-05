@@ -66,7 +66,7 @@ fi
 # --- Repo hooks (weekly) ---
 HOOKS_STAMP="$STATE_DIR/.maintenance-hooks"
 if [ "$(stamp_days_ago "$HOOKS_STAMP")" -ge 7 ]; then
-	need_fix=$(bash "$HOME/.claude/scripts/audit-repo-hooks.sh" 2>/dev/null \
+	need_fix=$("${BASH:-bash}" "$HOME/.claude/scripts/audit-repo-hooks.sh" 2>/dev/null \
 		| grep -cE '^\s*(STALE|missing|absent)' || true)
 	if [ "${need_fix:-0}" -gt 0 ]; then
 		echo "[maintenance] Repo hooks: ${need_fix} repos need attention -- bash ~/.claude/scripts/audit-repo-hooks.sh" >&2

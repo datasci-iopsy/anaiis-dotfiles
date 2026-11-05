@@ -33,7 +33,7 @@ if grep -qF -- 'repo-pre-commit.sh' "$hooks/pre-commit" 2>/dev/null \
 fi
 
 # Install silently; warn to stderr on failure
-if ! (cd "$repo" && bash "$HOME/.claude/scripts/install-repo-hooks.sh" >/dev/null 2>&1); then
+if ! (cd "$repo" && "${BASH:-bash}" "$HOME/.claude/scripts/install-repo-hooks.sh" >/dev/null 2>&1); then
 	echo "[hooks] Failed to install repo hooks in $repo" >&2
 fi
 

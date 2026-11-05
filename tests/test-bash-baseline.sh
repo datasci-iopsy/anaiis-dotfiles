@@ -142,6 +142,13 @@ BLOCKED_PRETOOL="$(jq '[.hooks.PreToolUse[].hooks[] | select(.onFailure == "bloc
 assert_eq "5.1 a guard that cannot start must block, not pass: every PreToolUse hook sets onFailure to block ($BLOCKED_PRETOOL of $TOTAL_PRETOOL)" \
 	"$TOTAL_PRETOOL" "$BLOCKED_PRETOOL"
 
+echo "--- 6. a harness hook starts its child scripts with the running bash"
+# Why: the pin reaches the entry point of a hook only. A child that starts with a bare bash resolves
+# through PATH, which holds /bin/bash 3.2 in a GUI launch. The shims repo-*.sh run under git, not under
+# the harness, so the pin does not reach them (decision D-015); the filter leaves them out.
+BARE_CHILDREN="$(grep -n 'bash "\$' "$REPO_DIR"/claude/hooks/*.sh | grep -v -e '/repo-[a-z-]*\.sh:' || true)"
+assert_eq "6.1 no harness hook starts a child script with a bare bash" "" "$BARE_CHILDREN"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1
