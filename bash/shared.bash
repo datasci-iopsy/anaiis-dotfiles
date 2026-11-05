@@ -195,10 +195,10 @@ alias gc-authList='gcloud auth list'
 # anything not already on the allow/deny lists; protection then depends
 # entirely on permissions.deny and the bash-guard/block-sensitive-writes hooks
 # catching it. Deliberate tradeoff for a trusted personal workflow.
-# Fast: opusplan, normal effort
+# Fast: opusplan, the exported effort level
 alias claude-fast='claude --model opusplan --permission-mode bypassPermissions'
 
-# Turbo: opusplan, high effort
+# Turbo: opusplan, xhigh effort
 alias claude-turbo='CLAUDE_CODE_EFFORT_LEVEL=xhigh claude --model opusplan --permission-mode bypassPermissions'
 
 # Fable: Fable 5.1, high effort
@@ -209,6 +209,15 @@ alias claude-fable-turbo='CLAUDE_CODE_EFFORT_LEVEL=xhigh claude --model claude-f
 
 # Fable max: Fable 5.1, max effort
 alias claude-fable-max='CLAUDE_CODE_EFFORT_LEVEL=max claude --model claude-fable-5-1 --permission-mode bypassPermissions'
+
+# Opus: Opus 5.5, high effort
+alias claude-opus='CLAUDE_CODE_EFFORT_LEVEL=high claude --model claude-opus-5-5 --permission-mode bypassPermissions'
+
+# Opus: Opus 5.5, xhigh effort
+alias claude-opus-turbo='CLAUDE_CODE_EFFORT_LEVEL=xhigh claude --model claude-opus-5-5 --permission-mode bypassPermissions'
+
+# Opus max: Opus 5.5, max effort
+alias claude-opus-max='CLAUDE_CODE_EFFORT_LEVEL=max claude --model claude-opus-5-5 --permission-mode bypassPermissions'
 
 # ── CodeRabbit ────────────────────────────────────────────────────────────────
 alias cr='coderabbit'
