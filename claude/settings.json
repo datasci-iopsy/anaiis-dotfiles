@@ -199,11 +199,13 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/block-em-dash.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/block-em-dash.sh",
+                        "onFailure": "block"
                     },
                     {
                         "type": "command",
-                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/block-edit-on-main.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/block-edit-on-main.sh",
+                        "onFailure": "block"
                     }
                 ]
             },
@@ -212,7 +214,8 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/block-em-dash.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/block-em-dash.sh",
+                        "onFailure": "block"
                     }
                 ]
             },
@@ -221,7 +224,8 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/block-sensitive-writes.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/block-sensitive-writes.sh",
+                        "onFailure": "block"
                     }
                 ]
             },
@@ -230,7 +234,8 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/bash-guard.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/bash-guard.sh",
+                        "onFailure": "block"
                     }
                 ]
             },
@@ -239,7 +244,8 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/cost-guard.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/cost-guard.sh",
+                        "onFailure": "block"
                     }
                 ]
             }

@@ -16,7 +16,7 @@
 # In check 2 the name must end at .bashrc: a line that sources only .bashrc.local does not count.
 #   4. each enabled plugin has a folder in ~/.claude/plugins/cache/
 #   5. when gh uses the ssh protocol, known_hosts holds a github.com key
-#   6. when claude is on PATH, its version is at least 2.1.277 (AGENTS.md support)
+#   6. when claude is on PATH, its version is at least 2.1.295 (onFailure support for PreToolUse guards)
 #   7. settings.json pins env.CLAUDE_CODE_SHELL to an executable bash whose major version is in
 #      APPROVED_BASH_MAJORS, and every command in it starts with ${CLAUDE_CODE_SHELL:-bash}
 #
@@ -164,10 +164,12 @@ else
 fi
 
 # ---- 6. Claude Code version -------------------------------------------------
-# Claude Code reads AGENTS.md from 2.1.277. Without it, the repo's AGENTS.md is not loaded.
+# Claude Code reads AGENTS.md from 2.1.277, and supports onFailure for PreToolUse hooks from
+# 2.1.295. Without onFailure, a guard that cannot start is a non-blocking error, so the doctor
+# checks the higher minimum.
 
 # ver_ge <a> <b>: succeed when version a is at least version b. Each is major.minor.patch, digits
-# only. Any other text for a fails. The parts compare as integers, so 2.1.1000 is above 2.1.277.
+# only. Any other text for a fails. The parts compare as integers, so 2.1.1000 is above 2.1.295.
 ver_ge() {
 	local a1 a2 a3 ax b1 b2 b3 part
 	IFS=. read -r a1 a2 a3 ax <<EOF
@@ -196,7 +198,7 @@ else
 	cv="$(claude --version 2>/dev/null)" || cv=""
 	cv="${cv%%$'\n'*}"
 	cv="${cv%% *}"
-	if ver_ge "$cv" 2.1.277; then
+	if ver_ge "$cv" 2.1.295; then
 		ok "claude version $cv"
 	else
 		missing "claude version" "update Claude Code"

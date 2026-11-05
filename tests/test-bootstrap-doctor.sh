@@ -380,18 +380,18 @@ assert_eq "5.7 no gh: exit 0 without a host key" 0 "$RC"
 assert_eq "5.8 no gh: the ok line says so" 1 "$(printf '%s\n' "$OUT" | grep -c '^ok github.com host key (not needed: gh not found)')"
 
 echo "--- 6. Claude Code version"
-# AGENTS.md support starts at 2.1.277. Each case below fails a different wrong comparison: a lexical
-# compare of the patch (1000 against 277), a compare of the patch alone, or a compare of the minor alone.
+# onFailure support starts at 2.1.295. Each case below fails a different wrong comparison: a lexical
+# compare of the patch (1000 against 295), a compare of the patch alone, or a compare of the minor alone.
 FIX_CLAUDE='update Claude Code'
 H="$(build_home)"
-CLAUDE_V="2.1.276 (Claude Code)" expect_one "6.1 one patch below the minimum" "$H" "MISSING claude version: $FIX_CLAUDE"
+CLAUDE_V="2.1.294 (Claude Code)" expect_one "6.1 one patch below the minimum" "$H" "MISSING claude version: $FIX_CLAUDE"
 CLAUDE_V="2.0.999 (Claude Code)" expect_one "6.2 an older minor with a high patch" "$H" "MISSING claude version: $FIX_CLAUDE"
 CLAUDE_V="1.9.9999 (Claude Code)" expect_one "6.3 an older major" "$H" "MISSING claude version: $FIX_CLAUDE"
 CLAUDE_V="" expect_one "6.4 the output is empty" "$H" "MISSING claude version: $FIX_CLAUDE"
 CLAUDE_V="not a version" expect_one "6.5 the output is not a version" "$H" "MISSING claude version: $FIX_CLAUDE"
 CLAUDE_V="2.1 (Claude Code)" expect_one "6.6 the version has two parts" "$H" "MISSING claude version: $FIX_CLAUDE"
 CLAUDE_V="2.1.277.1 (Claude Code)" expect_one "6.7 the version has four parts" "$H" "MISSING claude version: $FIX_CLAUDE"
-for v in 2.1.277 2.1.1000 2.2.0 3.0.0 2.1.318; do
+for v in 2.1.295 2.1.1000 2.2.0 3.0.0 2.1.318; do
 	CLAUDE_V="$v (Claude Code)" doctor "$H"
 	assert_eq "6.8 $v is accepted: exit 0" 0 "$RC"
 	assert_eq "6.8 $v is accepted: the ok line names it" 1 "$(printf '%s\n' "$OUT" | grep -c "^ok claude version $v\$")"

@@ -16,7 +16,8 @@ inside this repo, never the symlink destination.
 ## Instruction files
 
 `AGENTS.md` is the only instruction file in this repo. No `CLAUDE.md` is tracked.
-Claude Code reads `AGENTS.md` from version 2.1.277. `bootstrap-doctor.sh` checks the version.
+Claude Code reads `AGENTS.md` from version 2.1.277. `bootstrap-doctor.sh` checks for 2.1.295, the
+minimum version that supports `onFailure` for `PreToolUse` hooks.
 
 Global instructions live in `claude/rules/` (file `context.md`).
 Claude Code reads only the user-level `CLAUDE.md` file and the `~/.claude/rules/` folder at user scope.

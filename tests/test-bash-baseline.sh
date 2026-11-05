@@ -136,6 +136,12 @@ for major in "$LOW" "$HIGH"; do
 done
 assert_eq "4.6 the rule of case 1.2 rejects a bash $LOW and a bash $HIGH" " rejected rejected" "$VERDICTS"
 
+echo "--- 5. every PreToolUse guard blocks when it cannot start"
+TOTAL_PRETOOL="$(jq '[.hooks.PreToolUse[].hooks[]] | length' "$SETTINGS")"
+BLOCKED_PRETOOL="$(jq '[.hooks.PreToolUse[].hooks[] | select(.onFailure == "block")] | length' "$SETTINGS")"
+assert_eq "5.1 a guard that cannot start must block, not pass: every PreToolUse hook sets onFailure to block ($BLOCKED_PRETOOL of $TOTAL_PRETOOL)" \
+	"$TOTAL_PRETOOL" "$BLOCKED_PRETOOL"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1
