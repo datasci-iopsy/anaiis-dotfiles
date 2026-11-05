@@ -390,7 +390,7 @@ CLAUDE_V="1.9.9999 (Claude Code)" expect_one "6.3 an older major" "$H" "MISSING 
 CLAUDE_V="" expect_one "6.4 the output is empty" "$H" "MISSING claude version: $FIX_CLAUDE"
 CLAUDE_V="not a version" expect_one "6.5 the output is not a version" "$H" "MISSING claude version: $FIX_CLAUDE"
 CLAUDE_V="2.1 (Claude Code)" expect_one "6.6 the version has two parts" "$H" "MISSING claude version: $FIX_CLAUDE"
-CLAUDE_V="2.1.277.1 (Claude Code)" expect_one "6.7 the version has four parts" "$H" "MISSING claude version: $FIX_CLAUDE"
+CLAUDE_V="2.1.295.1 (Claude Code)" expect_one "6.7 the version has four parts" "$H" "MISSING claude version: $FIX_CLAUDE"
 for v in 2.1.295 2.1.1000 2.2.0 3.0.0 2.1.318; do
 	CLAUDE_V="$v (Claude Code)" doctor "$H"
 	assert_eq "6.8 $v is accepted: exit 0" 0 "$RC"
