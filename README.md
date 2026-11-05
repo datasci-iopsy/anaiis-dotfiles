@@ -118,7 +118,7 @@ bash ~/anaiis-dotfiles/install.sh
 
 The installer runs these phases in order:
 
-1. It links `~/anaiis-dotfiles` to the repo when the repo lives elsewhere. Then it links `claude/settings.json`, `claude/keybindings.json`, and the `claude/` folders (`rules`, `commands`, `skills`, `agents`, `hooks`, `scripts`, `memory`) into `~/.claude/`.
+1. It links `~/anaiis-dotfiles` to the repo when the repo lives elsewhere. Then it links `claude/settings.json`, `claude/keybindings.json`, and the `claude/` folders (`rules`, `commands`, `skills`, `agents`, `hooks`, `scripts`) into `~/.claude/`. It keeps `~/.claude/memory` as a local folder: it converts an old link into a folder with a copy of its data, and it creates an empty folder on a new machine.
 2. It wires the shell config.
 3. It adds the GitHub host keys.
 4. It links `claude-cleanup` into `~/.local/bin/` and `.lintr` to `~/.lintr`. It prints the Homebrew commands and does not run them.
