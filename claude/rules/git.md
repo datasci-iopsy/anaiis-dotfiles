@@ -130,6 +130,8 @@ A PR title follows the subject grammar and ends with the ticket in brackets (see
 - The validator is `claude/scripts/commit-msg-lint.sh`. To check a draft, run `bash ~/.claude/scripts/commit-msg-lint.sh <message-file>`. To print the allowed types, add the `--types` flag instead of a file.
 - The `commit-msg` hook runs the validator only in a repo whose working tree has a `.conventional-commits` file at its root. This repo has that file. Other repos accept any message.
 - If the lint rejects a message, fix the message.
+- In a repo with a `.require-noreply-email` file at its root, the `pre-commit` and `pre-push` hooks run `claude/scripts/noreply-email-check.sh`. A commit whose author or committer email is not a GitHub noreply address is rejected. This repo has that file. If the check rejects a commit, fix the identity (`git config user.email`) and redo the commit. `SKIP_EMAIL_CHECK=1` bypasses the check. Only the user uses it. Claude never uses it.
+- Limit: `--no-verify` skips both hooks. GitHub's GH007 then blocks only a private address of the GitHub account, not a work address.
 - `SKIP_COMMIT_LINT=1 git commit` bypasses the lint. Only the user uses it. Claude never uses it.
 
 ### Subject examples
@@ -187,7 +189,7 @@ Refs: D-12
 
 Use a worktree when any one of these four holds. Check them in order. When you create the worktree, name the criterion that held.
 
-1. **Live config.** The change touches a path that the `~/.claude/` links reach (`claude/hooks/`, `claude/scripts/`, `claude/rules/`, `claude/skills/`, `claude/commands/`, `claude/agents/`, `claude/memory/`, `claude/settings.json`, `claude/keybindings.json`), the file `.lintr`, the file `bash/shared.bash`, or a file under `bin/` (on PATH from the main checkout). Why: the links point at the main checkout, so an edit in place changes the running harness before the tests pass. A worktree stays inert until it merges.
+1. **Live config.** The change touches a path that the `~/.claude/` links reach (`claude/hooks/`, `claude/scripts/`, `claude/rules/`, `claude/skills/`, `claude/commands/`, `claude/agents/`, `claude/settings.json`, `claude/keybindings.json`), the file `.lintr`, the file `bash/shared.bash`, or a file under `bin/` (on PATH from the main checkout). Why: the links point at the main checkout, so an edit in place changes the running harness before the tests pass. A worktree stays inert until it merges.
 2. **Foreign changes.** `git status --short` in the main checkout lists a change that is not part of the task. Why: a branch in place carries that change into the commits.
 3. **Parallel streams.** Two or more sessions or branches work at the same time. Why: one checkout holds one branch.
 4. **The user asks** for a worktree ("worktree", "in parallel", "while I keep working on <branch>").

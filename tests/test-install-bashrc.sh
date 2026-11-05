@@ -136,7 +136,7 @@ assert_syntax_ok "syntax ok after two runs" "$MOCK"
 #
 # Fail-to-fail: the .bashrc assertion fails if the flag is ignored or if the
 # early exit is placed after the ~/.bashrc block (a PATH line would appear);
-# the memory-link assertion fails if the exit is placed before the Directories
+# the memory-folder assertion fails if the exit is placed before the Directories
 # section; the .lintr assertion fails if the exit is placed after R Style.
 # ---------------------------------------------------------------------------
 FAKE_HOME="$TMPDIR_TEST/home_symlinks_only"
@@ -146,15 +146,10 @@ HOME="$FAKE_HOME" bash "$INSTALL" --symlinks-only >/dev/null 2>&1
 rc=$?
 assert_eq "--symlinks-only: exits 0" "0" "$rc"
 assert_eq "--symlinks-only: .bashrc untouched" "# untouched" "$(cat "$FAKE_HOME/.bashrc")"
-linked=$(cd "$FAKE_HOME/.claude/memory" 2>/dev/null && pwd -P)
-# install.sh always links the main worktree, never a linked one, so a run from
-# a linked worktree expects the main worktree's memory directory. The first
-# `git worktree list` entry is the main worktree; outside git, REPO_DIR is it.
-MAIN_DIR=$(git -C "$REPO_DIR" worktree list --porcelain 2>/dev/null | awk '/^worktree/{sub(/^worktree /, ""); print; exit}')
-expected=$(cd "${MAIN_DIR:-$REPO_DIR}/claude/memory" 2>/dev/null && pwd -P)
-# An unresolved expected path must fail; two empty strings would compare equal.
-assert_eq "--symlinks-only: ~/.claude/memory resolves into the main worktree" \
-	"${expected:-<main worktree memory directory not found>}" "$linked"
+# install.sh makes ~/.claude/memory a real folder with an index, not a link.
+mem_state=$([ -d "$FAKE_HOME/.claude/memory" ] && [ ! -L "$FAKE_HOME/.claude/memory" ] \
+	&& [ -f "$FAKE_HOME/.claude/memory/MEMORY.md" ] && echo folder || echo other)
+assert_eq "--symlinks-only: ~/.claude/memory is a real folder with MEMORY.md" "folder" "$mem_state"
 lintr_present=$([ -e "$FAKE_HOME/.lintr" ] && echo 1 || echo 0)
 assert_eq "--symlinks-only: .lintr not linked" "0" "$lintr_present"
 

@@ -27,6 +27,12 @@ assert() {
 	fi
 }
 
+# names_rtk <file>: true when the text of the file mentions rtk. The file name of this suite does not
+# count: the README tests tree lists every suite by name, and that name wires nothing.
+names_rtk() {
+	grep -Ii rtk "$1" | sed 's/test-no-rtk\.sh//g' | grep -iq rtk
+}
+
 # tracked_hits <pathspec...>: tracked files whose text mentions rtk, one per line.
 # The two tests that assert rtk is absent must name it, so they are not counted.
 tracked_hits() {
@@ -35,7 +41,7 @@ tracked_hits() {
 		case "$f" in
 			tests/test-no-rtk.sh | tests/e2e-nested-session.sh) continue ;;
 		esac
-		grep -Iiq rtk "$REPO_DIR/$f" && printf '%s\n' "$f"
+		names_rtk "$REPO_DIR/$f" && printf '%s\n' "$f"
 	done < <(git -C "$REPO_DIR" ls-files -z -- "$@")
 }
 
@@ -52,14 +58,20 @@ printf 'imports\n@RTK.md\n' >"$FIX/context.md"
 printf 'clean\n' >"$FIX/clean.md"
 printf '{"hooks":{"PreToolUse":[{"hooks":[{"command":"rtk hook claude"}]}]}}\n' >"$FIX/settings.json"
 printf '{"hooks":{}}\n' >"$FIX/clean.json"
-grep -Iiq rtk "$FIX/context.md"
+names_rtk "$FIX/context.md"
 assert "0.1 text detector flags an @RTK.md import" 0 $?
-grep -Iiq rtk "$FIX/clean.md"
+names_rtk "$FIX/clean.md"
 assert "0.2 text detector passes a clean file" 1 $?
 assert "0.3 json detector flags an rtk hook" 1 "$(json_hits "$FIX/settings.json")"
 assert "0.4 json detector passes a clean file" 0 "$(json_hits "$FIX/clean.json")"
 assert "0.5 path check exempts only this test" "claude/RTK.md" \
 	"$(printf 'claude/RTK.md\ntests/test-no-rtk.sh\n' | grep -i rtk | grep -vx tests/test-no-rtk.sh)"
+printf 'see tests/test-no-rtk.sh\n' >"$FIX/suite-name.md"
+printf 'tests/test-no-rtk.sh, and an rtk hook\n' >"$FIX/suite-and-tool.md"
+names_rtk "$FIX/suite-name.md"
+assert "0.6 text detector passes the file name of this suite" 1 $?
+names_rtk "$FIX/suite-and-tool.md"
+assert "0.7 text detector flags rtk next to the file name of this suite" 0 $?
 
 # ── 1. Wiring ──────────────────────────────────────────────────────────────
 echo "# 1. Wiring"

@@ -43,9 +43,9 @@ Claude Code does not read a user-level `settings.local.json`.
 Two memory tiers exist. Both load automatically.
 
 - The global tier is `~/.claude/memory/`. It holds cross-project facts about the user, such as identity and preferences.
-  Git tracks it in the dotfiles repo (`claude/memory/`, linked by `install.sh`), so it syncs across machines.
+  It is a local folder in each profile, not a link into the repo. It does not sync across profiles or machines. A memory plugin will take that over.
   The `session-start-context.sh` SessionStart hook loads it once at session start, and again after `/compact`, as `additionalContext`.
-  Writes to it land in the dotfiles working tree. Commit them from a dotfiles session.
+  Writes to it stay in the local folder. Git does not track them.
 - The project tier is `~/.claude/projects/<project-key>/memory/`. It holds project facts for one machine.
   Claude Code loads the `MEMORY.md` index of the project natively.
   Claude Code derives `<project-key>` from the working directory, so each git worktree has its own project tier.

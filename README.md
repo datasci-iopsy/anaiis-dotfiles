@@ -17,7 +17,7 @@
 **Install in 60 seconds.**
 
 ```bash
-git clone git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/anaiis-dotfiles
+git clone git@github.com:anaiis-io/anaiis-dotfiles.git ~/anaiis-dotfiles
 bash ~/anaiis-dotfiles/install.sh
 ```
 
@@ -34,6 +34,7 @@ anaiis-dotfiles/
 ├── AGENTS.md                       Project instructions for Claude Code sessions in this repo
 ├── Brewfile                        Homebrew formulae, casks, taps; the daily refresh in shared.bash only adds entries
 ├── .conventional-commits           Opt-in marker: turns on the commit message lint in this repo
+├── .require-noreply-email          Opt-in marker: commits here must use a GitHub noreply email
 ├── .github/workflows/tests.yml     CI: the test suite on macOS, then the bootstrap suites on bash 3.2
 ├── .lintr                          → ~/.lintr   Global R style config
 ├── .env.example                    Structural template, this repo consumes nothing from .env
@@ -52,8 +53,8 @@ anaiis-dotfiles/
 │   ├── skills/                     → ~/.claude/skills/   Mount point for local and synced skills; anaiis-* skills come from the marketplace
 │   ├── agents/                     → ~/.claude/agents/   Intentionally empty; skill agents live in the plugin cache
 │   ├── hooks/                      → ~/.claude/hooks/   Hook scripts (referenced by settings.json)
-│   ├── scripts/                    → ~/.claude/scripts/   Utility scripts (bootstrap-doctor.sh, brew-sync.sh, brew-share.sh, commit-msg-lint.sh, install-repo-hooks.sh, rules-doctor.sh, seed-memory.sh, usage-report.sh, lint-staged dispatchers)
-│   ├── memory/                     → ~/.claude/memory/   Global memory tier (git-tracked, delivered at SessionStart)
+│   ├── scripts/                    → ~/.claude/scripts/   Utility scripts (bootstrap-doctor.sh, brew-sync.sh, brew-share.sh, commit-msg-lint.sh, install-repo-hooks.sh, noreply-email-check.sh, rules-doctor.sh, seed-memory.sh, usage-report.sh, lint-staged dispatchers)
+│   ├── memory/                     Former global memory tier, no longer linked (install.sh copies it once into a local ~/.claude/memory)
 │   └── memory-templates/           Project-tier templates copied by seed-memory.sh (MEMORY.md, project_current_phase.md)
 ├── templates/
 │   ├── dashboard/                  anaiis-dashboard: manifest validator, bootstrap.js, inline helper, Playwright spec
@@ -63,12 +64,15 @@ anaiis-dotfiles/
 ├── tests/
 │   ├── fixtures/                   Test fixture files
 │   ├── lib/                        Test helpers: fresh-home.sh (throwaway HOME), cov.sh (approximate line coverage from xtrace)
+│   ├── e2e-bash-shell.sh           Opt-in (`E2E=1`) check of which bash runs the Bash tool and the hooks in real Claude Code sessions
 │   ├── e2e-git-identity.sh         Opt-in (`E2E=1`) check in real `claude -p` sessions that the settings env block leaves the git identity of the repo in place
+│   ├── e2e-local-memory.sh         Opt-in (`E2E=1`) check that a real `claude -p` session loads global memory from a local `~/.claude/memory` folder
 │   ├── e2e-nested-session.sh       Opt-in (`E2E=1`) hook checks in real nested `claude -p` sessions; `E2E_OLD_REF=<ref>` replays them against older hooks
 │   ├── measure-memory-injection.sh  Memory injection overhead measurement
 │   ├── measure-userpromptsubmit.sh  Hook-latency measurement (run when chain grows)
 │   ├── run-all.sh                  Runs the full test suite
 │   ├── SMOKE-TESTS.md              Manual smoke test scenarios
+│   ├── test-bash-baseline.sh       The harness runs on one approved Homebrew bash major
 │   ├── test-bash-guard.sh          bash-guard.sh deny/allow/ask assertions (destructive cmds, secrets path blocking, env-dump blocking, prefer-jq, recursive-rm scoping, uv add/pip install notice)
 │   ├── test-block-sensitive-writes.sh   block-sensitive-writes.sh deny/allow assertions
 │   ├── test-bootstrap-doctor.sh    bootstrap-doctor.sh: an ok line or a MISSING line for each check, and the exit code
@@ -88,12 +92,17 @@ anaiis-dotfiles/
 │   ├── test-memory-doctor-guardrails.sh  Proves memory-doctor.sh checks I-M fail-then-pass
 │   ├── test-memory-hooks.sh        Memory seed hook and marker-pruning assertions
 │   ├── test-migrate-memory-guard.sh  migrate-memory.sh dry-run-default and template-stub-refusal assertions
+│   ├── test-no-rtk.sh              A removed tool appears in no tracked file except one Brewfile line
+│   ├── test-noreply-email-check.sh  noreply-email-check.sh: commit and push checks in a repo with the opt-in marker
 │   ├── test-no-stale-refs.sh       No tracked file names a removed thing; README.md and AGENTS.md name only tracked repo paths
 │   ├── test-post-edit-lint-dispatch.sh  PostToolUse lint hook dispatch tests
+│   ├── test-public-tree.sh         No tracked file names the old repo, a private email address, or an employer term
 │   ├── test-r-lint-staged.sh       r-lint-staged.sh assertions
 │   ├── test-repo-hook-install.sh   install-repo-hooks.sh and ensure-repo-hooks.sh: three hooks in a plain repo, a linked worktree, and a core.hooksPath repo
 │   ├── test-rules-integrity.sh     rules-doctor.sh passes a green tree and names each targeted check when every drift is applied at once
+│   ├── test-safe-rm.sh             safe-rm.sh, the run-time guard for rm
 │   ├── test-session-start-context.sh  session-start-context.sh additionalContext delivery assertions
+│   ├── test-shared-bash-aliases.sh  The claude-* aliases in bash/shared.bash match their model exports
 │   ├── test-staged-lint-dispatch.sh     Pre-commit staged-lint hook dispatch tests
 │   ├── test-statusline-context-bridge.sh  statusline pct-file write and 60% marker assertions
 │   └── test-stop-hook-git-check.sh  stop-hook-git-check.sh exit-code assertions
@@ -108,7 +117,7 @@ Do the steps in this order. Steps 1 to 6 prepare the machine. Steps 7 and 8 appl
 ### 1. Clone
 
 ```bash
-git clone git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/anaiis-dotfiles
+git clone git@github.com:anaiis-io/anaiis-dotfiles.git ~/anaiis-dotfiles
 ```
 
 ### 2. Run the installer
@@ -119,7 +128,7 @@ bash ~/anaiis-dotfiles/install.sh
 
 The installer runs these phases in order:
 
-1. It links `~/anaiis-dotfiles` to the repo when the repo lives elsewhere. Then it links `claude/settings.json`, `claude/keybindings.json`, and the `claude/` folders (`rules`, `commands`, `skills`, `agents`, `hooks`, `scripts`, `memory`) into `~/.claude/`.
+1. It links `~/anaiis-dotfiles` to the repo when the repo lives elsewhere. Then it links `claude/settings.json`, `claude/keybindings.json`, and the `claude/` folders (`rules`, `commands`, `skills`, `agents`, `hooks`, `scripts`) into `~/.claude/`. It keeps `~/.claude/memory` as a local folder: it converts an old link into a folder with a copy of its data, and it creates an empty folder on a new machine.
 2. It wires the shell config.
 3. It adds the GitHub host keys.
 4. It links `claude-cleanup` into `~/.local/bin/` and `.lintr` to `~/.lintr`. It prints the Homebrew commands and does not run them.
@@ -172,13 +181,13 @@ The doctor only reads. It prints `ok <what>` for each passing check and `MISSING
 |---|---|---|
 | 1 | `~/.bashrc` exists and holds the PATH line and the `shared.bash` source line | `bash ~/anaiis-dotfiles/install.sh --bashrc-only` |
 | 2 | The login shell file (the first of `~/.bash_profile`, `~/.bash_login`, `~/.profile`) mentions `~/.bashrc` | Add the line that the message prints (`install.sh --bashrc-only` when no login file exists) |
-| 3 | Each of nine `~/.claude` links resolves into `~/anaiis-dotfiles/claude` | `bash ~/anaiis-dotfiles/install.sh --symlinks-only` |
+| 3 | Each of eight `~/.claude` links resolves into `~/anaiis-dotfiles/claude`, and `~/.claude/memory` is a local folder (a `WARN` line that does not count as missing when the folder is absent or still a link) | `bash ~/anaiis-dotfiles/install.sh --symlinks-only` |
 | 4 | Each plugin that `enabledPlugins` sets to `true` has a folder in `~/.claude/plugins/cache/` | Start Claude Code once, run `/reload-plugins`, read the Errors tab of `/plugin` |
 | 5 | When `gh` uses the SSH protocol, `~/.ssh/known_hosts` holds a `github.com` key | `bash ~/anaiis-dotfiles/install.sh --hostkeys-only` |
 | 6 | When `claude` is on PATH, its version is at least 2.1.295 (the first version that supports `onFailure` for `PreToolUse` guards) | Update Claude Code |
 | 7 | `settings.json` pins `env.CLAUDE_CODE_SHELL` to an executable bash whose major version is in `APPROVED_BASH_MAJORS`, and every command in it starts with `${CLAUDE_CODE_SHELL:-bash}` | Set the pin, install an approved bash, or approve the major (see "Bash baseline") |
 
-The nine links in check 3 are `settings.json`, `keybindings.json`, `rules`, `commands`, `skills`, `agents`, `hooks`, `scripts`, and `memory`. Check 4 needs `jq`. Without `jq` the doctor prints `MISSING jq (needed to read the plugin list): brew install jq`.
+The eight links in check 3 are `settings.json`, `keybindings.json`, `rules`, `commands`, `skills`, `agents`, `hooks`, and `scripts`. Check 4 needs `jq`. Without `jq` the doctor prints `MISSING jq (needed to read the plugin list): brew install jq`.
 
 Do not use `claude plugin list` as the check. The doctor reads the plugin cache folders (check 4). A plugin shows MISSING until Claude Code has fetched it, so run the doctor after step 4.
 
@@ -212,6 +221,8 @@ Three dispatcher hooks go into every repo:
 - `pre-push` runs the repo's `tests/run-all.sh`, if it has one. The full suite then gates code that leaves the machine, not every commit (`SKIP_TESTS=1 git push` to bypass). A push with nothing to send, or one that only deletes remote branches, skips the suite and returns git's own `Everything up-to-date`.
 - `commit-msg` checks the message against the commit rubric in `rules/git.md` (section "Commit rubric"). It checks only in a repo that has a `.conventional-commits` file at its root. This repo tracks that file. Other repos accept any message. The hook rejects a message that breaks a rule. It prints one `commit-msg-lint: R<n> <reason>` line for each rule (`SKIP_COMMIT_LINT=1 git commit` to bypass).
 
+In a repo with a `.require-noreply-email` file at its root, `pre-commit` and `pre-push` also run `claude/scripts/noreply-email-check.sh`. It rejects a commit whose author or committer email is not a GitHub noreply address. `pre-commit` checks the next commit before the linters. `pre-push` checks every commit that the push sends before the suite, so it also catches `--author` and amended commits. This repo tracks that file. Other repos are not checked. `SKIP_EMAIL_CHECK=1` bypasses both email checks; only the owner uses it. `--no-verify` skips them, and GitHub's GH007 blocks only a private address of the GitHub account, not a work address.
+
 To check a draft before you commit, run `bash ~/.claude/scripts/commit-msg-lint.sh <message-file>`. The flag `--types` prints the allowed types.
 
 In Claude Code, `ensure-repo-hooks.sh` installs all three on the first prompt in any repo. It also adds the missing hooks to a repo that has only some of them. For repos you commit to outside Claude (direct CLI commits, CI), run once from the project root:
@@ -228,7 +239,7 @@ The installer asks git where the hooks folder is (`git rev-parse --git-path hook
 
 Memory, compaction, and session history are three separate layers:
 
-- **Memory files** (`claude/memory/` global tier, `~/.claude/projects/<key>/memory/` project tier): stable facts explicitly saved; persist across sessions; delivered to the model by `session-start-context.sh` (a SessionStart hook, matchers `startup|resume|clear|compact`) via `hookSpecificOutput.additionalContext`. This is the channel that actually reaches Claude, not `systemMessage`, which is display-only and never delivered to the model, a bug that went undetected for months before the 2026-07-15 memory-system review.
+- **Memory files** (`~/.claude/memory/` global tier, `~/.claude/projects/<key>/memory/` project tier): stable facts explicitly saved; persist across sessions; delivered to the model by `session-start-context.sh` (a SessionStart hook, matchers `startup|resume|clear|compact`) via `hookSpecificOutput.additionalContext`. This is the channel that actually reaches Claude, not `systemMessage`, which is display-only and never delivered to the model, a bug that went undetected for months before the 2026-07-15 memory-system review.
 - **Compaction**: triggered manually (`/compact`) or automatically by the harness at 60% context (`CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=60` in `shared.bash`; policy in `rules/session.md`). The compactor summarizes the conversation itself and does not read memory files to decide what to keep.
 - **Session history**: full JSONL transcript on disk, persists until pruned.
 
@@ -355,8 +366,8 @@ Configured in `claude/settings.json`. Scripts in `claude/hooks/`.
 | `Stop` |, | `stop-hook-git-check.sh` | Exits 2 (continues agent loop) on uncommitted changes, untracked files, or unpushed commits; exits 0 when clean |
 | `PreCompact` | `*` | `pre-compact.sh` | Writes a structured handoff to project memory |
 | `StatusLine` | n/a | `statusline-command.sh` (in `scripts/`) | Custom status line display; also bridges the exact context percentage to `context-watch.sh` via a per-session `/tmp` file |
-| (in project repos) | n/a | `repo-pre-commit.sh` | Pre-commit dispatcher: staged-file linters only (R, Python, Shell, JSON, SQL); installed into repos by `install-repo-hooks.sh`; not a Claude Code hook |
-| (in project repos) | n/a | `repo-pre-push.sh` | Pre-push dispatcher: runs the repo's `tests/run-all.sh` when present and the push sends commits (skipped for no-op pushes and deletions; `SKIP_TESTS=1 git push` to bypass); installed alongside pre-commit; not a Claude Code hook |
+| (in project repos) | n/a | `repo-pre-commit.sh` | Pre-commit dispatcher: the noreply email check (repos with `.require-noreply-email`), then the staged-file linters (R, Python, Shell, JSON, SQL); installed into repos by `install-repo-hooks.sh`; not a Claude Code hook |
+| (in project repos) | n/a | `repo-pre-push.sh` | Pre-push dispatcher: checks the email of every pushed commit (repos with `.require-noreply-email`), then runs the repo's `tests/run-all.sh` when present and the push sends commits (skipped for no-op pushes and deletions; `SKIP_TESTS=1 git push` to bypass); installed alongside pre-commit; not a Claude Code hook |
 | (in project repos) | n/a | `repo-commit-msg.sh` | Commit-msg dispatcher: runs `commit-msg-lint.sh` only in a repo with a `.conventional-commits` file at its root (the opt-in marker); skipped when the marker or the validator is absent or `SKIP_COMMIT_LINT=1`; installed alongside the other two; not a Claude Code hook |
 
 Hook latency on this machine (measured 2026-07-15, 3-hook chain after the memory-delivery hooks moved to SessionStart): aggregate UserPromptSubmit chain median = **81 ms** (under 100 ms target). Re-measure with `bash tests/measure-userpromptsubmit.sh` if the chain grows.
@@ -383,7 +394,7 @@ Hook latency on this machine (measured 2026-07-15, 3-hook chain after the memory
 
 The `tests` GitHub Actions check (`.github/workflows/tests.yml`) runs the same command on `macos-latest` for every pull request and for pushes to `main`. The runner installs Homebrew `bash`, `shfmt`, and `shellcheck` only if the image lacks them, then runs `install.sh --symlinks-only` to build the `~/.claude` symlink tree the hooks expect. macOS on purpose: the hooks use BSD-only forms (`date -j`, `stat -f`) and only ever run on macOS.
 
-A last CI step runs seven bootstrap suites with `/bin/bash`, which is bash 3.2 on macOS, and stops at the first failure. A fresh Mac starts on bash 3.2, so the new scripts must run there. The seven suites are `test-brew-sync`, `test-maintenance-check`, `test-install-bashrc`, `test-install-hostkeys`, `test-bootstrap-doctor`, `test-no-stale-refs`, and `test-install-fresh-home`.
+A last CI step runs eight bootstrap suites with `/bin/bash`, which is bash 3.2 on macOS, and stops at the first failure. A fresh Mac starts on bash 3.2, so the new scripts must run there. The git hook scripts run under git, outside the bash pin, so they must run there too. The eight suites are `test-brew-sync`, `test-maintenance-check`, `test-install-bashrc`, `test-install-hostkeys`, `test-bootstrap-doctor`, `test-no-stale-refs`, `test-noreply-email-check`, and `test-install-fresh-home`.
 
 ```bash
 bash tests/run-all.sh                       # full suite, the same command CI runs
