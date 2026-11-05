@@ -104,8 +104,9 @@ ensure_local_memory() {
 			echo "  migrated $dst (copied from $target, now a local folder)"
 		else
 			rm "$dst"
-			mkdir "$dst"
-			echo "  WARN $dst linked to $target, which is gone. Made an empty folder. Recover the index with: git -C $CANONICAL show HEAD:claude/memory/MEMORY.md"
+			mkdir -p "$dst"
+			printf '# Global Memory Index\n' >"$dst/MEMORY.md"
+			echo "  WARN $dst linked to $target, which is gone. Made a folder with an empty MEMORY.md index. Recover the old files with: git -C $CANONICAL archive \"\$(git -C $CANONICAL rev-list -n1 HEAD -- claude/memory)^\" claude/memory | tar -x --strip-components=2 -C $dst"
 		fi
 	elif [ -d "$dst" ]; then
 		echo "  ok   $dst (local folder)"

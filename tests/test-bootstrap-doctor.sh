@@ -487,6 +487,12 @@ doctor "$H"
 assert_eq "9.4 old link: exit code 0" 0 "$RC"
 assert_eq "9.5 old link: the one WARN line" "WARN ~/.claude/memory (a link, not a local folder): $FIX_LINKS" "$(warn_lines)"
 assert_eq "9.6 old link: no ok line for the folder" 0 "$(printf '%s\n' "$OUT" | grep -c '^ok ~/.claude/memory' || true)"
+H="$(build_home)"
+rm -r "$H/.claude/memory"
+: >"$H/.claude/memory"
+doctor "$H"
+assert_eq "9.7 regular file: exit code 0" 0 "$RC"
+assert_eq "9.8 regular file: the one WARN line" "WARN ~/.claude/memory (not a folder): back it up and remove it, then $FIX_LINKS" "$(warn_lines)"
 
 if [ -n "${COV:-}" ]; then
 	cov_end

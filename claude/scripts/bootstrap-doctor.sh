@@ -137,6 +137,8 @@ if [ -L "$HOME/.claude/memory" ]; then
 	warn "~/.claude/memory (a link, not a local folder)" "$FIX_LINKS"
 elif [ -d "$HOME/.claude/memory" ]; then
 	ok "~/.claude/memory (local folder)"
+elif [ -e "$HOME/.claude/memory" ]; then
+	warn "~/.claude/memory (not a folder)" "back it up and remove it, then $FIX_LINKS"
 else
 	warn "~/.claude/memory (absent)" "$FIX_LINKS"
 fi
