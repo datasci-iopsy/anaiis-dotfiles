@@ -1,10 +1,11 @@
 {
-    "skillListingBudgetFraction": 0.075,
+    "skillListingBudgetFraction": 0.1,
     "env": {
         "GIT_AUTHOR_NAME": "datasci-iopsy",
         "GIT_AUTHOR_EMAIL": "14611107+datasci-iopsy@users.noreply.github.com",
         "GIT_COMMITTER_NAME": "datasci-iopsy",
-        "GIT_COMMITTER_EMAIL": "14611107+datasci-iopsy@users.noreply.github.com"
+        "GIT_COMMITTER_EMAIL": "14611107+datasci-iopsy@users.noreply.github.com",
+        "CLAUDE_CODE_SHELL": "/opt/homebrew/bin/bash"
     },
     "attribution": {
         "commit": "",
@@ -140,7 +141,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "bash $HOME/.claude/hooks/maintenance-check.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/maintenance-check.sh"
                     }
                 ]
             },
@@ -148,7 +149,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "bash $HOME/.claude/hooks/ensure-repo-hooks.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/ensure-repo-hooks.sh"
                     }
                 ]
             },
@@ -156,7 +157,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "bash $HOME/.claude/hooks/list-merged-claude-branches.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/list-merged-claude-branches.sh"
                     }
                 ]
             }
@@ -167,7 +168,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "bash $HOME/.claude/hooks/session-start-context.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/session-start-context.sh"
                     }
                 ]
             }
@@ -178,7 +179,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "bash $HOME/.claude/hooks/post-edit-lint.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/post-edit-lint.sh"
                     }
                 ]
             },
@@ -187,7 +188,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "bash $HOME/.claude/hooks/context-watch.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/context-watch.sh"
                     }
                 ]
             }
@@ -198,11 +199,11 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "bash $HOME/.claude/hooks/block-em-dash.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/block-em-dash.sh"
                     },
                     {
                         "type": "command",
-                        "command": "bash $HOME/.claude/hooks/block-edit-on-main.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/block-edit-on-main.sh"
                     }
                 ]
             },
@@ -211,7 +212,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "bash $HOME/.claude/hooks/block-em-dash.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/block-em-dash.sh"
                     }
                 ]
             },
@@ -220,7 +221,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "bash $HOME/.claude/hooks/block-sensitive-writes.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/block-sensitive-writes.sh"
                     }
                 ]
             },
@@ -229,7 +230,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "bash $HOME/.claude/hooks/bash-guard.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/bash-guard.sh"
                     }
                 ]
             },
@@ -238,7 +239,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "bash $HOME/.claude/hooks/cost-guard.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/cost-guard.sh"
                     }
                 ]
             }
@@ -248,7 +249,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "bash $HOME/.claude/hooks/stop-hook-git-check.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/stop-hook-git-check.sh"
                     }
                 ]
             }
@@ -259,7 +260,7 @@
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "bash $HOME/.claude/hooks/pre-compact.sh"
+                        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/hooks/pre-compact.sh"
                     }
                 ]
             }
@@ -267,7 +268,7 @@
     },
     "statusLine": {
         "type": "command",
-        "command": "bash $HOME/.claude/scripts/statusline-command.sh"
+        "command": "${CLAUDE_CODE_SHELL:-bash} $HOME/.claude/scripts/statusline-command.sh"
     },
     "enabledPlugins": {
         "frontend-design@claude-plugins-official": true,
@@ -317,5 +318,6 @@
     "autoCompactEnabled": true,
     "remoteControlAtStartup": false,
     "inputNeededNotifEnabled": true,
-    "agentPushNotifEnabled": true
+    "agentPushNotifEnabled": true,
+    "theme": "dark"
 }

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Read the JSON input from stdin
 input=$(cat)
