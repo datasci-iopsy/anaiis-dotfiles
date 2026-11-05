@@ -4,6 +4,8 @@
 
 **Shell config.** `bash/shared.bash` is the tracked, portable shell config (PATH, aliases, tool inits, prompt). It is sourced by `~/.bashrc`, which is machine-local and not tracked. The wiring on each machine follows a three-file hierarchy. The files load in this order: `~/.bash_profile` (entry point only, sources `~/.bashrc`) -> `~/.bashrc` (sources `shared.bash`, then `~/.bashrc.local`) -> `~/.bashrc.local` (secrets and machine overrides, gitignored). Never add config to `~/.bash_profile` directly; put portable things in `shared.bash` and machine-local secrets in `~/.bashrc.local`. `install.sh` writes the PATH line and the `shared.bash` source line into `~/.bashrc`. It does not add a line that sources `~/.bashrc.local`. Add that line yourself, after the `shared.bash` line, for example `[ -f "$HOME/.bashrc.local" ] && . "$HOME/.bashrc.local"`. Without it, nothing loads `~/.bashrc.local`.
 
+**Configuration homes.** Dials (model, effort, limits, plugin levels) live in `bash/shared.bash` as exports and aliases. Wiring that must hold in every launch path (the shell pin, git identity) lives in the `env` block of `claude/settings.json`. Preferences and structured config live in the other `settings.json` keys. A name never appears in both `shared.bash` and the `env` block, because the `env` value overwrites the shell value. `claude/settings.json` holds no `model`, `effortLevel`, or `modelSettings` key. `rules/environment.md` (section "Configuration homes") has the table and the reasons, and `rules-doctor.sh` check I enforces the two rules that a machine can check.
+
 **Instruction files.** `AGENTS.md` is the only instruction file in this repo. No `CLAUDE.md` is tracked. The global instructions live in `claude/rules/context.md` and the other rule files, which Claude Code loads from `~/.claude/rules/`.
 
 **The "anaiis-" prefix** is the namespace for the custom skills, distinct from upstream Anthropic skills (which keep their unprefixed names). They are served by the `datasci-iopsy/anaiis-plugins` marketplace registered in `claude/settings.json`; `claude/skills/` holds no copies of them.
@@ -161,7 +163,7 @@ Start Claude Code once in a trusted folder. Then run `/reload-plugins` inside Cl
 bash ~/.claude/scripts/bootstrap-doctor.sh
 ```
 
-The doctor only reads. It prints `ok <what>` for each passing check and `MISSING <what>: <fix>` for each gap. The last line is `doctor: <n> missing`. The doctor exits 1 when `n` is above 0. A check that does not apply prints `ok` with the reason, for example `ok github.com host key (not needed: gh not found)`. The doctor runs six checks:
+The doctor only reads. It prints `ok <what>` for each passing check and `MISSING <what>: <fix>` for each gap. The last line is `doctor: <n> missing`. The doctor exits 1 when `n` is above 0. A check that does not apply prints `ok` with the reason, for example `ok github.com host key (not needed: gh not found)`. The doctor runs seven checks:
 
 | # | Check | The fix that the MISSING line names |
 |---|---|---|
@@ -171,6 +173,7 @@ The doctor only reads. It prints `ok <what>` for each passing check and `MISSING
 | 4 | Each plugin that `enabledPlugins` sets to `true` has a folder in `~/.claude/plugins/cache/` | Start Claude Code once, run `/reload-plugins`, read the Errors tab of `/plugin` |
 | 5 | When `gh` uses the SSH protocol, `~/.ssh/known_hosts` holds a `github.com` key | `bash ~/anaiis-dotfiles/install.sh --hostkeys-only` |
 | 6 | When `claude` is on PATH, its version is at least 2.1.277 (the first version that reads `AGENTS.md`) | Update Claude Code |
+| 7 | `settings.json` pins `env.CLAUDE_CODE_SHELL` to an executable bash whose major version is in `APPROVED_BASH_MAJORS`, and every command in it starts with `${CLAUDE_CODE_SHELL:-bash}` | Set the pin, install an approved bash, or approve the major (see "Bash baseline") |
 
 The nine links in check 3 are `settings.json`, `keybindings.json`, `rules`, `commands`, `skills`, `agents`, `hooks`, `scripts`, and `memory`. Check 4 needs `jq`. Without `jq` the doctor prints `MISSING jq (needed to read the plugin list): brew install jq`.
 
@@ -299,13 +302,14 @@ Claude Code loads every file in `~/.claude/rules/` by itself, so no index file e
 |---|---|
 | `rules/context.md` | Project context, build scope, rule precedence, author identity, machine-local rule files, memory tiers, Postman CLI note |
 | `rules/behavioral.md` | The 8 imperatives: authorization before action, model judgment scope, surface conflicts, fail loud, plan and checkpoint, hook output is not user input, investigate is read-only, check before you ask or hedge. Build scope (how much code to write) is the ponytail plugin's, see Skills |
-| `rules/environment.md` | macOS, Bash, direnv, uv, worktree safety, rm -rf splitting |
+| `rules/environment.md` | macOS, Bash, direnv, uv, worktree safety, rm -rf splitting, configuration homes (shell variable, `env` block, or settings key) |
 | `rules/tools.md` | gh, jq, gcloud, make, structured CLI output flags |
 | `rules/code-style.md` | ASD-STE100 default writing register, shell formatting, no emojis, convention conformance |
-| `rules/git.md` | Typed branches (`claude-<type>/<ticket>-<desc>`), trivial-edit criteria, the commit rubric (section "Commit rubric": types, subject grammar, footers, breaking changes, reverts, opt-in lint), PR title format, push, worktrees for parallel work only |
+| `rules/git.md` | Typed branches (`claude-<type>/<ticket>-<desc>`), trivial-edit criteria, the commit rubric (section "Commit rubric": types, subject grammar, footers, breaking changes, reverts, opt-in lint), PR title format, push, criteria for a worktree or a branch in place |
 | `rules/r-conventions.md` | Vectorization, lapply/vapply, lintr style |
 | `rules/python.md` | uv, direnv, ruff |
 | `rules/session.md` | Token efficiency, subagent limits, context thresholds, output preferences |
+| `rules/work-tracking.md` | Slug layout for `spec/` and `tasks/`, file names per kind, stream files, `_archive/`, skill default paths, todo item format |
 | `rules/duckdb.md` | DuckDB query discipline (purpose-based patterns) |
 | `rules/citations.md` | Citation integrity (corpus-only sources, no fabrication) |
 | `rules/testing.md` | Test-intent discipline: tests must encode why, not just what; fail-to-fail check |
@@ -378,9 +382,34 @@ The suites for the bootstrap and commit-lint scripts accept `COV=1`. The helper 
 
 ---
 
+## Bash baseline
+
+The harness runs on one approved Homebrew bash major. The line `APPROVED_BASH_MAJORS="5"` in `claude/scripts/bootstrap-doctor.sh` lists the approved majors. A bash 4 fails the checks. A bash 6 fails them until you add 6 to that line.
+
+- **The pin.** `env.CLAUDE_CODE_SHELL` in `claude/settings.json` is `/opt/homebrew/bin/bash`. It selects the shell of the Bash tool. Without it, Claude Code reads `$SHELL`, and VS Code hands it a stale `/bin/bash` (bash 3.2). With no `$SHELL` at all, Claude Code picks zsh.
+- **The prefix.** Every hook and status line command in `settings.json` starts with `${CLAUDE_CODE_SHELL:-bash}`. The hooks then run on the pinned bash even when PATH has no Homebrew.
+- **Two tiers.** `install.sh`, `bootstrap-doctor.sh`, and `bash/shared.bash` run on bash 3.2, because they run before Homebrew bash exists. Everything else runs on the approved major.
+- **Checks.** Doctor check 7, `tests/test-bash-baseline.sh` (part of `run-all.sh`), and the opt-in `E2E=1 bash tests/e2e-bash-shell.sh`. The e2e suite starts real sessions in three launch environments and reads the bash major of the Bash tool and of a hook. Each environment also runs without the pin, and that control must show the defect.
+- **Another Homebrew prefix.** The pin is the Apple Silicon path. A machine with another prefix fails check 7, and the message names the line to change.
+
+## Claude aliases
+
+`ANTHROPIC_MODEL=opusplan` is the default for a plain `claude`. The aliases start one model with one effort level. Each passes `--model`, which outranks `ANTHROPIC_MODEL`, and `--permission-mode bypassPermissions`.
+
+| Alias | Model | Effort |
+|---|---|---|
+| `claude-fast` | `opusplan` | the exported level |
+| `claude-turbo` | `opusplan` | xhigh |
+| `claude-fable`, `claude-fable-turbo`, `claude-fable-max` | Fable 5.1 | high, xhigh, max |
+| `claude-opus`, `claude-opus-turbo`, `claude-opus-max` | Opus 5.5 | high, xhigh, max |
+
+`tests/test-shared-bash-aliases.sh` ties the model id of each alias to its `ANTHROPIC_DEFAULT_*_MODEL` export, under bash 3.2 and bash 5. While `CLAUDE_CODE_EFFORT_LEVEL` is exported, `/effort` and `--effort` have no effect, so use an alias to change the effort for one launch.
+
+---
+
 ## Worktrees
 
-Use a worktree only for parallel work (see `rules/git.md`). The default is a branch in place.
+Choose a worktree or a branch in place by the criteria in `rules/git.md`, section "Worktree or branch in place": live config, foreign changes in the main checkout, parallel streams, or a request. In this repo a worktree is the default, because the `~/.claude/*` links point at the main checkout.
 
 - **Where.** Worktrees live under `tmp/worktrees/<id>` inside the main checkout. Git ignores `tmp/`, `tasks/`, and `spec/`. Those folders exist only in the main checkout, so edit them there by absolute path.
 - **Live config.** The `~/.claude/*` links point at `~/anaiis-dotfiles/claude/`, which is the main checkout. `install.sh` resolves the main worktree as the canonical path, even when you run it from a worktree. Hook commands in `claude/settings.json` call `$HOME/.claude/hooks/...`, so a hook runs the code of the main checkout. A change in a worktree reaches `~/.claude/` only after it merges.

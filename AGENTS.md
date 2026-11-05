@@ -33,6 +33,18 @@ Three-file hierarchy (none are symlinked; all machine-local except `shared.bash`
 | `~/.bashrc` | No | Machine-specific wiring: sources `shared.bash`, machine extras, then `~/.bashrc.local`. |
 | `~/.bashrc.local` | No (gitignored) | Secrets and machine-specific overrides (API keys, project IDs). Never re-source `shared.bash` here. |
 
+Claude Code values follow `claude/rules/environment.md`, section "Configuration homes". Dials (model, effort, limits) go in `shared.bash`. Wiring (the shell pin, git identity) goes in the `env` block of `claude/settings.json`. A name never appears in both.
+
+## Bash baseline
+
+The harness runs on one approved Homebrew bash major.
+
+- `claude/scripts/bootstrap-doctor.sh` holds the line `APPROVED_BASH_MAJORS="5"`. To approve another major, edit that line and run `bash tests/run-all.sh`. No test needs an edit.
+- `env.CLAUDE_CODE_SHELL` in `claude/settings.json` pins the shell of the Bash tool. Every command in that file starts with `${CLAUDE_CODE_SHELL:-bash}`, so the hooks use the pin too.
+- `install.sh`, `bootstrap-doctor.sh`, and `bash/shared.bash` run on bash 3.2, because they run before Homebrew bash exists. Everything else runs on the approved major.
+- The pin is the Apple Silicon path `/opt/homebrew/bin/bash`. Another prefix fails doctor check 7.
+- Checks: doctor check 7, `tests/test-bash-baseline.sh`, and the opt-in `E2E=1 bash tests/e2e-bash-shell.sh`.
+
 ## Install
 
 Run `install.sh` once on a new machine. It links the Claude config into `~/.claude/`.
