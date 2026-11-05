@@ -252,7 +252,7 @@ if [ -n "$vim_mode" ]; then
 	line1+=("$(printf "${dim}[%s]${rs}" "$vim_mode")")
 fi
 
-# Directory: last two path components of cwd (e.g. "mattermoreai/dbt")
+# Directory: last two path components of cwd (e.g. "acme/dbt")
 _d1=$(basename "$cwd")
 _d2=$(basename "$(dirname "$cwd")")
 if [ -n "$_d2" ] && [ "$_d2" != "." ] && [ "$_d2" != "/" ]; then
