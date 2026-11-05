@@ -37,7 +37,7 @@ Binary rules, checked in order:
    5. The changed file is not under `tests/`, `claude/hooks/`, or `claude/skills/`, and does not end in `.json`, `.yaml`, `.toml`, or `.envrc`.
 3. **Any other edit:** create a `claude-<type>/<ticket>-<desc>` branch from the current user feature branch, inheriting `<ticket>` from that branch name when present.
 
-Before rule 1 or rule 3 creates a branch, check the criteria in "Worktree or branch in place". A worktree makes its own branch with `git worktree add -b`.
+Before applying any branching rule, check the criteria in "Worktree or branch in place". A worktree makes its own branch with `git worktree add -b`.
 
 ## Branch reuse
 Before creating any new `claude-*` branch, run `git branch --list 'claude-*'`. If an unmerged branch whose name contains the topic slug exists, ask: "Continue on `<existing>`? (y/n)." Never silently create a duplicate of an unmerged branch.
@@ -197,7 +197,7 @@ If none holds, use a branch in place (see "Branching decision"). In the dotfiles
 - Path: the `AGENTS.md` of the project names it. The dotfiles repo uses `tmp/worktrees/<id>`. A project with no such line uses `../<repo>.worktrees/<id>`. `<id>` is the short name of the work.
 - Create it with `git -C <main-checkout> worktree add <path> -b claude-<type>/<ticket>-<desc> <base>`. The `-b` flag makes the branch. `<base>` is the current branch, or `main` when the current branch is `main`.
 - Gitignored inputs such as `spec/` and `tasks/` exist only in the main checkout. Read and write them there by absolute path.
-- An uncommitted foreign change (criterion 2) does not enter the worktree. Save it with `git diff <path>`, apply it with `git apply` in the worktree, and commit it on its own. Then tell the user to run `git restore <path>` in the main checkout before `git pull`, because the merge touches the same file.
+- An uncommitted foreign change (criterion 2) does not enter the worktree. For a tracked path, save all changes with `git diff HEAD --binary -- <path>`. For an untracked path, copy the file by hand. In the worktree, apply the diff or add the copied file. Commit it on its own. Then tell the user to run `git restore <path>` in the main checkout before `git pull`, because the merge touches the same file.
 - Merging, pushing, and removing the worktree stay with the user (see "Push" and "Branch cleanup").
 - When a worktree is in use: verify its path and branch with `git worktree list` before referencing either; `git checkout main` fails inside a worktree (return via `cd` to the repo root or ExitWorktree); after leaving, confirm the active branch with `git branch --show-current`.
 
