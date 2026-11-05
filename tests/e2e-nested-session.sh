@@ -191,8 +191,14 @@ case_guard_paths() {
 }
 
 # case_sqlfmt_project: the file's own project config applies, not the session's working directory.
+# Without sqlfmt the hook skips formatting, so the case cannot pass. It reports NOT RUN before any
+# tokens are spent. The lookup is the one of post-edit-lint.sh: PATH, then ~/.local/bin.
 case_sqlfmt_project() {
 	local v="$1" d="$WORK/sq-$1" s="$WORK/sq-$1.json" lines
+	command -v sqlfmt >/dev/null || [ -x "$HOME/.local/bin/sqlfmt" ] || {
+		verdict "$v" sqlfmt_project NOTRUN "sqlfmt not installed; run: uv tool install shandy-sqlfmt"
+		return
+	}
 	mkdir -p "$d/proj"
 	printf '[tool.sqlfmt]\nline_length = 60\n' >"$d/proj/pyproject.toml"
 	hooks_settings "$(hooks_for "$v")" "$s"
