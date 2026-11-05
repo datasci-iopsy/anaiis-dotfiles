@@ -26,7 +26,6 @@ If a rule and a skill conflict, the rule wins.
 ## Author identity
 
 The dotfiles set no git identity. Each machine sets `user.name` and `user.email` in its own git config (README, "Setup on a new machine", step 6).
-The `env` block of `~/.claude/settings.json` sets no `GIT_AUTHOR_*` or `GIT_COMMITTER_*` variable. A value there would override the git config of every repo.
 The `attribution.commit` field controls the Co-Authored-By trailer only. It does not set the commit author.
 
 ## Machine-local overrides
