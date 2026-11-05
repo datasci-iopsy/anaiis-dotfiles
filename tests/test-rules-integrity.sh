@@ -267,7 +267,7 @@ else
 	echo "  SKIP  7.1 jq not available"
 fi
 assert "7.2 no tracked doc says the env block sets the git identity" "" \
-	"$(git -C "$REPO_DIR" grep -l -F -e 'git identity)' -e 'These variables set the git author' \
+	"$(git -C "$REPO_DIR" grep -l -F -e 'shell pin, git identity' -e 'Bash tool and of the hooks, git identity' -e 'These variables set the git author' \
 		-e 'Git author identity is set via' -e 'commit authorship is set via env vars' \
 		-- ':(exclude)tests/test-rules-integrity.sh' | tr '\n' ' ')"
 
