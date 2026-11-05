@@ -210,6 +210,8 @@ alias claude-fable-turbo='CLAUDE_CODE_EFFORT_LEVEL=xhigh claude --model claude-f
 # Fable max: Fable 5.1, max effort
 alias claude-fable-max='CLAUDE_CODE_EFFORT_LEVEL=max claude --model claude-fable-5-1 --permission-mode bypassPermissions'
 
+# The model id of each Opus alias repeats ANTHROPIC_DEFAULT_OPUS_MODEL on purpose. The Fable aliases do the same.
+# A stale copy runs the wrong model, so tests/test-shared-bash-aliases.sh fails when a copy drifts from the export.
 # Opus: Opus 5.5, high effort
 alias claude-opus='CLAUDE_CODE_EFFORT_LEVEL=high claude --model claude-opus-5-5 --permission-mode bypassPermissions'
 

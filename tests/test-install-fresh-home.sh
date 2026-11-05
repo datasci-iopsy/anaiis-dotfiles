@@ -138,6 +138,8 @@ ENABLED="$(jq '[(.enabledPlugins // {}) | to_entries[] | select(.value == true)]
 # the expected gap from the file itself: one line for an absent pin, one for commands with a bare bash.
 # Once the main checkout holds both, GAP is 0 and this section is strict. The repo's own settings.json
 # is checked by tests/test-bash-baseline.sh, which does not read through the links.
+# shortcut: GAP reads the live main checkout and repeats the counting filter of the doctor. Once PR 38
+# has merged, delete GAP and the two lines that set it, and assert a count of 0 for check 7.
 GAP=0
 [ -n "$(jq -r '.env.CLAUDE_CODE_SHELL // empty' "$H/.claude/settings.json")" ] || GAP=$((GAP + 1))
 # shellcheck disable=SC2016 # ${...} stays literal: it is the text that settings.json holds
