@@ -21,8 +21,9 @@
 #   6. when claude is on PATH, its version is at least 2.1.295 (onFailure support for PreToolUse guards)
 #   7. settings.json pins env.CLAUDE_CODE_SHELL to an executable bash whose major version is in
 #      APPROVED_BASH_MAJORS, and every command in it starts with ${CLAUDE_CODE_SHELL:-bash}
+#   8. sqlfmt runs, on PATH or in ~/.local/bin (WARN when it is absent or does not run)
 #
-# Tools used: dirname basename readlink grep jq gh ssh-keygen claude, and the pinned bash (check 7,
+# Tools used: dirname basename readlink grep jq gh ssh-keygen claude sqlfmt, and the pinned bash (check 7,
 # by absolute path, run once with -c to print its major). ssh-keygen reads the passwd
 # home and ignores $HOME, so its call passes -f.
 
@@ -50,6 +51,7 @@ FIX_PIN='set env.CLAUDE_CODE_SHELL in ~/anaiis-dotfiles/claude/settings.json to 
 FIX_MAJOR='install an approved bash (brew install bash), or approve this major by editing APPROVED_BASH_MAJORS in ~/anaiis-dotfiles/claude/scripts/bootstrap-doctor.sh'
 # shellcheck disable=SC2016 # ${...} stays literal: the user pastes this text into settings.json
 FIX_PREFIX='start each command in ~/anaiis-dotfiles/claude/settings.json with ${CLAUDE_CODE_SHELL:-bash} (a bare bash follows PATH)'
+FIX_SQLFMT='uv tool install shandy-sqlfmt'
 
 # phys <path>: print the physical path of an existing path, with every link resolved.
 phys() {
@@ -250,6 +252,25 @@ if command -v jq >/dev/null 2>&1 && [ -f "$settings" ] && jq -e . "$settings" >/
 	else
 		missing "hook commands without the pin prefix ($bare of $total)" "$FIX_PREFIX"
 	fi
+fi
+
+# ---- 8. sqlfmt --------------------------------------------------------------
+# post-edit-lint.sh and sqlfmt-lint-staged.sh format SQL with sqlfmt and skip with a notice when it is
+# absent. The doctor looks where they look: PATH, then ~/.local/bin, where uv tool install puts it.
+# uv tools are per user, so each profile needs its own install. A gap is a WARN, not missing.
+sqlfmt_bin="$(command -v sqlfmt 2>/dev/null)" || sqlfmt_bin=""
+if [ -z "$sqlfmt_bin" ] && [ -x "$HOME/.local/bin/sqlfmt" ]; then
+	sqlfmt_bin="$HOME/.local/bin/sqlfmt"
+fi
+if [ -z "$sqlfmt_bin" ]; then
+	warn "sqlfmt (absent: the hooks skip SQL formatting)" "$FIX_SQLFMT"
+else
+	sv="$("$sqlfmt_bin" --version 2>/dev/null)" || sv=""
+	sv="${sv%%$'\n'*}"
+	case "$sv" in
+		"sqlfmt, version "*) ok "sqlfmt ${sv#sqlfmt, version }" ;;
+		*) warn "sqlfmt ($sqlfmt_bin does not run)" "$FIX_SQLFMT" ;;
+	esac
 fi
 
 printf 'doctor: %s missing\n' "$MISSING"

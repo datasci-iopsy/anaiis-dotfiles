@@ -61,7 +61,7 @@ if [ -n "${COV:-}" ]; then
 fi
 
 # ---- Tools on PATH ----------------------------------------------------------
-# The doctor may call only: dirname basename readlink grep jq gh ssh-keygen claude. Each PATH folder
+# The doctor may call only: dirname basename readlink grep jq gh ssh-keygen claude sqlfmt. Each PATH folder
 # below links just those that a case needs. Without gh, jq, or claude on PATH, the doctor sees them as absent.
 mkdir -p "$TMPD/stub"
 cat >"$TMPD/stub/gh" <<'EOF'
@@ -99,14 +99,26 @@ cat >"$TMPD/stub/bash" <<'EOF'
 printf '%s' "$STUB_BASH_V"
 EOF
 chmod +x "$TMPD/stub/bash"
+cat >"$TMPD/stub/sqlfmt" <<'EOF'
+#!/bin/sh
+# POSIX sh, for the same reason as the stub gh. Accepts exactly: --version.
+# STUB_SQLFMT_V is the whole line to print. Empty makes it fail, like a broken install.
+[ "$*" = "--version" ] || {
+	echo "stub sqlfmt: unexpected arguments: $*" >&2
+	exit 64
+}
+[ -n "$STUB_SQLFMT_V" ] || exit 1
+echo "$STUB_SQLFMT_V"
+EOF
+chmod +x "$TMPD/stub/sqlfmt"
 
-# make_bin <dir> <tool>...: a PATH folder that links the named real tools. The stubs are "gh" and "claude".
+# make_bin <dir> <tool>...: a PATH folder that links the named real tools. The stubs are "gh", "claude", and "sqlfmt".
 make_bin() {
 	local dir="$1" tool real
 	shift
 	mkdir -p "$dir"
 	for tool in "$@"; do
-		if [ "$tool" = gh ] || [ "$tool" = claude ]; then
+		if [ "$tool" = gh ] || [ "$tool" = claude ] || [ "$tool" = sqlfmt ]; then
 			real="$TMPD/stub/$tool"
 		else
 			real="$(command -v "$tool")"
@@ -114,10 +126,11 @@ make_bin() {
 		ln -s "$real" "$dir/$tool"
 	done
 }
-make_bin "$TMPD/bin" dirname basename readlink grep jq ssh-keygen gh claude
-make_bin "$TMPD/bin-nogh" dirname basename readlink grep jq ssh-keygen claude
-make_bin "$TMPD/bin-nojq" dirname basename readlink grep ssh-keygen gh claude
-make_bin "$TMPD/bin-noclaude" dirname basename readlink grep jq ssh-keygen gh
+make_bin "$TMPD/bin" dirname basename readlink grep jq ssh-keygen gh claude sqlfmt
+make_bin "$TMPD/bin-nogh" dirname basename readlink grep jq ssh-keygen claude sqlfmt
+make_bin "$TMPD/bin-nojq" dirname basename readlink grep ssh-keygen gh claude sqlfmt
+make_bin "$TMPD/bin-noclaude" dirname basename readlink grep jq ssh-keygen gh sqlfmt
+make_bin "$TMPD/bin-nosqlfmt" dirname basename readlink grep jq ssh-keygen gh claude
 
 # ---- Fixture HOME -----------------------------------------------------------
 ssh-keygen -q -t ed25519 -N '' -C '' -f "$TMPD/hostkey" >/dev/null
@@ -162,9 +175,10 @@ build_home() {
 # doctor <home>: run the script. OUT holds stdout and stderr, RC the exit code.
 # PROTO (default ssh) sets the stub gh answer; BIN_DIR (default $TMPD/bin) sets PATH.
 # CLAUDE_V (default: a new version) sets the line that the stub claude prints for --version.
+# SQLFMT_V (default: version 0.32.0) sets the line that the stub sqlfmt prints. Empty makes it fail.
 doctor() {
 	OUT="$(HOME="$1" PATH="${BIN_DIR:-$TMPD/bin}" STUB_PROTOCOL="${PROTO-ssh}" \
-		STUB_CLAUDE_VERSION="${CLAUDE_V-2.1.318 (Claude Code)}" STUB_BASH_V="${STUB_BASH_V-$FIRST}" "$BASH" "$DOCTOR" 2>&1)"
+		STUB_CLAUDE_VERSION="${CLAUDE_V-2.1.318 (Claude Code)}" STUB_BASH_V="${STUB_BASH_V-$FIRST}" STUB_SQLFMT_V="${SQLFMT_V-sqlfmt, version 0.32.0}" "$BASH" "$DOCTOR" 2>&1)"
 	RC=$?
 }
 
@@ -207,8 +221,8 @@ assert_eq "0.1 exit code 0" 0 "$RC"
 assert_eq "0.2 no MISSING line" 0 "$(miss_count)"
 assert_eq "0.3 summary line" "doctor: 0 missing" "$(printf '%s\n' "$OUT" | tail -n 1)"
 # 2 bashrc + 1 login + 8 links + 1 memory folder + 2 enabled plugins + 1 host key + 1 claude version
-# + 1 harness bash pin + 1 hook command prefix. The disabled plugin is not listed.
-assert_eq "0.4 eighteen ok lines" 18 "$(ok_count)"
+# + 1 harness bash pin + 1 hook command prefix + 1 sqlfmt. The disabled plugin is not listed.
+assert_eq "0.4 nineteen ok lines" 19 "$(ok_count)"
 assert_eq "0.5 the disabled plugin is not checked" 0 "$(printf '%s\n' "$OUT" | grep -c 'off@mk3' || true)"
 assert_eq "0.6 the HOME is unchanged" "$SNAP0" "$(snapshot "$H0")"
 assert_eq "0.7 a real memory folder is ok" 1 "$(printf '%s\n' "$OUT" | grep -c '^ok ~/.claude/memory (local folder)$' || true)"
@@ -478,6 +492,28 @@ if [ -n "${COV:-}" ]; then
 	cov_end
 	cov_report "$DOCTOR"
 fi
+
+echo "--- 10. sqlfmt"
+# The post-edit hook and the pre-commit hook skip SQL formatting without sqlfmt, so a gap is a WARN,
+# not missing. The doctor looks where the hooks look: PATH, then ~/.local/bin (uv tool install).
+FIX_SQLFMT='uv tool install shandy-sqlfmt'
+doctor "$H0"
+assert_eq "10.1 on PATH: the ok line names the version" 1 "$(printf '%s\n' "$OUT" | grep -c '^ok sqlfmt 0\.32\.0$' || true)"
+BIN_DIR="$TMPD/bin-nosqlfmt" doctor "$H0"
+assert_eq "10.2 absent: exit code 0" 0 "$RC"
+assert_eq "10.3 absent: the one WARN line" "WARN sqlfmt (absent: the hooks skip SQL formatting): $FIX_SQLFMT" "$(warn_lines)"
+assert_eq "10.4 absent: summary line" "doctor: 0 missing" "$(printf '%s\n' "$OUT" | tail -n 1)"
+H="$(build_home)"
+mkdir -p "$H/.local/bin"
+ln -s "$TMPD/stub/sqlfmt" "$H/.local/bin/sqlfmt"
+BIN_DIR="$TMPD/bin-nosqlfmt" doctor "$H"
+assert_eq "10.5 only in ~/.local/bin: the ok line names the version" 1 "$(printf '%s\n' "$OUT" | grep -c '^ok sqlfmt 0\.32\.0$' || true)"
+assert_eq "10.6 only in ~/.local/bin: no WARN line" "" "$(warn_lines)"
+SQLFMT_V="" doctor "$H0"
+assert_eq "10.7 --version fails: exit code 0" 0 "$RC"
+assert_eq "10.8 --version fails: the one WARN line" "WARN sqlfmt ($TMPD/bin/sqlfmt does not run): $FIX_SQLFMT" "$(warn_lines)"
+SQLFMT_V="usage: sqlfmt [OPTIONS]" doctor "$H0"
+assert_eq "10.9 other text: the one WARN line" "WARN sqlfmt ($TMPD/bin/sqlfmt does not run): $FIX_SQLFMT" "$(warn_lines)"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
