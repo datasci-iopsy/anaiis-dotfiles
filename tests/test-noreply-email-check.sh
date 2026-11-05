@@ -173,9 +173,14 @@ assert_eq "8.5 the suite still runs after a clean check" 1 "$([ -e "$R/.suite-ra
 git -C "$R" update-ref -d refs/remotes/origin/main
 assert_eq "8.6 a new branch with an unpushed private-email commit is rejected" 1 \
 	"$(run_push "$R" "refs/heads/topic $TOP refs/heads/topic $ZERO")"
+git -C "$R" update-ref refs/remotes/origin/main "$BASE"
 assert_eq "8.7 a remote sha that the clone lacks falls back to the remote refs" 1 \
 	"$(run_push "$R" "refs/heads/main $TOP refs/heads/main 1111111111111111111111111111111111111111")"
 assert_eq "8.8 a push reject gives the --amend hint for the listed commits" 1 "$(grep -c -- '--amend' "$WORK/last.out")"
+git -C "$R" update-ref refs/remotes/origin/main "$BADSHA"
+assert_eq "8.7b the fallback leaves out a private-email commit that a remote ref holds" 0 \
+	"$(run_push "$R" "refs/heads/main $TOP refs/heads/main 1111111111111111111111111111111111111111")"
+git -C "$R" update-ref -d refs/remotes/origin/main
 
 echo
 echo "=== Results: $PASS passed, $FAIL failed ==="
