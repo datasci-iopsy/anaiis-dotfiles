@@ -7,8 +7,9 @@
 #   trap 'rm -rf "$H"' EXIT
 #   HOME="$H" bash some-script.sh
 #
-# The new HOME holds ~/.claude/{hooks,scripts,rules,commands,skills,agents,memory} as links to
-# <repo_dir>/claude/<name>. repo_dir may be relative; the function makes it absolute and returns 1
+# The new HOME holds ~/.claude/{hooks,scripts,rules,commands,skills,agents} as links to
+# <repo_dir>/claude/<name>, and ~/.claude/memory as a real folder with a fixture MEMORY.md, as
+# install.sh leaves it. repo_dir may be relative; the function makes it absolute and returns 1
 # when it is not a folder. Nothing else exists: no plans folder, no projects folder, no shell
 # config. That is the state of a fresh machine. The function reads and writes only inside the new
 # folder, and it never reads the real HOME.
@@ -24,8 +25,10 @@ fresh_home_new() {
 	repo_dir="$(CDPATH='' cd -- "$1" && pwd)" || return 1
 	home="$(mktemp -d "${TMPDIR:-/tmp}/fresh-home.XXXXXX")" || return 1
 	mkdir -p "$home/.claude"
-	for name in hooks scripts rules commands skills agents memory; do
+	for name in hooks scripts rules commands skills agents; do
 		ln -s "$repo_dir/claude/$name" "$home/.claude/$name"
 	done
+	mkdir -p "$home/.claude/memory"
+	printf '# Global Memory Index\n' >"$home/.claude/memory/MEMORY.md"
 	printf '%s\n' "$home"
 }

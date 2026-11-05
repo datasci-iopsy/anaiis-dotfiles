@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # tests/test-lib-fresh-home.sh -- verify tests/lib/fresh-home.sh builds a throwaway HOME
 # whose ~/.claude links point at the repo under test, and never touches the real HOME.
+# ~/.claude/memory is a real folder with a fixture index, as install.sh leaves it.
 #
 # Why this matters: hooks and scripts call $HOME/.claude/scripts/... at run time. In a linked
 # worktree the live ~/.claude links point at the MAIN checkout, so a test that uses the real
@@ -52,10 +53,13 @@ assert_eq "1.2 two calls return two different folders" yes "$(yesno test "$H1" !
 assert_eq "1.3 the folder is not the real HOME" yes "$(yesno test "$H1" != "$HOME")"
 
 echo "--- 2. the links point at the repo under test"
-for name in hooks scripts rules commands skills agents memory; do
+for name in hooks scripts rules commands skills agents; do
 	assert_eq "2.$name link target" "$REPO_DIR/claude/$name" "$(readlink "$H1/.claude/$name")"
 	assert_eq "2.$name link resolves to a folder" yes "$(yesno test -d "$H1/.claude/$name/")"
 done
+assert_eq "2.memory is not a link" no "$(yesno test -L "$H1/.claude/memory")"
+assert_eq "2.memory is a real folder" yes "$(yesno test -d "$H1/.claude/memory")"
+assert_eq "2.memory holds a MEMORY.md index" yes "$(yesno test -f "$H1/.claude/memory/MEMORY.md")"
 
 echo "--- 2b. a relative repo path still gives working links"
 # A relative target would resolve against $home/.claude and the links would dangle.
