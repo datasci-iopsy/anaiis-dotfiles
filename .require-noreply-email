@@ -1,0 +1,2 @@
+# Opt-in marker for claude/scripts/noreply-email-check.sh: every commit in this repo must use a
+# GitHub noreply author and committer email. The pre-commit and pre-push hooks enforce it.
