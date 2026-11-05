@@ -272,10 +272,7 @@ run_links "$H8"
 assert_eq "8.1 link: exit code is 0" 0 "$RC"
 assert_eq "8.2 link: the path is now a real folder" yes \
 	"$([ -d "$H8/.claude/memory" ] && [ ! -L "$H8/.claude/memory" ] && echo yes || echo no)"
-assert_eq "8.3 link: the folder holds two files" 2 "$(find "$H8/.claude/memory" -mindepth 1 | wc -l | tr -d ' ')"
-for f in MEMORY.md user_profile.md; do
-	assert_eq "8.4 link: $f matches byte for byte" yes "$(cmp -s "$SRC8/$f" "$H8/.claude/memory/$f" && echo yes || echo no)"
-done
+assert_eq "8.3 link: the folder holds the same files, byte for byte" "" "$(diff -r "$SRC8" "$H8/.claude/memory" 2>&1)"
 assert_eq "8.5 link: the old target keeps its two files" 2 "$(find "$SRC8" -mindepth 1 | wc -l | tr -d ' ')"
 assert_eq "8.6 link: one migrated line names the path" 1 "$(printf '%s\n' "$OUT" | grep -c "^  migrated $H8/.claude/memory ")"
 assert_eq "8.7 link: no temp folder is left next to it" "" "$(find "$H8/.claude" -maxdepth 1 -name 'memory.*')"

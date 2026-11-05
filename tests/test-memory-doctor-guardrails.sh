@@ -83,10 +83,12 @@ GLOBAL_DIR="$TMP_HOME/.claude/memory"
 INDEX="$GLOBAL_DIR/MEMORY.md"
 PROJECTS_DIR="$TMP_HOME/.claude/projects"
 
-# make_global: build the global tier as a real folder from a synthetic
+# make_global: (re)build the global tier as a real folder from a synthetic
 # fixture that passes every check: one topical file with full frontmatter,
-# linked from the index, small enough for the payload budget.
+# linked from the index, small enough for the payload budget. It first
+# removes the old tier; a link is removed, not its target.
 make_global() {
+	rm -rf "$GLOBAL_DIR"
 	mkdir -p "$GLOBAL_DIR"
 	printf '# Global Memory Index\n\n- [Fixture fact](feedback_fixture_fact.md): a synthetic fact\n' >"$INDEX"
 	printf -- '---\nname: fixture-fact\ndescription: a synthetic fact\nmetadata:\n  type: feedback\n---\n\nfixture body\n' \
@@ -104,12 +106,6 @@ run_doctor() {
 		bash "$DOCTOR" >"$out" 2>&1
 }
 
-# Reset the global tier to the synthetic fixture.
-restore_global() {
-	rm -rf "$GLOBAL_DIR"
-	make_global
-}
-
 # ── 0. Doctor passes on the green tree ────────────────────────────────────
 echo "# 0. Doctor on green tree"
 run_doctor "$OUT_DIR/green.out"
@@ -124,8 +120,7 @@ ln -s "$WORK/linked-memory" "$GLOBAL_DIR"
 run_doctor "$OUT_DIR/link.out"
 assert "0.4 doctor exits 0 when the global tier is a link" "0" "$?"
 assert_contains "0.5 A.1 passes for a link" "  PASS  A.1 " "$(cat "$OUT_DIR/link.out")"
-rm "$GLOBAL_DIR"
-mv "$WORK/linked-memory" "$GLOBAL_DIR"
+make_global
 
 # ── 1. Every drift fixture at once (checks I, J.1, J.2, K, L, M) ──────────
 echo "# 1. Every drift fixture applied at once"
@@ -176,7 +171,7 @@ assert_contains "1.6 doctor names the payload budget (L.1)" "L.1 payload budget"
 assert_contains "1.7 doctor names pending migration (M.1)" "M.1 pending migration" "$OUT"
 
 rm -rf "$T1_PROJ" "$PROJECTS_DIR/${T1_KEY:?}"
-restore_global
+make_global
 
 # ── 7. Receipt detection (check H) ─────────────────────────────────────────
 # Regression fixture for a real bug found via a live headless (`claude -p`)

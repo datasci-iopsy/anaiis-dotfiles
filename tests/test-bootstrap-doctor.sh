@@ -135,17 +135,15 @@ NAMES="settings.json keybindings.json rules commands skills agents hooks scripts
 
 # build_home: print the path of a new, healthy HOME. The repo sits elsewhere and ~/anaiis-dotfiles
 # links to it, as install.sh arranges when the clone is not at the canonical path. ~/.claude/memory is
-# a real folder with an index, as install.sh leaves it.
+# a real folder, as install.sh leaves it. The doctor does not read its files.
 build_home() {
 	local h repo name
 	h="$(mktemp -d "$TMPD/home.XXXXXX")"
 	repo="$h.repo"
-	mkdir -p "$repo/claude" "$h/.claude" "$h/.ssh"
+	mkdir -p "$repo/claude" "$h/.claude/memory" "$h/.ssh"
 	for name in rules commands skills agents hooks scripts; do
 		mkdir -p "$repo/claude/$name"
 	done
-	mkdir -p "$h/.claude/memory"
-	printf '# Global Memory Index\n' >"$h/.claude/memory/MEMORY.md"
 	printf '%s\n' "$SETTINGS_JSON" >"$repo/claude/settings.json"
 	printf '{}\n' >"$repo/claude/keybindings.json"
 	ln -s "$repo" "$h/anaiis-dotfiles"

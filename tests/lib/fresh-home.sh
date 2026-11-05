@@ -24,11 +24,10 @@ fresh_home_new() {
 	# CDPATH stops cd from picking another folder with the same name and printing its path.
 	repo_dir="$(CDPATH='' cd -- "$1" && pwd)" || return 1
 	home="$(mktemp -d "${TMPDIR:-/tmp}/fresh-home.XXXXXX")" || return 1
-	mkdir -p "$home/.claude"
+	mkdir -p "$home/.claude/memory"
 	for name in hooks scripts rules commands skills agents; do
 		ln -s "$repo_dir/claude/$name" "$home/.claude/$name"
 	done
-	mkdir -p "$home/.claude/memory"
 	printf '# Global Memory Index\n' >"$home/.claude/memory/MEMORY.md"
 	printf '%s\n' "$home"
 }
