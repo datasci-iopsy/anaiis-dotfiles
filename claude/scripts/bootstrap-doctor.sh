@@ -17,14 +17,20 @@
 #   4. each enabled plugin has a folder in ~/.claude/plugins/cache/
 #   5. when gh uses the ssh protocol, known_hosts holds a github.com key
 #   6. when claude is on PATH, its version is at least 2.1.277 (AGENTS.md support)
+#   7. settings.json pins env.CLAUDE_CODE_SHELL to an executable bash whose major version is in
+#      APPROVED_BASH_MAJORS, and every command in it starts with ${CLAUDE_CODE_SHELL:-bash}
 #
-# Tools used: dirname basename readlink grep jq gh ssh-keygen claude. ssh-keygen reads the passwd
+# Tools used: dirname basename readlink grep jq gh ssh-keygen claude, and the pinned bash (check 7,
+# by absolute path, run once with -c to print its major). ssh-keygen reads the passwd
 # home and ignores $HOME, so its call passes -f.
 
 # shellcheck disable=SC2088 # "~" is literal text in the messages, never a path to expand
 set -u
 
 MISSING=0
+# The Homebrew bash majors that the harness is approved to run on. Check 7 fails for any other major,
+# older or newer. To approve a new major, edit this one line (for example "5 6"). The suites read it.
+APPROVED_BASH_MAJORS="5"
 ok() { printf 'ok %s\n' "$1"; }
 missing() {
 	printf 'MISSING %s: %s\n' "$1" "$2"
@@ -37,6 +43,10 @@ FIX_KEYS='bash ~/anaiis-dotfiles/install.sh --hostkeys-only'
 # shellcheck disable=SC2016 # $HOME stays literal: the user pastes this line into a file
 FIX_LOGIN='add this line to it: [ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"'
 FIX_PLUGIN='start Claude Code once, run /reload-plugins, and read the /plugin Errors tab. A GitHub clone over SSH needs the host key from the github.com check (fix: bash ~/anaiis-dotfiles/install.sh --hostkeys-only).'
+FIX_PIN='set env.CLAUDE_CODE_SHELL in ~/anaiis-dotfiles/claude/settings.json to the Homebrew bash path, for example /opt/homebrew/bin/bash'
+FIX_MAJOR='install an approved bash (brew install bash), or approve this major by editing APPROVED_BASH_MAJORS in ~/anaiis-dotfiles/claude/scripts/bootstrap-doctor.sh'
+# shellcheck disable=SC2016 # ${...} stays literal: the user pastes this text into settings.json
+FIX_PREFIX='start each command in ~/anaiis-dotfiles/claude/settings.json with ${CLAUDE_CODE_SHELL:-bash} (a bare bash follows PATH)'
 
 # phys <path>: print the physical path of an existing path, with every link resolved.
 phys() {
@@ -190,6 +200,41 @@ else
 		ok "claude version $cv"
 	else
 		missing "claude version" "update Claude Code"
+	fi
+fi
+
+# ---- 7. harness bash --------------------------------------------------------
+# The harness runs on one approved Homebrew bash major. settings.json pins the shell of the Bash tool
+# with env.CLAUDE_CODE_SHELL, and every command starts with ${CLAUDE_CODE_SHELL:-bash}, so one pin
+# controls the Bash tool and the hooks. Without a readable settings.json, check 4 already reports the
+# cause, so this check adds no line. The pin runs once, with -c, to print its own major version.
+if command -v jq >/dev/null 2>&1 && [ -f "$settings" ] && jq -e . "$settings" >/dev/null 2>&1; then
+	pin="$(jq -r '.env.CLAUDE_CODE_SHELL // empty' "$settings")"
+	if [ -z "$pin" ]; then
+		missing "harness bash pin (env.CLAUDE_CODE_SHELL absent in ~/.claude/settings.json)" "$FIX_PIN"
+	elif [ ! -f "$pin" ] || [ ! -x "$pin" ]; then
+		missing "harness bash pin ($pin is not an executable file)" "$FIX_PIN"
+	else
+		# shellcheck disable=SC2016 # the pinned bash expands ${BASH_VERSINFO[0]}, not this shell
+		major="$("$pin" -c 'printf %s "${BASH_VERSINFO[0]}"' 2>/dev/null)" || major=""
+		approved=no
+		for m in $APPROVED_BASH_MAJORS; do
+			[ "$major" = "$m" ] && approved=yes
+		done
+		if [ "$approved" = yes ]; then
+			ok "harness bash $pin (major $major)"
+		else
+			missing "harness bash $pin (major ${major:-unknown}, approved: $APPROVED_BASH_MAJORS)" "$FIX_MAJOR"
+		fi
+	fi
+	# shellcheck disable=SC2016 # ${...} stays literal: it is the text that settings.json holds
+	counts="$(jq -r '[.. | objects | select(has("command")) | .command | strings] | "\(length) \(map(select(startswith("${CLAUDE_CODE_SHELL:-bash} ") | not)) | length)"' "$settings")"
+	total="${counts% *}"
+	bare="${counts#* }"
+	if [ "$bare" -eq 0 ]; then
+		ok "hook commands start with the pin prefix ($total)"
+	else
+		missing "hook commands without the pin prefix ($bare of $total)" "$FIX_PREFIX"
 	fi
 fi
 

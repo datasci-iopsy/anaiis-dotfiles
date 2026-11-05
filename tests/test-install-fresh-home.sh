@@ -133,6 +133,15 @@ assert_eq "3.4 the second run ends with Done." 1 "$(printf '%s\n' "$OUT" | grep 
 
 echo "--- 4. the doctor agrees"
 ENABLED="$(jq '[(.enabledPlugins // {}) | to_entries[] | select(.value == true)] | length' "$H/.claude/settings.json")"
+# Doctor check 7 reads the shell pin and the hook commands from the settings.json that the links reach.
+# That file sits in the main checkout, which holds neither until the branch that adds them merges. Count
+# the expected gap from the file itself: one line for an absent pin, one for commands with a bare bash.
+# Once the main checkout holds both, GAP is 0 and this section is strict. The repo's own settings.json
+# is checked by tests/test-bash-baseline.sh, which does not read through the links.
+GAP=0
+[ -n "$(jq -r '.env.CLAUDE_CODE_SHELL // empty' "$H/.claude/settings.json")" ] || GAP=$((GAP + 1))
+# shellcheck disable=SC2016 # ${...} stays literal: it is the text that settings.json holds
+[ "$(jq '[.. | objects | select(has("command")) | .command | select(startswith("${CLAUDE_CODE_SHELL:-bash} ") | not)] | length' "$H/.claude/settings.json")" -eq 0 ] || GAP=$((GAP + 1))
 OUT="$(HOME="$H" PATH="$TMPD/stub:$PATH" "$BASH" "$DOCTOR" 2>&1)"
 RC=$?
 okl() { printf '%s\n' "$OUT" | grep -c "$1"; }
@@ -141,10 +150,10 @@ assert_eq "4.2 ok for the shared.bash line" 1 "$(okl '^ok ~/.bashrc shared.bash 
 assert_eq "4.3 ok for the login shell file" 1 "$(okl '^ok ~/.bash_profile mentions ~/.bashrc$')"
 assert_eq "4.4 ok for all nine links" 9 "$(okl '^ok ~/.claude/[a-z.]* -> ~/anaiis-dotfiles/claude$')"
 assert_eq "4.5 one MISSING line per enabled plugin" "$ENABLED" "$(okl '^MISSING plugin ')"
-assert_eq "4.6 no other MISSING line" "$ENABLED" "$(okl '^MISSING ')"
+assert_eq "4.6 no other MISSING line (check 7 adds GAP lines)" "$((ENABLED + GAP))" "$(okl '^MISSING ')"
 assert_eq "4.7 the host key is not needed for https" 1 "$(okl '^ok github.com host key (not needed: gh protocol is https)$')"
-assert_eq "4.8 summary counts the missing plugins" "doctor: $ENABLED missing" "$(printf '%s\n' "$OUT" | tail -n 1)"
-if [ "$ENABLED" -gt 0 ]; then WANT_RC=1; else WANT_RC=0; fi
+assert_eq "4.8 summary counts the missing plugins and the check 7 gap" "doctor: $((ENABLED + GAP)) missing" "$(printf '%s\n' "$OUT" | tail -n 1)"
+if [ "$((ENABLED + GAP))" -gt 0 ]; then WANT_RC=1; else WANT_RC=0; fi
 assert_eq "4.9 exit code follows the missing count" "$WANT_RC" "$RC"
 assert_eq "4.10 the claude version check passes against the stub" 1 "$(okl '^ok claude version 2.1.318$')"
 
