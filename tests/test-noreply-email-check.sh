@@ -127,12 +127,12 @@ echo "=== 3. config override on the command line ==="
 assert_eq "3.1 git -c user.email=<private> is rejected" rejected \
 	"$(try_commit "$R" git -c user.email="$BAD" commit -q --allow-empty -m c31)"
 
-echo "=== 4. --author: what pre-commit sees, and the push backstop ==="
-SEEN="$(try_commit "$R" git commit -q --allow-empty --author="A <$BAD>" -m c41)"
-printf '  INFO  4.0 pre-commit result for --author with a private email: %s\n' "$SEEN"
-if [ "$SEEN" = rejected ]; then
-	try_commit "$R" SKIP_EMAIL_CHECK=1 git commit -q --allow-empty --author="A <$BAD>" -m c41b >/dev/null
-fi
+echo "=== 4. --author: pre-commit rejects it, and the push backstop ==="
+# git exports the --author identity to the pre-commit hook, so staged mode sees it.
+assert_eq "4.0 a private --author email is rejected at commit time" rejected \
+	"$(try_commit "$R" git commit -q --allow-empty --author="A <$BAD>" -m c41)"
+# The push case needs the commit, so it is made with the check bypassed.
+try_commit "$R" SKIP_EMAIL_CHECK=1 git commit -q --allow-empty --author="A <$BAD>" -m c41b >/dev/null
 assert_eq "4.1 the commit with the private --author exists for the push case" "$BAD" "$(git -C "$R" log -1 --format=%ae)"
 PARENT="$(git -C "$R" rev-parse HEAD~1)"
 HEAD_SHA="$(git -C "$R" rev-parse HEAD)"
