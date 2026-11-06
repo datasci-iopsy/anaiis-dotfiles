@@ -130,6 +130,8 @@ A PR title follows the subject grammar and ends with the ticket in brackets (see
 - The validator is `claude/scripts/commit-msg-lint.sh`. To check a draft, run `bash ~/.claude/scripts/commit-msg-lint.sh <message-file>`. To print the allowed types, add the `--types` flag instead of a file.
 - The `commit-msg` hook runs the validator only in a repo whose working tree has a `.conventional-commits` file at its root. This repo has that file. Other repos accept any message.
 - If the lint rejects a message, fix the message.
+- In a repo with a `.require-noreply-email` file at its root, the `pre-commit` and `pre-push` hooks run `claude/scripts/noreply-email-check.sh`. A commit whose author or committer email is not a GitHub noreply address is rejected. This repo has that file. If the check rejects a commit, fix the identity (`git config user.email`) and redo the commit. `SKIP_EMAIL_CHECK=1` bypasses the check. Only the user uses it. Claude never uses it.
+- Limit: `--no-verify` skips both hooks. GitHub's GH007 then blocks only a private address of the GitHub account, not a work address.
 - `SKIP_COMMIT_LINT=1 git commit` bypasses the lint. Only the user uses it. Claude never uses it.
 
 ### Subject examples
