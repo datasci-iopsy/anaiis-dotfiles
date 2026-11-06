@@ -177,7 +177,7 @@ Start Claude Code once in a trusted folder. Then run `/reload-plugins` inside Cl
 bash ~/.claude/scripts/bootstrap-doctor.sh
 ```
 
-The doctor only reads. It prints `ok <what>` for each passing check and `MISSING <what>: <fix>` for each gap. The last line is `doctor: <n> missing`. The doctor exits 1 when `n` is above 0. A check that does not apply prints `ok` with the reason, for example `ok github.com host key (not needed: gh not found)`. The doctor runs seven checks:
+The doctor only reads. It prints `ok <what>` for each passing check and `MISSING <what>: <fix>` for each gap. The last line is `doctor: <n> missing`. The doctor exits 1 when `n` is above 0. A check that does not apply prints `ok` with the reason, for example `ok github.com host key (not needed: gh not found)`. A `WARN <what>: <fix>` line reports a gap that does not count in `n`. The doctor runs eight checks:
 
 | # | Check | The fix that the MISSING line names |
 |---|---|---|
@@ -188,6 +188,7 @@ The doctor only reads. It prints `ok <what>` for each passing check and `MISSING
 | 5 | When `gh` uses the SSH protocol, `~/.ssh/known_hosts` holds a `github.com` key | `bash ~/anaiis-dotfiles/install.sh --hostkeys-only` |
 | 6 | When `claude` is on PATH, its version is at least 2.1.295 (the first version that supports `onFailure` for `PreToolUse` guards) | Update Claude Code |
 | 7 | `settings.json` pins `env.CLAUDE_CODE_SHELL` to an executable bash whose major version is in `APPROVED_BASH_MAJORS`, and every command in it starts with `${CLAUDE_CODE_SHELL:-bash}` | Set the pin, install an approved bash, or approve the major (see "Bash baseline") |
+| 8 | `sqlfmt` runs, on PATH or in `~/.local/bin` (a `WARN` line that does not count as missing when it is absent or does not run; the hooks then skip SQL formatting) | `uv tool install shandy-sqlfmt` |
 
 The eight links in check 3 are `settings.json`, `keybindings.json`, `rules`, `commands`, `skills`, `agents`, `hooks`, and `scripts`. Check 4 needs `jq`. Without `jq` the doctor prints `MISSING jq (needed to read the plugin list): brew install jq`.
 
@@ -501,6 +502,8 @@ It adds two inheritable ACL entries for group `admin` to the prefix, one for dir
 ```bash
 bash ~/anaiis-dotfiles/claude/scripts/brew-sync.sh install
 ```
+
+`brew bundle` installs the `uv` entries, such as `shandy-sqlfmt`, with `uv tool install`. uv tools are per user: they go in `~/.local/bin` of each profile, not in the shared Homebrew prefix. Each profile runs the install once. Doctor check 8 prints a `WARN` line when sqlfmt is absent.
 
 The `graphify` skill is served by the `anaiis-data` marketplace plugin. Nothing to install per machine.
 
