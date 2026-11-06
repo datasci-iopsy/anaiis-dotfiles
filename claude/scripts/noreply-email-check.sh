@@ -10,7 +10,8 @@
 #           environment, the -c options, and the config.
 #   push    (repo-pre-push.sh) reads git's pre-push lines on stdin and checks the
 #           author and committer email of every commit that the push sends. This
-#           also covers --author and amended commits, which staged mode may not see.
+#           also covers commits that never ran pre-commit: --no-verify, merges,
+#           rebases, and cherry-picks.
 #
 # Accepted: <id>+<login>@users.noreply.github.com, <login>@users.noreply.github.com
 # (a [bot] suffix allowed), and noreply@github.com (commits made on GitHub).
