@@ -4,13 +4,15 @@
 # Usage: bash ~/.claude/scripts/bootstrap-doctor.sh
 #
 # Prints `ok <what>` or `MISSING <what>: <fix command>` for each check, then `doctor: <n> missing`.
+# A `WARN <what>: <fix command>` line reports a gap that does not count in n.
 # Exits 1 when n is above 0. The script writes nothing: it only reads files and runs read-only
 # commands, so it is safe to run at any time.
 #
 # Checks:
 #   1. ~/.bashrc exists and holds the PATH line and the shared.bash source line
 #   2. the login shell file (the first of ~/.bash_profile, ~/.bash_login, ~/.profile) mentions ~/.bashrc
-#   3. each ~/.claude link resolves to its own target in ~/anaiis-dotfiles/claude/
+#   3. each ~/.claude link resolves to its own target in ~/anaiis-dotfiles/claude/, and
+#      ~/.claude/memory is a local folder (WARN when it is absent or still a link)
 #
 # In checks 1 and 2 a line that starts with # does not count: the shell never reads it.
 # In check 2 the name must end at .bashrc: a line that sources only .bashrc.local does not count.
@@ -36,6 +38,7 @@ missing() {
 	printf 'MISSING %s: %s\n' "$1" "$2"
 	MISSING=$((MISSING + 1))
 }
+warn() { printf 'WARN %s: %s\n' "$1" "$2"; }
 
 FIX_BASHRC='bash ~/anaiis-dotfiles/install.sh --bashrc-only'
 FIX_LINKS='bash ~/anaiis-dotfiles/install.sh --symlinks-only'
@@ -104,7 +107,7 @@ fi
 # ---- 3. ~/.claude links -----------------------------------------------------
 root=""
 [ -e "$HOME/anaiis-dotfiles/claude" ] && root="$(phys "$HOME/anaiis-dotfiles/claude")"
-for name in settings.json keybindings.json rules commands skills agents hooks scripts memory; do
+for name in settings.json keybindings.json rules commands skills agents hooks scripts; do
 	link="$HOME/.claude/$name"
 	if [ ! -L "$link" ]; then
 		if [ -e "$link" ]; then why="not a link"; else why="absent"; fi
@@ -126,6 +129,17 @@ for name in settings.json keybindings.json rules commands skills agents hooks sc
 		missing "~/.claude/$name ($why)" "$FIX_LINKS"
 	fi
 done
+# ~/.claude/memory is a local folder, not a link into the repo. A new machine has no memory yet, so
+# an absent folder is a WARN, not a gap. A link is the old layout that install.sh converts.
+if [ -L "$HOME/.claude/memory" ]; then
+	warn "~/.claude/memory (a link, not a local folder)" "$FIX_LINKS"
+elif [ -d "$HOME/.claude/memory" ]; then
+	ok "~/.claude/memory (local folder)"
+elif [ -e "$HOME/.claude/memory" ]; then
+	warn "~/.claude/memory (not a folder)" "back it up and remove it, then $FIX_LINKS"
+else
+	warn "~/.claude/memory (absent)" "$FIX_LINKS"
+fi
 
 # ---- 4. plugins -------------------------------------------------------------
 settings="$HOME/.claude/settings.json"

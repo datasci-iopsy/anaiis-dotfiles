@@ -3,7 +3,9 @@
 # Run once on a new machine (or after moving the repo) to:
 #   1. Create ~/anaiis-dotfiles as a canonical symlink to wherever this repo lives
 #   2. Symlink the Claude policy stack into ~/.claude/, and remove the old
-#      CLAUDE.md link from that folder (rules/context.md replaces the file)
+#      CLAUDE.md link from that folder (rules/context.md replaces the file).
+#      ~/.claude/memory is a local folder, not a link: a link becomes a folder
+#      that holds a copy of its data
 #   3. Wire PATH and source shared.bash into ~/.bashrc
 #   4. Add the GitHub host keys to ~/.ssh/known_hosts (SSH git protocol only)
 # Safe to re-run: idempotent.
@@ -53,7 +55,8 @@ symlink() {
 	elif [ -e "$dst" ] && [ ! -L "$dst" ]; then
 		echo "  SKIP $dst (real file exists, back it up and remove it first)"
 	else
-		ln -sf "$src" "$dst"
+		# -n: replace a link to a folder; do not make a new link inside that folder.
+		ln -sfn "$src" "$dst"
 		echo "  link $dst -> $src"
 	fi
 }
@@ -82,6 +85,37 @@ remove_old_claude_md_link() {
 		esac
 	elif [ -e "$link" ]; then
 		echo "  note  $link is a real file. Claude Code still reads it. Left in place."
+	fi
+}
+
+# Keep $HOME/.claude/memory as a local folder, not a link into the repo. Once the repo stops tracking
+# claude/memory/, a git pull deletes the data behind a link. The function copies before it removes,
+# and it never deletes memory data.
+ensure_local_memory() {
+	local dst="$HOME/.claude/memory" target tmp
+	if [ -L "$dst" ]; then
+		target="$(readlink "$dst")"
+		if [ -d "$dst" ]; then
+			# Copy into a temp folder next to the link first. If the copy fails, set -e stops here and the link stays.
+			tmp="$(mktemp -d "$dst.tmp.XXXXXX")"
+			cp -Rp "$dst/." "$tmp/"
+			rm "$dst"
+			mv "$tmp" "$dst"
+			echo "  migrated $dst (copied from $target, now a local folder)"
+		else
+			rm "$dst"
+			mkdir -p "$dst"
+			printf '# Global Memory Index\n' >"$dst/MEMORY.md"
+			echo "  WARN $dst linked to $target, which is gone. Made a folder with an empty MEMORY.md index. Recover the old files with: git -C $CANONICAL archive \"\$(git -C $CANONICAL rev-list -n1 HEAD -- claude/memory)^\" claude/memory | tar -x --strip-components=2 -C $dst"
+		fi
+	elif [ -d "$dst" ]; then
+		echo "  ok   $dst (local folder)"
+	elif [ -e "$dst" ]; then
+		echo "  SKIP $dst (real file exists, back it up and remove it first)"
+	else
+		mkdir -p "$dst"
+		printf '# Global Memory Index\n' >"$dst/MEMORY.md"
+		echo "  created $dst (empty MEMORY.md index)"
 	fi
 }
 
@@ -250,7 +284,7 @@ symlink "$CANONICAL/claude/skills" "$HOME/.claude/skills"
 symlink "$CANONICAL/claude/agents" "$HOME/.claude/agents"
 symlink "$CANONICAL/claude/hooks" "$HOME/.claude/hooks"
 symlink "$CANONICAL/claude/scripts" "$HOME/.claude/scripts"
-symlink "$CANONICAL/claude/memory" "$HOME/.claude/memory"
+ensure_local_memory
 
 if [ "$MODE" = "--symlinks-only" ]; then
 	echo ""

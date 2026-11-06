@@ -2,8 +2,8 @@
 
 Mined from all locally retained Claude Code session transcripts across every project
 (`~/.claude/projects/*/*.jsonl`), not just this repo: 13,558 Bash tool_use commands and
-1,764 Read/Edit/Write tool_use calls in total. Backs the item 3 and item 4 fixes in
-`tasks/plan.md` with real data instead of a guessed posture.
+1,764 Read/Edit/Write tool_use calls in total. Backs two guards with real data instead of a guessed posture:
+Fix 3 (`claude/hooks/block-sensitive-writes.sh`) and Fix 4 (the env dump check in `claude/hooks/bash-guard.sh`).
 
 ## env / printenv piping (informs Fix 4)
 
