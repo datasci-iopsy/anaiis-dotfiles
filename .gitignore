@@ -14,6 +14,9 @@
 # Machine-local Claude rule files (see claude/rules/context.md)
 claude/rules/*.local.md
 
+# Global memory is a local folder in each profile (~/.claude/memory); a copy placed here stays out of git
+claude/memory/
+
 # Local Claude session artifacts
 .claude/
 

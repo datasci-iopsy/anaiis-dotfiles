@@ -106,7 +106,7 @@ ensure_local_memory() {
 			rm "$dst"
 			mkdir -p "$dst"
 			printf '# Global Memory Index\n' >"$dst/MEMORY.md"
-			echo "  WARN $dst linked to $target, which is gone. Made a folder with an empty MEMORY.md index. Recover the old files with: git -C $CANONICAL archive \"\$(git -C $CANONICAL rev-list -n1 HEAD -- claude/memory)^\" claude/memory | tar -x --strip-components=2 -C $dst"
+			echo "  WARN $dst linked to $target, which is gone. Made a folder with an empty MEMORY.md index. If the old clone still exists (for example ~/anaiis-dotfiles.old), copy its claude/memory files into $dst. If the clone at $CANONICAL still holds the history of claude/memory, run: git -C $CANONICAL archive \"\$(git -C $CANONICAL rev-list -n1 HEAD -- claude/memory)^\" claude/memory | tar -x --strip-components=2 -C $dst"
 		fi
 	elif [ -d "$dst" ]; then
 		echo "  ok   $dst (local folder)"

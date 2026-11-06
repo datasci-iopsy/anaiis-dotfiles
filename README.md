@@ -56,7 +56,6 @@ anaiis-dotfiles/
 │   ├── agents/                     → ~/.claude/agents/   Intentionally empty; skill agents live in the plugin cache
 │   ├── hooks/                      → ~/.claude/hooks/   Hook scripts (referenced by settings.json)
 │   ├── scripts/                    → ~/.claude/scripts/   Utility scripts (bootstrap-doctor.sh, brew-sync.sh, brew-share.sh, commit-msg-lint.sh, install-repo-hooks.sh, noreply-email-check.sh, rules-doctor.sh, seed-memory.sh, usage-report.sh, lint-staged dispatchers)
-│   ├── memory/                     Former global memory tier, no longer linked (install.sh copies it once into a local ~/.claude/memory)
 │   └── memory-templates/           Project-tier templates copied by seed-memory.sh (MEMORY.md, project_current_phase.md)
 ├── templates/
 │   ├── dashboard/                  anaiis-dashboard: manifest validator, bootstrap.js, inline helper, Playwright spec
