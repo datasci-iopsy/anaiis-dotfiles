@@ -285,8 +285,8 @@ assert_eq "8.10 second run: no change line" 0 "$(printf '%s\n' "$OUT" | grep -cE
 assert_eq "8.11 second run: the HOME snapshot is identical" "$SNAP8" "$(snapshot "$H8")"
 
 echo "--- 9. a dangling memory link"
-# The data is gone, so install.sh cannot copy it. It writes an empty index and names the git command
-# that recovers the old files.
+# The data is gone, so install.sh cannot copy it. It writes an empty index and tells the user to copy
+# the files from the old clone. The repo keeps no memory in its history, so no git command recovers them.
 H9="$(mktemp -d "$TMPD/home.XXXXXX")"
 mkdir -p "$H9/.claude"
 ln -s "$TMPD/no-such-memory" "$H9/.claude/memory"
@@ -295,8 +295,10 @@ assert_eq "9.1 dangling: exit code is 0" 0 "$RC"
 assert_eq "9.2 dangling: the path is now a real folder" yes \
 	"$([ -d "$H9/.claude/memory" ] && [ ! -L "$H9/.claude/memory" ] && echo yes || echo no)"
 assert_eq "9.3 dangling: the folder holds only the empty MEMORY.md index" "MEMORY.md" "$(cd "$H9/.claude/memory" && find . -mindepth 1 | sed 's|^\./||' 2>&1)"
-assert_eq "9.4 dangling: one WARN line names the recovery command" 1 \
-	"$(printf '%s\n' "$OUT" | grep -c "^  WARN $H9/.claude/memory .*git -C .* archive .*claude/memory")"
+assert_eq "9.4 dangling: one WARN line says to copy the files from the old clone" 1 \
+	"$(printf '%s\n' "$OUT" | grep -c "^  WARN $H9/.claude/memory .*old clone.*copy its claude/memory files into $H9/.claude/memory")"
+assert_eq "9.4b dangling: the WARN line names no git command" 0 \
+	"$(printf '%s\n' "$OUT" | grep '^  WARN ' | grep -c 'git -C')"
 
 H9="$(mktemp -d "$TMPD/home.XXXXXX")"
 mkdir -p "$H9/.claude"
