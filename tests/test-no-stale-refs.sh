@@ -13,6 +13,8 @@
 # Docs: README.md and AGENTS.md are scanned like every other file, so they name no dead token. A
 # second check (section 3) requires each backticked path in the two files that starts with claude/,
 # tests/, bash/, or bin/ to exist in git ls-files. A doc cannot name a file that the repo lacks.
+# A third check (section 4) is the other way round: the README tests tree lists every tracked
+# tests/*.sh file, so a new suite cannot stay out of the docs.
 #
 # Usage: bash tests/test-no-stale-refs.sh
 
@@ -87,6 +89,18 @@ doc_path_misses() {
 	done
 }
 
+# tests_tree_misses <repo_dir>: print each tracked tests/*.sh file (top level only) that the tests
+# tree of README.md does not list. The tree starts at the line "├── tests/" and ends at the first
+# line that does not start with "│". The name of an entry is the word after its last "── ".
+tests_tree_misses() {
+	local repo="$1" listed f
+	listed="$(awk '/^├── tests\// { on = 1; next } on && !/^│/ { exit } on' "$repo/README.md" \
+		| sed -n 's/.*── \([^ ]*\).*/\1/p')"
+	git -C "$repo" ls-files -- 'tests/*.sh' | sed -n 's|^tests/\([^/]*\)$|\1|p' | while IFS= read -r f; do
+		printf '%s\n' "$listed" | grep -qxF -- "$f" || printf '%s\n' "$f"
+	done
+}
+
 # ── 0. The scanner catches what it guards (fail-to-fail) ───────────────────
 echo "# 0. The scanner fails on a tree that still holds a dead token"
 FIX="$(mktemp -d "${TMPDIR:-/tmp}/test-no-stale-refs.XXXXXX")"
@@ -152,6 +166,20 @@ printf 'x\n' >"$FIX4/claude/untracked.sh"
 printf 'disk only `claude/untracked.sh`\n' >"$FIX4/disk.md"
 assert "0.10 a file on disk that git does not track is reported" "claude/untracked.sh" "$(doc_path_misses "$FIX4" "$FIX4/disk.md")"
 
+# The tests tree check reads only the tests/ block of the README and only top-level tracked suites.
+FIX5="$(mktemp -d "${TMPDIR:-/tmp}/test-no-stale-refs.XXXXXX")"
+trap 'rm -rf "$FIX" "$FIX2" "$FIX3" "$FIX4" "$FIX5"' EXIT
+git init -q --template= "$FIX5"
+mkdir -p "$FIX5/tests/lib"
+for f in tests/a.sh tests/b.sh tests/c.sh tests/lib/h.sh; do printf 'x\n' >"$FIX5/$f"; done
+git -C "$FIX5" add tests
+printf 'x\n' >"$FIX5/tests/untracked.sh"
+printf '%s\n' '```' '├── other/' '│   └── b.sh            listed under another folder' '├── tests/' \
+	'│   ├── lib/            helpers' '│   ├── a.sh            a suite' '│   └── c.sh' '```' >"$FIX5/README.md"
+assert "0.11 a tracked suite that only another folder lists is reported" "b.sh" "$(tests_tree_misses "$FIX5")"
+printf '%s\n' '├── tests/' '│   ├── a.sh' '│   ├── b.sh' '│   └── c.sh' >"$FIX5/README.md"
+assert "0.12 a tree that lists every top-level tracked suite passes" "" "$(tests_tree_misses "$FIX5")"
+
 # ── 1. The graphify step is gone ───────────────────────────────────────────
 echo "# 1. The graphify step is gone"
 assert "1.1 .gitmodules is not tracked" "" "$(git -C "$REPO_DIR" ls-files .gitmodules)"
@@ -167,6 +195,10 @@ assert "2.1 no tracked file holds a dead token" "" "$(stale_hits "$REPO_DIR")"
 echo "# 3. README.md and AGENTS.md name only tracked repo paths"
 assert "3.1 README.md names only tracked paths" "" "$(doc_path_misses "$REPO_DIR" "$REPO_DIR/README.md")"
 assert "3.2 AGENTS.md names only tracked paths" "" "$(doc_path_misses "$REPO_DIR" "$REPO_DIR/AGENTS.md")"
+
+# ── 4. The README tests tree lists every suite ─────────────────────────────
+echo "# 4. The README tests tree lists every tracked tests/*.sh file"
+assert "4.1 no tracked tests/*.sh file is missing from the README tests tree" "" "$(tests_tree_misses "$REPO_DIR")"
 
 printf '\ntest-no-stale-refs: %s passed, %s failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

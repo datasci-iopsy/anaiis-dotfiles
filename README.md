@@ -17,7 +17,7 @@
 **Install in 60 seconds.**
 
 ```bash
-git clone git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/anaiis-dotfiles
+git clone git@github.com:anaiis-io/anaiis-dotfiles.git ~/anaiis-dotfiles
 bash ~/anaiis-dotfiles/install.sh
 ```
 
@@ -64,12 +64,14 @@ anaiis-dotfiles/
 ├── tests/
 │   ├── fixtures/                   Test fixture files
 │   ├── lib/                        Test helpers: fresh-home.sh (throwaway HOME), cov.sh (approximate line coverage from xtrace)
+│   ├── e2e-bash-shell.sh           Opt-in (`E2E=1`) check of which bash runs the Bash tool and the hooks in real Claude Code sessions
 │   ├── e2e-local-memory.sh         Opt-in (`E2E=1`) check that a real `claude -p` session loads global memory from a local `~/.claude/memory` folder
 │   ├── e2e-nested-session.sh       Opt-in (`E2E=1`) hook checks in real nested `claude -p` sessions; `E2E_OLD_REF=<ref>` replays them against older hooks
 │   ├── measure-memory-injection.sh  Memory injection overhead measurement
 │   ├── measure-userpromptsubmit.sh  Hook-latency measurement (run when chain grows)
 │   ├── run-all.sh                  Runs the full test suite
 │   ├── SMOKE-TESTS.md              Manual smoke test scenarios
+│   ├── test-bash-baseline.sh       The harness runs on one approved Homebrew bash major
 │   ├── test-bash-guard.sh          bash-guard.sh deny/allow/ask assertions (destructive cmds, secrets path blocking, env-dump blocking, prefer-jq, recursive-rm scoping, uv add/pip install notice)
 │   ├── test-block-sensitive-writes.sh   block-sensitive-writes.sh deny/allow assertions
 │   ├── test-bootstrap-doctor.sh    bootstrap-doctor.sh: an ok line or a MISSING line for each check, and the exit code
@@ -89,13 +91,17 @@ anaiis-dotfiles/
 │   ├── test-memory-doctor-guardrails.sh  Proves memory-doctor.sh checks I-M fail-then-pass
 │   ├── test-memory-hooks.sh        Memory seed hook and marker-pruning assertions
 │   ├── test-migrate-memory-guard.sh  migrate-memory.sh dry-run-default and template-stub-refusal assertions
+│   ├── test-no-rtk.sh              A removed tool appears in no tracked file except one Brewfile line
 │   ├── test-noreply-email-check.sh  noreply-email-check.sh: commit and push checks in a repo with the opt-in marker
 │   ├── test-no-stale-refs.sh       No tracked file names a removed thing; README.md and AGENTS.md name only tracked repo paths
 │   ├── test-post-edit-lint-dispatch.sh  PostToolUse lint hook dispatch tests
+│   ├── test-public-tree.sh         No tracked file names the old repo, a private email address, or an employer term
 │   ├── test-r-lint-staged.sh       r-lint-staged.sh assertions
 │   ├── test-repo-hook-install.sh   install-repo-hooks.sh and ensure-repo-hooks.sh: three hooks in a plain repo, a linked worktree, and a core.hooksPath repo
 │   ├── test-rules-integrity.sh     rules-doctor.sh passes a green tree and names each targeted check when every drift is applied at once
+│   ├── test-safe-rm.sh             safe-rm.sh, the run-time guard for rm
 │   ├── test-session-start-context.sh  session-start-context.sh additionalContext delivery assertions
+│   ├── test-shared-bash-aliases.sh  The claude-* aliases in bash/shared.bash match their model exports
 │   ├── test-staged-lint-dispatch.sh     Pre-commit staged-lint hook dispatch tests
 │   ├── test-statusline-context-bridge.sh  statusline pct-file write and 60% marker assertions
 │   └── test-stop-hook-git-check.sh  stop-hook-git-check.sh exit-code assertions
@@ -110,7 +116,7 @@ Do the steps in this order. Steps 1 to 5 prepare the machine. Steps 6 and 7 appl
 ### 1. Clone
 
 ```bash
-git clone git@github.com:datasci-iopsy/anaiis-dotfiles.git ~/anaiis-dotfiles
+git clone git@github.com:anaiis-io/anaiis-dotfiles.git ~/anaiis-dotfiles
 ```
 
 ### 2. Run the installer
