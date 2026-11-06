@@ -271,6 +271,16 @@ assert "7.2 no tracked doc says the env block sets the git identity" "" \
 		-e 'Git author identity is set via' -e 'commit authorship is set via env vars' \
 		-- ':(exclude)tests/test-rules-integrity.sh' | tr '\n' ' ')"
 
+# ── 8. The repo tracks no global memory ──────────────────────────────────
+# Why: ~/.claude/memory is a local folder in each profile (install.sh keeps it so). A tracked
+# claude/memory/ would publish the notes of one profile in the public repo. The .gitignore entry keeps
+# a copy that a profile places there out of git.
+echo "# 8. No tracked global memory"
+assert "8.1 no tracked path starts with claude/memory/" "" \
+	"$(git -C "$REPO_DIR" ls-files -- claude/memory | tr '\n' ' ')"
+assert "8.2 .gitignore ignores claude/memory/" yes \
+	"$(git -C "$REPO_DIR" check-ignore -q claude/memory/probe.md && echo yes || echo no)"
+
 # ── Summary ───────────────────────────────────────────────────────────────
 echo
 echo "──────────────────────────────────────────────"
