@@ -4,7 +4,7 @@
 
 **Shell config.** `bash/shared.bash` is the tracked, portable shell config (PATH, aliases, tool inits, prompt). It is sourced by `~/.bashrc`, which is machine-local and not tracked. The wiring on each machine follows a three-file hierarchy. The files load in this order: `~/.bash_profile` (entry point only, sources `~/.bashrc`) -> `~/.bashrc` (sources `shared.bash`, then `~/.bashrc.local`) -> `~/.bashrc.local` (secrets and machine overrides, gitignored). Never add config to `~/.bash_profile` directly; put portable things in `shared.bash` and machine-local secrets in `~/.bashrc.local`. `install.sh` writes the PATH line and the `shared.bash` source line into `~/.bashrc`. It does not add a line that sources `~/.bashrc.local`. Add that line yourself, after the `shared.bash` line, for example `[ -f "$HOME/.bashrc.local" ] && . "$HOME/.bashrc.local"`. Without it, nothing loads `~/.bashrc.local`.
 
-**Configuration homes.** Dials (model, effort, limits, plugin levels) live in `bash/shared.bash` as exports and aliases. Wiring that must hold in every launch path (the shell pin, git identity) lives in the `env` block of `claude/settings.json`. Preferences and structured config live in the other `settings.json` keys. A name never appears in both `shared.bash` and the `env` block, because the `env` value overwrites the shell value. `claude/settings.json` holds no `model`, `effortLevel`, or `modelSettings` key. `rules/environment.md` (section "Configuration homes") has the table and the reasons, and `rules-doctor.sh` check I enforces the two rules that a machine can check.
+**Configuration homes.** Dials (model, effort, limits, plugin levels) live in `bash/shared.bash` as exports and aliases. Wiring that must hold in every launch path (the shell pin) lives in the `env` block of `claude/settings.json`. The git identity is not set here: each machine sets it in its git config (step 6 of "Setup on a new machine"). Preferences and structured config live in the other `settings.json` keys. A name never appears in both `shared.bash` and the `env` block, because the `env` value overwrites the shell value. `claude/settings.json` holds no `model`, `effortLevel`, or `modelSettings` key. `rules/environment.md` (section "Configuration homes") has the table and the reasons. `rules-doctor.sh` check I enforces two of its rules, and `tests/test-rules-integrity.sh` (section 7) enforces the rule for the git identity.
 
 **Instruction files.** `AGENTS.md` is the only instruction file in this repo. No `CLAUDE.md` is tracked. The global instructions live in `claude/rules/context.md` and the other rule files, which Claude Code loads from `~/.claude/rules/`.
 
@@ -21,7 +21,7 @@ git clone git@github.com:anaiis-io/anaiis-dotfiles.git ~/anaiis-dotfiles
 bash ~/anaiis-dotfiles/install.sh
 ```
 
-That installs the Claude policy stack, wires `~/.bashrc`, and adds the GitHub host keys when `gh` uses SSH. Then follow steps 3 to 5 of "Setup on a new machine" below. Open a new terminal, start Claude Code once, run `/reload-plugins`, and run the doctor.
+That installs the Claude policy stack, wires `~/.bashrc`, and adds the GitHub host keys when `gh` uses SSH. Then follow steps 3 to 6 of "Setup on a new machine" below. Open a new terminal, start Claude Code once, run `/reload-plugins`, run the doctor, and set the git identity.
 
 ---
 
@@ -32,6 +32,8 @@ anaiis-dotfiles/
 ├── install.sh                      Symlinks claude/* into ~/.claude/; wires the shell config; adds GitHub host keys
 ├── README.md                       This file
 ├── AGENTS.md                       Project instructions for Claude Code sessions in this repo
+├── LICENSE                         Apache License 2.0
+├── NOTICE                          Attribution notice that Apache-2.0 section 4(d) makes a redistributor keep
 ├── Brewfile                        Homebrew formulae, casks, taps; the daily refresh in shared.bash only adds entries
 ├── .conventional-commits           Opt-in marker: turns on the commit message lint in this repo
 ├── .require-noreply-email          Opt-in marker: commits here must use a GitHub noreply email
@@ -65,6 +67,7 @@ anaiis-dotfiles/
 │   ├── fixtures/                   Test fixture files
 │   ├── lib/                        Test helpers: fresh-home.sh (throwaway HOME), cov.sh (approximate line coverage from xtrace)
 │   ├── e2e-bash-shell.sh           Opt-in (`E2E=1`) check of which bash runs the Bash tool and the hooks in real Claude Code sessions
+│   ├── e2e-git-identity.sh         Opt-in (`E2E=1`) check in real `claude -p` sessions that the settings env block leaves the git identity of the repo in place
 │   ├── e2e-local-memory.sh         Opt-in (`E2E=1`) check that a real `claude -p` session loads global memory from a local `~/.claude/memory` folder
 │   ├── e2e-nested-session.sh       Opt-in (`E2E=1`) hook checks in real nested `claude -p` sessions; `E2E_OLD_REF=<ref>` replays them against older hooks
 │   ├── measure-memory-injection.sh  Memory injection overhead measurement
@@ -111,7 +114,7 @@ anaiis-dotfiles/
 
 ## Setup on a new machine
 
-Do the steps in this order. Steps 1 to 5 prepare the machine. Steps 6 and 7 apply to each project.
+Do the steps in this order. Steps 1 to 6 prepare the machine. Steps 7 and 8 apply to each project.
 
 ### 1. Clone
 
@@ -174,7 +177,7 @@ Start Claude Code once in a trusted folder. Then run `/reload-plugins` inside Cl
 bash ~/.claude/scripts/bootstrap-doctor.sh
 ```
 
-The doctor only reads. It prints `ok <what>` for each passing check and `MISSING <what>: <fix>` for each gap. The last line is `doctor: <n> missing`. The doctor exits 1 when `n` is above 0. A check that does not apply prints `ok` with the reason, for example `ok github.com host key (not needed: gh not found)`. The doctor runs seven checks:
+The doctor only reads. It prints `ok <what>` for each passing check and `MISSING <what>: <fix>` for each gap. The last line is `doctor: <n> missing`. The doctor exits 1 when `n` is above 0. A check that does not apply prints `ok` with the reason, for example `ok github.com host key (not needed: gh not found)`. A `WARN <what>: <fix>` line reports a gap that does not count in `n`. The doctor runs eight checks:
 
 | # | Check | The fix that the MISSING line names |
 |---|---|---|
@@ -185,12 +188,24 @@ The doctor only reads. It prints `ok <what>` for each passing check and `MISSING
 | 5 | When `gh` uses the SSH protocol, `~/.ssh/known_hosts` holds a `github.com` key | `bash ~/anaiis-dotfiles/install.sh --hostkeys-only` |
 | 6 | When `claude` is on PATH, its version is at least 2.1.295 (the first version that supports `onFailure` for `PreToolUse` guards) | Update Claude Code |
 | 7 | `settings.json` pins `env.CLAUDE_CODE_SHELL` to an executable bash whose major version is in `APPROVED_BASH_MAJORS`, and every command in it starts with `${CLAUDE_CODE_SHELL:-bash}` | Set the pin, install an approved bash, or approve the major (see "Bash baseline") |
+| 8 | `sqlfmt` runs, on PATH or in `~/.local/bin` (a `WARN` line that does not count as missing when it is absent or does not run; the hooks then skip SQL formatting) | `uv tool install shandy-sqlfmt` |
 
 The eight links in check 3 are `settings.json`, `keybindings.json`, `rules`, `commands`, `skills`, `agents`, `hooks`, and `scripts`. Check 4 needs `jq`. Without `jq` the doctor prints `MISSING jq (needed to read the plugin list): brew install jq`.
 
 Do not use `claude plugin list` as the check. The doctor reads the plugin cache folders (check 4). A plugin shows MISSING until Claude Code has fetched it, so run the doctor after step 4.
 
-### 6. Per-project memory bootstrap
+### 6. Set the git identity
+
+The dotfiles set no git identity. Set it once in the global git config of each machine:
+
+```bash
+git config --global user.name "<name>"
+git config --global user.email "<id>+<login>@users.noreply.github.com"
+```
+
+`<id>` is the numeric id of your GitHub account, and `<login>` is its login. Claude Code sessions use the same git config: `claude/settings.json` sets no `GIT_AUTHOR_*` or `GIT_COMMITTER_*` variable, and a value there would override the git config of every repo. To use another identity in one repo, run the same commands there without `--global`. In this repo, a pre-commit check rejects a commit whose email is not a GitHub noreply address. The `attribution` block of `claude/settings.json` controls only the `Co-Authored-By` trailer, not the author.
+
+### 7. Per-project memory bootstrap
 
 Run once from each project root you'll use Claude in:
 
@@ -201,7 +216,7 @@ bash ~/.claude/scripts/seed-memory.sh
 
 In Claude Code, `/seed-project` runs the same script. Then edit `~/.claude/projects/<encoded-path>/memory/project_current_phase.md`.
 
-### 7. Repo hooks: pre-commit lint, pre-push tests, commit-msg lint
+### 8. Repo hooks: pre-commit lint, pre-push tests, commit-msg lint
 
 Three dispatcher hooks go into every repo:
 
@@ -446,21 +461,6 @@ bash ~/.claude/scripts/usage-report.sh --since 2026-04-01 --until 2026-04-30 --j
 
 ---
 
-## Git author identity
-
-Claude-driven commit authorship is set via env vars in `claude/settings.json`:
-
-```json
-"env": {
-    "GIT_AUTHOR_NAME": "datasci-iopsy",
-    "GIT_COMMITTER_NAME": "datasci-iopsy"
-}
-```
-
-These override `git config`. The `attribution.commit` field (currently `""`) controls Co-Authored-By trailers only, it does not affect author name.
-
----
-
 ## Homebrew packages
 
 A `Brewfile` at the repo root tracks all formulae, casks, and taps. Three commands cover the full lifecycle:
@@ -503,6 +503,8 @@ It adds two inheritable ACL entries for group `admin` to the prefix, one for dir
 bash ~/anaiis-dotfiles/claude/scripts/brew-sync.sh install
 ```
 
+`brew bundle` installs the `uv` entries, such as `shandy-sqlfmt`, with `uv tool install`. uv tools are per user: they go in `~/.local/bin` of each profile, not in the shared Homebrew prefix. Each profile runs the install once. Doctor check 8 prints a `WARN` line when sqlfmt is absent.
+
 The `graphify` skill is served by the `anaiis-data` marketplace plugin. Nothing to install per machine.
 
 R packages (global, not renv-managed):
@@ -519,3 +521,11 @@ install.packages(c("lintr", "styler", "languageserver"))
 2. Add a `symlink` line to `install.sh`.
 3. Run `install.sh` once to create the new symlink.
 4. Commit and push.
+
+---
+
+## License
+
+Anaiis LLC licenses this repo under the Apache License 2.0. The full text is in `LICENSE`.
+If you redistribute this work, keep the attribution notice in `NOTICE`, as section 4(d) of the license requires.
+The license covers this repo only. `anaiis-plugins` and any other plugin marketplace this repo registers are not part of this repo and are not covered by this license; see each source repo for its terms.

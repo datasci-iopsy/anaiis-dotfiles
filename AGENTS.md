@@ -34,7 +34,7 @@ Three-file hierarchy (none are symlinked; all machine-local except `shared.bash`
 | `~/.bashrc` | No | Machine-specific wiring: sources `shared.bash`, machine extras, then `~/.bashrc.local`. |
 | `~/.bashrc.local` | No (gitignored) | Secrets and machine-specific overrides (API keys, project IDs). Never re-source `shared.bash` here. |
 
-Claude Code values follow `claude/rules/environment.md`, section "Configuration homes". Dials (model, effort, limits) go in `shared.bash`. Wiring (the shell pin, git identity) goes in the `env` block of `claude/settings.json`. A name never appears in both.
+Claude Code values follow `claude/rules/environment.md`, section "Configuration homes". Dials (model, effort, limits) go in `shared.bash`. Wiring (the shell pin) goes in the `env` block of `claude/settings.json`. A name never appears in both. The dotfiles set no git identity: each machine sets it in its own git config.
 
 ## Bash baseline
 
