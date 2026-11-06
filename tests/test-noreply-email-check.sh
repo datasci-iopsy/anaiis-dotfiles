@@ -57,9 +57,12 @@ ZERO=0000000000000000000000000000000000000000
 
 # make_repo <dir> <marker 0|1>: a repo with a noreply identity in its config, a
 # stub tests/run-all.sh that drops .suite-ran, one initial commit, and the
-# shims from the real installer.
-make_repo() {
+# shims from the real installer. It runs in a subshell under the throwaway HOME,
+# so global git settings (core.hooksPath, init.templateDir) and real hooks never
+# touch the fixture or the real ~/.claude.
+make_repo() (
 	local dir="$1" marker="$2"
+	export HOME="$TMP_HOME"
 	mkdir -p "$dir/tests"
 	git -C "$dir" init -q -b main
 	git -C "$dir" config user.name "Octo"
@@ -72,8 +75,8 @@ make_repo() {
 		git -C "$dir" add .require-noreply-email
 	fi
 	git -C "$dir" commit -q -m init
-	(cd "$dir" && HOME="$TMP_HOME" bash "$INSTALLER" >/dev/null 2>&1)
-}
+	cd "$dir" && bash "$INSTALLER" >/dev/null 2>&1
+)
 
 # try_commit <dir> <command...>: run the command in <dir> with the throwaway
 # HOME; print "accepted" when HEAD moved, "rejected" when it did not.
